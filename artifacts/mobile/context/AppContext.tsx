@@ -771,7 +771,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const created = await apiPost<{ id: string }>('/db-connections', body);
       const result = await apiPost<{ success: boolean }>(`/db-connections/${created.id}/test`, {});
       if (result.success) {
-        await apiPost(`/db-connections/${created.id}/activate`, {});
+        const activation = await apiPost<{ success: boolean; message?: string }>(`/db-connections/${created.id}/activate`, {});
+        if (!activation.success) throw new Error(activation.message ?? 'The database could not be activated.');
         await AsyncStorage.removeItem(PENDING_CONFIG_KEY);
         console.log('[AppContext] Pending DB config synced and activated.');
       } else {
