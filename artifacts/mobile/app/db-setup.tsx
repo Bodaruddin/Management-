@@ -302,7 +302,8 @@ export default function DbSetupScreen() {
         });
         const result = await apiFetch<TestResult>(`/db-connections/${created.id}/test`, { method: 'POST' });
         if (result.success) {
-          await apiFetch(`/db-connections/${created.id}/activate`, { method: 'POST' });
+          const activation = await apiFetch<{ success: boolean; message?: string }>(`/db-connections/${created.id}/activate`, { method: 'POST' });
+          if (!activation.success) throw new Error(activation.message ?? 'The database could not be activated.');
           await clearLocalConfig(); // synced — no need to retry later
           syncedToApi = true;
         } else {
