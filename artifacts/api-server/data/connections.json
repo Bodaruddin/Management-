@@ -1,0 +1,25 @@
+{
+  "activeId": "6d12fbfe-6bed-4e9a-8bb3-7cdb579e3d7f",
+  "connections": [
+    {
+      "dbType": "postgresql",
+      "id": "env",
+      "name": "Environment Database",
+      "encryptedUrl": "7c48e504d3e6f83a8b3398bc27a5e81b:c374da981e43258a42f7f8a04a4aa495f3028272d8c2608aa8d682b0221029681361fedb3aeb2f31f7ba84572dd9fd5a451ed9450a7fb866d0c494f4e6163fd9",
+      "host": "helium",
+      "dbName": "heliumdb",
+      "createdAt": "2026-07-29T04:59:15.146Z",
+      "updatedAt": "2026-07-29T04:59:15.146Z"
+    },
+    {
+      "dbType": "postgresql",
+      "id": "6d12fbfe-6bed-4e9a-8bb3-7cdb579e3d7f",
+      "name": "momroojali3@gmail.com's",
+      "encryptedUrl": "0f605a3af5f1d197ba71ef431eea8f3a:2f3b098e5a260e818fe41554c99a28619f575cc60cedbf763c1e36c8abd76a5440ac8a15ee414cfa06baadd2f8fa6b8f8d42ce51f49bd85921ca1a2c2be39fdba12881a6d2562362a4f1bdbc3387d3fadbcd4c6600e19c4f7f2274687e1eb16d4d63b874af65b25a01cd0126c6c5e1e9d0b8f080a64547c9a1750a7bdff9aa77",
+      "host": "aws-0-ap-southeast-1.pooler.supabase.com:6543",
+      "dbName": "postgres",
+      "createdAt": "2026-07-29T05:05:56.086Z",
+      "updatedAt": "2026-07-29T05:05:56.086Z"
+    }
+  ]
+}
