@@ -11,8 +11,8 @@ if ! command -v pnpm &> /dev/null; then
   export PATH="$PNPM_HOME:$PATH"
 fi
 
-# Install all workspace dependencies (allow postinstall scripts for esbuild etc.)
-pnpm install --no-frozen-lockfile --config.dangerouslyAllowAllBuilds=true
+# Install all workspace dependencies using the workspace pnpm allowlist
+pnpm install --no-frozen-lockfile
 
 # Build the api-server
 pnpm --filter @workspace/api-server run build
