@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: school-mg-api
+    runtime: node
+    autoDeploy: true
+    healthCheckPath: /
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && rm -rf artifacts/api-server/dist && pnpm --filter @workspace/api-server run build
+    startCommand: node --enable-source-maps ./artifacts/api-server/dist/index.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
