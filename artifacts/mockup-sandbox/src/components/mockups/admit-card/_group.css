@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
+
+.admit-preview {
+  min-height: 100vh;
+  background: #e9eef5;
+  color: #10213f;
+  font-family: 'DM Sans', Arial, sans-serif;
+}
+
+.admit-preview *,
+.admit-preview *::before,
+.admit-preview *::after {
+  box-sizing: border-box;
+}
+
+.admit-sheet {
+  width: min(100%, 794px);
+  min-height: 1123px;
+  margin: 0 auto;
+  background: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+.admit-display {
+  font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+}
+
+@media (max-width: 820px) {
+  .admit-preview { padding: 0; }
+  .admit-sheet { min-height: 100vh; }
+}
