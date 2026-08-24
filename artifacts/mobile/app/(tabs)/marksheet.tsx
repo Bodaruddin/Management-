@@ -11,7 +11,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Print from 'expo-print';
 import * as Haptics from 'expo-haptics';
 import {
-  useApp, Student, Exam, ExamResult, getSubjectMaxMarksForClass, isActiveStudent,
+  useApp, Student, Exam, ExamResult, getExamSubjectsForClass,
+  getSubjectMaxMarksForClass, isActiveStudent,
 } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
 import { SCHOOL_INFO } from '@/constants/schoolInfo';
@@ -126,6 +127,19 @@ function combinedMarksheetDownloadName(label: string): string {
 // ─── Per-subject max marks lookup ─────────────────────────────────────────────
 function getSubjectMaxMarks(exam: Exam, sub: string, className?: string): number {
   return getSubjectMaxMarksForClass(exam, sub, className);
+}
+
+function classNamesMatch(left: unknown, right: unknown): boolean {
+  const normalize = (value: unknown) => String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/^class\s*/, '');
+  return normalize(left) !== '' && normalize(left) === normalize(right);
+}
+
+function examIncludesClass(exam: Exam, className: string): boolean {
+  return classNamesMatch(exam.class, className)
+    || (exam.classSubjects?.some(assignment => classNamesMatch(assignment.class, className)) ?? false);
 }
 
 // ─── Grade calculation ────────────────────────────────────────────────────────
@@ -1177,19 +1191,23 @@ export default function MarksheetScreen() {
   // ── Single: filtered exams for chosen class ───────────────────────────────────
   const filteredExams = useMemo(() => {
     if (!selectedClass) return exams;
-    return exams.filter(e => e.class === selectedClass);
+    // Multi-class exams keep the first class in `exam.class` and the complete
+    // assignment list in `classSubjects`. Check both so exams are available
+    // for every class they were created for, not only the first one.
+    return exams.filter(e => examIncludesClass(e, selectedClass));
   }, [exams, selectedClass]);
 
   // ── Single: student lists ─────────────────────────────────────────────────────
   const singleStudents = useMemo(() => {
     if (!selectedExam) return [];
-    let list = students.filter(s => s.class === selectedExam.class && isActiveStudent(s));
+    const examClass = selectedClass || selectedExam.class;
+    let list = students.filter(s => classNamesMatch(s.class, examClass) && isActiveStudent(s));
     if (search.trim()) {
       const q = search.toLowerCase();
       list = list.filter(s => s.name.toLowerCase().includes(q) || s.rollNumber.toLowerCase().includes(q));
     }
     return list.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true }));
-  }, [students, selectedExam, search]);
+  }, [students, selectedExam, selectedClass, search]);
 
   const singleStudentsWithResults = useMemo(() => {
     if (!selectedExam) return [];
@@ -1829,7 +1847,7 @@ export default function MarksheetScreen() {
               <View style={s.examBanner}>
                 <View style={{ flex: 1 }}>
                   <Text style={s.examBannerTitle}>{selectedExam.name}</Text>
-                  <Text style={s.examBannerSub}>{selectedExam.class} · {selectedExam.subjects.length} subjects · Max {selectedExam.subjects.reduce((s, sub) => s + getSubjectMaxMarks(selectedExam, sub, selectedClass), 0)} total marks</Text>
+                  <Text style={s.examBannerSub}>{selectedClass || selectedExam.class} · {getExamSubjectsForClass(selectedExam, selectedClass || selectedExam.class).length} subjects · Max {getExamSubjectsForClass(selectedExam, selectedClass || selectedExam.class).reduce((s, sub) => s + getSubjectMaxMarks(selectedExam, sub, selectedClass || selectedExam.class), 0)} total marks</Text>
                   <Text style={s.examBannerSub}>Pass mark: 30% of each subject's maximum marks</Text>
                 </View>
                 <View style={s.examBannerBadge}>
@@ -2220,7 +2238,7 @@ export default function MarksheetScreen() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={[s.pickerItemTxt, selectedExam?.id === e.id && { color: '#059669' }]}>{e.name}</Text>
-                    <Text style={s.pickerItemSub}>{e.class} · {e.subjects.length} subjects · Max {e.maxMarks} marks</Text>
+                    <Text style={s.pickerItemSub}>{selectedClass || e.class} · {getExamSubjectsForClass(e, selectedClass || e.class).length} subjects · Max {e.maxMarks} marks</Text>
                     {classifyExam(e.name) && (
                       <Text style={[s.pickerItemSub, { color: '#2563EB', marginTop: 1 }]}>
                         Type: {EXAM_TYPE_LABELS[classifyExam(e.name)!]}
