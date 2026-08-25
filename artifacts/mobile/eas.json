@@ -8,7 +8,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "school-mg-2.onrender.com"
+        "EXPO_PUBLIC_DOMAIN": "management-2-5u13.onrender.com"
       }
     },
     "production": {
@@ -16,7 +16,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_DOMAIN": "school-mg-2.onrender.com"
+        "EXPO_PUBLIC_DOMAIN": "management-2-5u13.onrender.com"
       }
     }
   }
