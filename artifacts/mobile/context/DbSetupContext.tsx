@@ -4,6 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 export const SETUP_KEY = '@db_setup_complete';
 export const PENDING_CONFIG_KEY = '@db_pending_config';
 
+const PRODUCTION_API_DOMAIN = 'management-2-5u13.onrender.com';
+
 export type DbProvider = 'supabase' | 'firebase' | 'postgresql' | 'custom';
 
 export interface PendingDbConfig {
@@ -42,13 +44,21 @@ export function DbSetupProvider({ children }: { children: React.ReactNode }) {
 
   async function checkSetupStatus() {
     const [setup, cfg] = await AsyncStorage.multiGet([SETUP_KEY, PENDING_CONFIG_KEY]);
-    setLocalConfig(cfg[1] ? JSON.parse(cfg[1]) : null);
+    let savedConfig: PendingDbConfig | null = null;
+    if (cfg[1]) {
+      try {
+        savedConfig = JSON.parse(cfg[1]) as PendingDbConfig;
+      } catch {
+        await AsyncStorage.removeItem(PENDING_CONFIG_KEY);
+      }
+    }
+    setLocalConfig(savedConfig);
 
     // Always verify with the server — the local cache may be stale if the
     // admin reset the DB connection from another device or the server restarted.
     try {
       const domain = process.env.EXPO_PUBLIC_DOMAIN;
-      const base = domain ? `https://${domain}` : '';
+      const base = `https://${domain || PRODUCTION_API_DOMAIN}`;
       const res = await fetch(`${base}/api/db-connections/active`, {
         signal: AbortSignal.timeout(5000),
       });
