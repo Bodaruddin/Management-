@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useDbSetup, DbProvider, PendingDbConfig } from '@/context/DbSetupContext';
 
+const PRODUCTION_API_DOMAIN = 'management-2-5u13.onrender.com';
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TestResult {
   success: boolean;
@@ -21,7 +23,7 @@ interface TestResult {
 function getApiBase(): string {
   if (Platform.OS === 'web') return '';
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return domain ? `https://${domain}` : '';
+  return `https://${domain || PRODUCTION_API_DOMAIN}`;
 }
 
 async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
