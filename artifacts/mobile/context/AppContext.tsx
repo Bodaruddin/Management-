@@ -478,7 +478,7 @@ const DEFAULT_STATE: AppState = {
 // ─── API helpers ──────────────────────────────────────────────────────────────
 const getApiBase = (): string => {
   const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return domain ? `https://${domain}` : '';
+  return `https://${domain || 'management-2-5u13.onrender.com'}`;
 };
 
 let receiptCounter = 1;
