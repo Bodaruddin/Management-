@@ -39,12 +39,9 @@ import {
   principalSignatureHtml,
 } from "@/utils/documentBranding";
 import type { DocumentBranding } from "@/context/AppContext";
+import { getApiBase } from "@/constants/api";
 
 // ─── API helpers (same pattern as AppContext) ──────────────────────────────────
-const getApiBase = (): string => {
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return domain ? `https://${domain}` : "";
-};
 async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${getApiBase()}/api${path}`);
   if (!res.ok) throw new Error(`GET /api${path} failed: ${res.status}`);

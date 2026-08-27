@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "School Management App",
-    "slug": "mobile",
+    "slug": "school-management",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "schoolmanagement",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -23,12 +23,7 @@
       "favicon": "./assets/images/icon.png"
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://management-2-5u13.onrender.com"
-        }
-      ],
+      "expo-router",
       "expo-font",
       "expo-web-browser"
     ],

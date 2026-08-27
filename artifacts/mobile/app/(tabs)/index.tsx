@@ -15,6 +15,7 @@ import { useApp, Student, alumniToStudent, isActiveStudent } from '@/context/App
 import { SCHOOL_INFO } from '@/constants/schoolInfo';
 import { daysUntilBirthday, isBirthdayToday, extractMMDD } from '@/utils/dateUtils';
 import { sendBirthdayCardWhatsApp, sendReminderWhatsApp } from '@/utils/reminder';
+import { getApiBase } from '@/constants/api';
 
 // ─── DB status hook ───────────────────────────────────────────────────────────
 function useDbStatus() {
@@ -23,11 +24,6 @@ function useDbStatus() {
     connected: false,
     apiReachable: false,
   });
-  const getApiBase = () => {
-    if (Platform.OS === 'web') return '';
-    const domain = process.env.EXPO_PUBLIC_DOMAIN;
-    return domain ? `https://${domain}` : '';
-  };
   const refresh = () => {
     fetch(`${getApiBase()}/api/db-connections/active`)
       .then(r => r.ok ? r.json() : null)
@@ -973,7 +969,7 @@ export default function AdminDashboard() {
   const todayStr     = now.toISOString().split('T')[0];
   const todayPresent = visibleAttendanceRecords.filter(a => a.date === todayStr && a.status === 'present').length;
   const todayAbsent  = visibleAttendanceRecords.filter(a => a.date === todayStr && a.status === 'absent').length;
-  const todayLeave   = visibleAttendanceRecords.filter(a => a.date === todayStr && a.status === 'leave').length;
+  const todayLeave   = visibleAttendanceRecords.filter(a => a.date === todayStr && (a.status as string) === 'leave').length;
   const todayTotal   = todayPresent + todayAbsent + todayLeave;
   const attendancePct = todayTotal > 0 ? Math.round((todayPresent / todayTotal) * 100) : 0;
 

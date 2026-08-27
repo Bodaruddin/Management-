@@ -45236,12 +45236,13 @@ var _pool;
 var _db;
 function getPool() {
   if (!_pool) {
-    if (!process.env.DATABASE_URL) {
+    const databaseUrl = process.env.RENDER_DATABASE_URL ?? process.env.APP_DATABASE_URL ?? process.env.DATABASE_URL;
+    if (!databaseUrl) {
       throw new Error(
-        "DATABASE_URL must be set. Did you forget to provision a database?"
+        "RENDER_DATABASE_URL must be set. Add the hosted PostgreSQL connection string."
       );
     }
-    _pool = new Pool3({ connectionString: process.env.DATABASE_URL });
+    _pool = new Pool3({ connectionString: databaseUrl });
   }
   return _pool;
 }
@@ -45362,6 +45363,8 @@ function createPgAdapter(db2) {
           dateOfBirth: data.dateOfBirth ?? "",
           address: data.address ?? null,
           photo: data.photo ?? null,
+          gender: data.gender ?? null,
+          caste: data.caste ?? null,
           annualFee: data.annualFee ?? null,
           discountType: data.discountType ?? null,
           discountValue: data.discountValue ?? null,
@@ -45384,6 +45387,8 @@ function createPgAdapter(db2) {
         if (data.dateOfBirth !== void 0) setValues.dateOfBirth = data.dateOfBirth;
         if ("address" in data) setValues.address = data.address ?? null;
         if ("photo" in data) setValues.photo = data.photo ?? null;
+        if ("gender" in data) setValues.gender = data.gender ?? null;
+        if ("caste" in data) setValues.caste = data.caste ?? null;
         if ("annualFee" in data) setValues.annualFee = data.annualFee ?? null;
         if ("discountType" in data) setValues.discountType = data.discountType ?? null;
         if ("discountValue" in data) setValues.discountValue = data.discountValue ?? null;
@@ -45521,6 +45526,19 @@ function createPgAdapter(db2) {
           if (consecutiveAbsents >= limit) {
             const [updated] = await db2.update(studentsTable2).set({ status: "inactive" }).where(and(eq(studentsTable2.id, studentId), eq(studentsTable2.status, "active"))).returning({ id: studentsTable2.id });
             if (updated) {
+              await db2.delete(attendanceRecordsTable2).where(and(
+                eq(attendanceRecordsTable2.studentId, studentId),
+                eq(attendanceRecordsTable2.date, date2)
+              ));
+              const student = await db2.select({ studentName: studentsTable2.name }).from(studentsTable2).where(eq(studentsTable2.id, studentId)).limit(1);
+              await db2.insert(attendanceRecordsTable2).values({
+                studentId,
+                studentName: student[0]?.studentName ?? "",
+                class: cls,
+                date: date2,
+                status: "inactive",
+                takenBy: "System"
+              });
               inactivated.push(studentId);
             }
           }
@@ -45885,14 +45903,6 @@ function createPgAdapter(db2) {
       async list() {
         return db2.select().from(alumniTable2).orderBy(asc(alumniTable2.batch), asc(alumniTable2.name));
       },
-      async syncGraduatedStudents() {
-        const alumniRows = await db2.select({ studentId: alumniTable2.studentId }).from(alumniTable2);
-        const studentIds = Array.from(new Set(
-          alumniRows.map((row) => String(row.studentId ?? "")).filter(Boolean)
-        ));
-        if (studentIds.length === 0) return;
-        await db2.update(studentsTable2).set({ status: "graduated", class: "", section: null }).where(inArray(studentsTable2.id, studentIds));
-      },
       async create(data) {
         const values = {
           studentId: data.studentId ?? data.id ?? `manual-${Date.now()}`,
@@ -45917,7 +45927,7 @@ function createPgAdapter(db2) {
         return db2.transaction(async (tx) => {
           const [row] = await tx.insert(alumniTable2).values(values).returning();
           if (data.studentId) {
-            await tx.update(studentsTable2).set({ status: "graduated", class: "", section: null }).where(eq(studentsTable2.id, String(data.studentId)));
+            await tx.update(studentsTable2).set({ status: "graduated" }).where(eq(studentsTable2.id, String(data.studentId)));
           }
           return row;
         });
@@ -45984,7 +45994,7 @@ function createPgAdapter(db2) {
             }
           }).returning();
           if (studentIds.length > 0) {
-            await tx.update(studentsTable2).set({ status: "graduated", class: "", section: null }).where(inArray(studentsTable2.id, studentIds));
+            await tx.update(studentsTable2).set({ status: "graduated" }).where(inArray(studentsTable2.id, studentIds));
           }
           return rows;
         });
@@ -46702,6 +46712,18 @@ function createFirebaseAdapter(fs2) {
         await col("fee_records").doc(id).set(doc);
         return { id, ...doc };
       },
+      async update(id, data) {
+        const ref = col("fee_records").doc(id);
+        const existing = await ref.get();
+        if (!existing.exists) return null;
+        const updates = {};
+        for (const key of ["amount", "date", "description", "paymentMethod"]) {
+          if (data[key] !== void 0) updates[key] = data[key];
+        }
+        if (Object.keys(updates).length === 0) return null;
+        await ref.update(updates);
+        return { id, ...existing.data(), ...updates };
+      },
       async delete(id) {
         await col("fee_records").doc(id).delete();
       }
@@ -47160,7 +47182,8 @@ async function destroyFirebase(id) {
   const app2 = firebaseApps.get(id);
   if (app2) {
     try {
-      await app2.delete();
+      const { deleteApp } = await import("firebase-admin/app");
+      await deleteApp(app2);
     } catch {
     }
     firebaseApps.delete(id);
@@ -47195,14 +47218,14 @@ async function initDbManager() {
       }
     }
   }
-  const envUrl = process.env.APP_DATABASE_URL ?? process.env.DATABASE_URL;
+  const envUrl = process.env.RENDER_DATABASE_URL ?? process.env.APP_DATABASE_URL ?? process.env.DATABASE_URL;
   if (envUrl) {
     try {
       const pool2 = getOrCreatePool("env", envUrl);
       await pool2.query("SELECT 1");
       _activeAdapter = createPgAdapter(buildDrizzle(pool2));
       _activeId = "env";
-      _activeName = "Environment (APP_DATABASE_URL)";
+      _activeName = "Render Database";
       _activeDbType = "postgresql";
       if (!store.connections.find((c) => c.id === "env")) {
         const { host, dbName } = parseDisplayInfo(envUrl);
@@ -47219,7 +47242,7 @@ async function initDbManager() {
         store.activeId = "env";
         saveStore(store);
       }
-      logger.info("DB Manager: using APP_DATABASE_URL");
+      logger.info("DB Manager: using hosted database environment variable");
       await initPostgresSchema(pool2).catch(
         (e) => logger.warn({ e }, "DB Manager: schema init warning (non-fatal)")
       );
@@ -47879,7 +47902,11 @@ async function getCompleteSubjectMarks(examId, cls, subject, marks) {
   if (!allowedSubjects.includes(subject)) {
     throw new Error(`Subject "${subject}" is not assigned to ${cls} for this exam`);
   }
-  const maxMarks = Number(exam.maxMarks);
+  const subjectSchedule = classAssignment?.subjectSchedule ?? classAssignment?.subjectSchedules ?? exam.subjectSchedule ?? exam.subjectSchedules ?? [];
+  const configuredSubject = Array.isArray(subjectSchedule) ? subjectSchedule.find((schedule) => schedule?.subject === subject) : void 0;
+  const maxMarks = Number(
+    configuredSubject?.maxMarks ?? configuredSubject?.max_marks ?? exam.maxMarks
+  );
   if (!Number.isFinite(maxMarks) || maxMarks < 0) {
     throw new Error("Exam has an invalid maximum mark");
   }
@@ -47955,10 +47982,10 @@ router11.post("/mark-submissions/submit", async (req, res) => {
     return;
   }
   const existing = await getAdapter().markSubmissions.get(examId, cls, subject);
-  const allowTeacherEdit = (teacher.permissions ?? {}).allowMarkEdit === true;
   const hasLegacyStoredMarks = !existing && await subjectHasStoredMarks(examId, cls, subject);
   const effectiveExisting = existing ?? (hasLegacyStoredMarks ? { status: "submitted", teacherId: null } : null);
-  const isTeacherEdit = effectiveExisting?.status === "submitted" && (effectiveExisting.teacherId === teacherId || hasLegacyStoredMarks && allowTeacherEdit);
+  const allowTeacherEdit = (teacher.permissions ?? {}).allowMarkEdit === true;
+  const isTeacherEdit = effectiveExisting?.status === "submitted" && effectiveExisting.teacherId === teacherId;
   if (effectiveExisting?.status === "locked") {
     res.status(409).json({
       error: `Subject "${subject}" marks are locked. Only an admin can unlock them.`,
@@ -47966,16 +47993,16 @@ router11.post("/mark-submissions/submit", async (req, res) => {
     });
     return;
   }
-  if (effectiveExisting?.status === "submitted" && !isTeacherEdit) {
-    res.status(403).json({
-      error: `Only the teacher who submitted "${subject}" can edit these marks.`,
+  if (isTeacherEdit && !allowTeacherEdit) {
+    res.status(409).json({
+      error: "Editing submitted marks is disabled for this teacher by the administrator.",
       status: "submitted"
     });
     return;
   }
-  if (isTeacherEdit && !allowTeacherEdit) {
-    res.status(409).json({
-      error: "Editing submitted marks is disabled for this teacher by the administrator.",
+  if (effectiveExisting?.status === "submitted" && !isTeacherEdit) {
+    res.status(403).json({
+      error: `Only the teacher who submitted "${subject}" can edit these marks.`,
       status: "submitted"
     });
     return;
@@ -48156,6 +48183,14 @@ router13.post("/fee-records", async (req, res) => {
   }
   const row = await getAdapter().feeRecords.create(body);
   res.status(201).json(row);
+});
+router13.put("/fee-records/:id", async (req, res) => {
+  const row = await getAdapter().feeRecords.update(req.params.id, req.body);
+  if (!row) {
+    res.status(404).json({ error: "Fee record not found" });
+    return;
+  }
+  res.json(row);
 });
 router13.delete("/fee-records/:id", async (req, res) => {
   await getAdapter().feeRecords.delete(req.params.id);

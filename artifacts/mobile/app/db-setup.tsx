@@ -8,8 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useDbSetup, DbProvider, PendingDbConfig } from '@/context/DbSetupContext';
-
-const PRODUCTION_API_DOMAIN = 'management-2-5u13.onrender.com';
+import { getApiBase } from '@/constants/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface TestResult {
@@ -20,12 +19,6 @@ interface TestResult {
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
-function getApiBase(): string {
-  if (Platform.OS === 'web') return '';
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return `https://${domain || PRODUCTION_API_DOMAIN}`;
-}
-
 async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${getApiBase()}/api${path}`, {
     headers: { 'Content-Type': 'application/json' },

@@ -4,7 +4,7 @@
  * - Stores multiple named connections in ./data/connections.json (AES-256-CBC encrypted).
  * - Manages pg.Pool instances (PostgreSQL) and Firebase Admin app instances (Firebase).
  * - Exports getAdapter() used by all routes.
- * - On startup: restores the last-active connection, falls back to APP_DATABASE_URL env var.
+ * - On startup: restores the last-active connection, falls back to the hosted database env var.
  * - On activate: auto-initialises all required tables/collections if they don't exist.
  */
 import { drizzle, NodePgDatabase } from "drizzle-orm/node-postgres";
@@ -194,15 +194,18 @@ export async function initDbManager(): Promise<void> {
     }
   }
 
-  // 2. Fall back to APP_DATABASE_URL / DATABASE_URL
-  const envUrl = process.env.APP_DATABASE_URL ?? process.env.DATABASE_URL;
+  // 2. Fall back to the new hosted database secret, then legacy names for compatibility.
+  const envUrl =
+    process.env.RENDER_DATABASE_URL ??
+    process.env.APP_DATABASE_URL ??
+    process.env.DATABASE_URL;
   if (envUrl) {
     try {
       const pool = getOrCreatePool("env", envUrl);
       await pool.query("SELECT 1");
       _activeAdapter = createPgAdapter(buildDrizzle(pool));
       _activeId = "env";
-      _activeName = "Environment (APP_DATABASE_URL)";
+       _activeName = "Render Database";
       _activeDbType = "postgresql";
 
       if (!store.connections.find((c) => c.id === "env")) {
@@ -215,7 +218,7 @@ export async function initDbManager(): Promise<void> {
         store.activeId = "env";
         saveStore(store);
       }
-      logger.info("DB Manager: using APP_DATABASE_URL");
+      logger.info("DB Manager: using hosted database environment variable");
       // Auto-init schema on env connection too
       await initPostgresSchema(pool).catch((e) =>
         logger.warn({ e }, "DB Manager: schema init warning (non-fatal)"),

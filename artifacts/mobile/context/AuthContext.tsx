@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Platform } from 'react-native';
+import { getApiBase } from '@/constants/api';
 
 export interface AuthUser {
   id: string;
@@ -30,14 +30,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const AUTH_KEY = '@school_auth_user';
-const PRODUCTION_API_DOMAIN = 'management-2-5u13.onrender.com';
-
-function getApiBase(): string {
-  if (Platform.OS === 'web') return '';
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return `https://${domain || PRODUCTION_API_DOMAIN}`;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);

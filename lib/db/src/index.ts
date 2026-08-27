@@ -9,12 +9,16 @@ let _db: ReturnType<typeof drizzle> | undefined;
 
 export function getPool(): pg.Pool {
   if (!_pool) {
-    if (!process.env.DATABASE_URL) {
+    const databaseUrl =
+      process.env.RENDER_DATABASE_URL ??
+      process.env.APP_DATABASE_URL ??
+      process.env.DATABASE_URL;
+    if (!databaseUrl) {
       throw new Error(
-        "DATABASE_URL must be set. Did you forget to provision a database?",
+        "RENDER_DATABASE_URL must be set. Add the hosted PostgreSQL connection string.",
       );
     }
-    _pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    _pool = new Pool({ connectionString: databaseUrl });
   }
   return _pool;
 }

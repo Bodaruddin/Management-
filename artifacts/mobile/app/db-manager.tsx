@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { getApiBase } from '@/constants/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type DbType = 'postgresql' | 'firebase';
@@ -64,12 +65,6 @@ const DEFAULT_FIREBASE: FirebaseFields = {
 };
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
-const getApiBase = (): string => {
-  if (Platform.OS === 'web') return '';
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return domain ? `https://${domain}` : '';
-};
-
 async function apiFetch<T>(path: string, opts?: RequestInit): Promise<T> {
   const res = await fetch(`${getApiBase()}/api${path}`, {
     headers: { 'Content-Type': 'application/json' },

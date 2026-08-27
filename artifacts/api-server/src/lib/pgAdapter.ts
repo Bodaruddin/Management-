@@ -3,7 +3,7 @@
  */
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { eq, asc, and, desc, inArray, sql as drizzleSql } from "drizzle-orm";
-import * as schema from "@workspace/db";
+import * as schema from "@workspace/db/schema";
 import type { DataAdapter } from "./adapter.js";
 
 type DB = NodePgDatabase<typeof schema>;
@@ -632,6 +632,19 @@ export function createPgAdapter(db: DB): DataAdapter {
         const [row] = await db.insert(feeRecordsTable).values(values).returning();
         return row;
       },
+      async update(id, data: any) {
+        const setValues: any = {};
+        for (const key of ["amount", "date", "description", "paymentMethod"]) {
+          if (data[key] !== undefined) setValues[key] = data[key];
+        }
+        if (Object.keys(setValues).length === 0) return null;
+        const [row] = await db
+          .update(feeRecordsTable)
+          .set(setValues)
+          .where(eq(feeRecordsTable.id, id))
+          .returning();
+        return row ?? null;
+      },
       async delete(id) {
         await db.delete(feeRecordsTable).where(eq(feeRecordsTable.id, id));
       },
@@ -714,6 +727,19 @@ export function createPgAdapter(db: DB): DataAdapter {
     alumni: {
       async list() {
         return db.select().from(alumniTable).orderBy(asc(alumniTable.batch), asc(alumniTable.name));
+      },
+      async syncGraduatedStudents() {
+        const alumniRows = await db
+          .select({ studentId: alumniTable.studentId })
+          .from(alumniTable);
+        const studentIds = Array.from(
+          new Set(alumniRows.map(({ studentId }) => String(studentId ?? '')).filter(Boolean)),
+        );
+        if (studentIds.length === 0) return;
+        await db
+          .update(studentsTable)
+          .set({ status: 'graduated', class: '', section: null })
+          .where(inArray(studentsTable.id, studentIds));
       },
       async create(data: any) {
         const values: any = {

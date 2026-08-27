@@ -1,6 +1,6 @@
-# [Project name]
+# School Management App
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A mobile-first school administration app for managing students, teachers, attendance, exams, fees, salaries, alumni, and school documents.
 
 ## Run & Operate
 
@@ -9,7 +9,8 @@ _Replace the heading above with the project's name, and this line with one sente
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- Required secret: `RENDER_DATABASE_URL` — hosted PostgreSQL connection string
+- Required secret for Expo builds: `EXPO_TOKEN` — stored securely in Replit Secrets
 
 ## Stack
 
@@ -22,23 +23,33 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/mobile` — Expo Router mobile app and mobile build configuration
+- `artifacts/api-server` — Express API and database connection manager
+- `lib/db` — shared database schema and Drizzle helpers
+- `render.yaml` — Render web service configuration
+- `eas.json` — Expo build profiles
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Hosted deployments use `RENDER_DATABASE_URL`; legacy `APP_DATABASE_URL` and `DATABASE_URL` names remain fallback-compatible.
+- Database connection records are encrypted at rest and the committed connection store starts empty.
+- The mobile client receives its API host through `EXPO_PUBLIC_API_URL` or `EXPO_PUBLIC_DOMAIN`; no database credentials are bundled into the APK.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- Admin and teacher sign-in
+- Student, teacher, class, subject, attendance, exam, result, fee, expense, salary, promotion, inactive-student, alumni, messaging, document branding, and report workflows
+- PostgreSQL and Firebase connection management from the admin experience
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Deploy the API with Render and keep the mobile app connected to the hosted API.
+- Keep Expo and database credentials out of source control.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Android APKs require an Android build toolchain or a supported remote build service; the Replit shell does not include Java/Android SDK by default.
+- The mobile artifact uses a static `app.json`; do not introduce `app.config.ts` or `app.config.js`.
 
 ## Pointers
 

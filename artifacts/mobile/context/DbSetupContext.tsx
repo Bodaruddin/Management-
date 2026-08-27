@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getApiBase } from '@/constants/api';
 
 export const SETUP_KEY = '@db_setup_complete';
 export const PENDING_CONFIG_KEY = '@db_pending_config';
-
-const PRODUCTION_API_DOMAIN = 'management-2-5u13.onrender.com';
 
 export type DbProvider = 'supabase' | 'firebase' | 'postgresql' | 'custom';
 
@@ -57,9 +56,7 @@ export function DbSetupProvider({ children }: { children: React.ReactNode }) {
     // Always verify with the server — the local cache may be stale if the
     // admin reset the DB connection from another device or the server restarted.
     try {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN;
-      const base = `https://${domain || PRODUCTION_API_DOMAIN}`;
-      const res = await fetch(`${base}/api/db-connections/active`, {
+      const res = await fetch(`${getApiBase()}/api/db-connections/active`, {
         signal: AbortSignal.timeout(5000),
       });
       if (res.ok) {

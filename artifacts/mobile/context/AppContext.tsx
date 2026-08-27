@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PENDING_CONFIG_KEY, PendingDbConfig } from '@/context/DbSetupContext';
+import { getApiBase } from '@/constants/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export interface Student {
@@ -326,6 +327,24 @@ export interface Alumni {
   createdAt?: string;
 }
 
+export function alumniToStudent(alumni: Alumni): Student {
+  return {
+    id: alumni.studentId ?? alumni.id,
+    name: alumni.name,
+    fatherName: alumni.fatherName ?? '',
+    motherName: '',
+    mobileNumber: alumni.mobileNumber ?? '',
+    class: alumni.class ?? alumni.passOutClass ?? '',
+    section: alumni.section,
+    admissionNo: alumni.admissionNo,
+    rollNumber: alumni.rollNumber ?? '',
+    dateOfBirth: alumni.dateOfBirth ?? '',
+    address: alumni.address,
+    photo: alumni.photo,
+    status: 'graduated',
+  };
+}
+
 interface AppState {
   students: Student[];
   teachers: Teacher[];
@@ -388,6 +407,7 @@ interface AppContextType extends AppState {
   lockSubject: (examId: string, cls: string, subject: string, adminId: string, adminName: string) => Promise<void>;
   unlockSubject: (examId: string, cls: string, subject: string, adminId: string, adminName: string) => Promise<void>;
   addFeeRecord: (r: Omit<FeeRecord, 'id'>) => FeeRecord;
+  updateFeeRecord: (id: string, r: Partial<FeeRecord>) => void;
   deleteFeeRecord: (id: string) => void;
   addExpense: (e: Omit<Expense, 'id'>) => void;
   deleteExpense: (id: string) => void;
@@ -476,11 +496,6 @@ const DEFAULT_STATE: AppState = {
 };
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
-const getApiBase = (): string => {
-  const domain = process.env.EXPO_PUBLIC_DOMAIN;
-  return `https://${domain || 'management-2-5u13.onrender.com'}`;
-};
-
 let receiptCounter = 1;
 const genId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 const genReceiptNumber = (prefix = 'RCP') => `${prefix}${String(receiptCounter++).padStart(8, '0')}`;
@@ -1106,6 +1121,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return nr;
   }, []);
 
+  const updateFeeRecord = useCallback((id: string, changes: Partial<FeeRecord>) => {
+    setState(prev => ({
+      ...prev,
+      feeRecords: prev.feeRecords.map(record =>
+        record.id === id ? { ...record, ...changes } : record,
+      ),
+    }));
+    apiPut(`/fee-records/${id}`, changes).catch(console.error);
+  }, []);
+
   const deleteFeeRecord = useCallback((id: string) => {
     setState(prev => ({ ...prev, feeRecords: prev.feeRecords.filter(x => x.id !== id) }));
     apiDelete(`/fee-records/${id}`).catch(console.error);
@@ -1351,6 +1376,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addExam, updateExam, deleteExam, saveExamResults,
       submitSubjectMarks, lockSubject, unlockSubject,
       addFeeRecord, deleteFeeRecord,
+      updateFeeRecord,
       addExpense, deleteExpense,
       updateSalaryStatus, addSalaryRecord, deleteSalaryRecord,
       promoteStudent, bulkPromoteClass,
