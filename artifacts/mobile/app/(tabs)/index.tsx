@@ -11,7 +11,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/context/AuthContext';
-import { useApp, Student, alumniToStudent, isActiveStudent } from '@/context/AppContext';
+import { useApp, Student, alumniToStudent, isGraduatedStudent } from '@/context/AppContext';
 import { SCHOOL_INFO } from '@/constants/schoolInfo';
 import { daysUntilBirthday, isBirthdayToday, extractMMDD } from '@/utils/dateUtils';
 import { sendBirthdayCardWhatsApp, sendReminderWhatsApp } from '@/utils/reminder';
@@ -933,8 +933,14 @@ export default function AdminDashboard() {
   };
 
   // ── Stats ──────────────────────────────────────────────────────────────────
-  const activeStudents = useMemo(() => students.filter(isActiveStudent), [students]);
-  const uniqueClasses = useMemo(() => new Set(activeStudents.map(s => s.class)).size, [activeStudents]);
+  // The dashboard total represents currently enrolled students, including
+  // students temporarily marked inactive. Graduated students are kept in the
+  // dataset for records but are not part of the current student population.
+  const enrolledStudents = useMemo(
+    () => students.filter(student => !isGraduatedStudent(student)),
+    [students],
+  );
+  const uniqueClasses = useMemo(() => new Set(enrolledStudents.map(s => s.class)).size, [enrolledStudents]);
   const visibleStudentIds = useMemo(() => new Set(students.map(s => s.id)), [students]);
   const visibleFeeRecords = useMemo(
     () => feeRecords.filter(record => visibleStudentIds.has(record.studentId)),
@@ -1141,7 +1147,7 @@ export default function AdminDashboard() {
             {/* Row 1: People */}
             <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
               <PeopleCard
-                icon="users" label="Students" value={activeStudents.length}
+                icon="users" label="Students" value={enrolledStudents.length}
                 accentColor="#1E3A8A" accentBg="#EFF6FF"
                 onPress={() => router.push('/(tabs)/students' as any)}
               />
