@@ -120,7 +120,7 @@ const secMgrStyles = StyleSheet.create({
 });
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function StudentsScreen() {
+export default function StudentsScreen({ teacherMode = false }: { teacherMode?: boolean }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const {
@@ -309,14 +309,16 @@ export default function StudentsScreen() {
             />
             {search.length > 0 && <TouchableOpacity onPress={() => setSearch('')}><Feather name="x" size={16} color={colors.mutedForeground} /></TouchableOpacity>}
           </View>
-          {/* Manage Sections button */}
-          <TouchableOpacity
-            style={[topBarSt.iconBtn, { backgroundColor: colors.secondary }]}
-            onPress={() => setShowSectionsMgr(true)}
-            activeOpacity={0.8}
-          >
-            <Feather name="layers" size={18} color={colors.primary} />
-          </TouchableOpacity>
+          {/* Manage Sections is an admin-only control. */}
+          {!teacherMode && (
+            <TouchableOpacity
+              style={[topBarSt.iconBtn, { backgroundColor: colors.secondary }]}
+              onPress={() => setShowSectionsMgr(true)}
+              activeOpacity={0.8}
+            >
+              <Feather name="layers" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={[topBarSt.addBtn, { backgroundColor: colors.primary }]} onPress={openAdd} activeOpacity={0.8}>
             <Feather name="plus" size={20} color="#fff" />
           </TouchableOpacity>
