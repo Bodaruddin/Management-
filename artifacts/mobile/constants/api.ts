@@ -1,5 +1,7 @@
 import { Platform } from 'react-native';
 
+const DEFAULT_API_BASE = 'https://management-2-5u13.onrender.com';
+
 function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/, '');
 }
@@ -19,7 +21,8 @@ export function getApiBase(): string {
     );
   }
 
-  throw new Error(
-    'EXPO_PUBLIC_API_URL or EXPO_PUBLIC_DOMAIN must be configured for native builds.',
-  );
+  // Keep production APKs usable even when EAS environment variables are not
+  // configured in the selected EAS environment. A build-time override still
+  // takes precedence above this fallback.
+  return DEFAULT_API_BASE;
 }
