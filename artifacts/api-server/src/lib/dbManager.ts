@@ -40,8 +40,12 @@ function decrypt(text: string): string {
 }
 
 // ─── Persistent store ────────────────────────────────────────────────────────
-const DATA_DIR = path.join(process.cwd(), "data");
-const CONNECTIONS_FILE = path.join(DATA_DIR, "connections.json");
+// Render's default filesystem is ephemeral. Keep this path configurable so a
+// persistent disk can be mounted without changing application code.
+const CONNECTIONS_FILE = path.resolve(
+  process.env.CONNECTIONS_FILE ?? path.join(process.cwd(), "data", "connections.json"),
+);
+const DATA_DIR = path.dirname(CONNECTIONS_FILE);
 
 export type DbType = "postgresql" | "firebase";
 
@@ -86,13 +90,17 @@ export interface FirebaseConfig {
 function loadStore(): ConnectionsStore {
   try {
     if (fs.existsSync(CONNECTIONS_FILE)) {
-      const raw = JSON.parse(fs.readFileSync(CONNECTIONS_FILE, "utf8")) as ConnectionsStore;
+      const raw = JSON.parse(fs.readFileSync(CONNECTIONS_FILE, "utf8")) as Partial<ConnectionsStore>;
+      if (!Array.isArray(raw.connections)) throw new Error("Invalid connections store");
       // Backward-compat: connections without dbType were always PostgreSQL
       raw.connections = raw.connections.map((c: any) => ({
         dbType: "postgresql",
         ...c,
       }));
-      return raw;
+      return {
+        activeId: typeof raw.activeId === "string" ? raw.activeId : null,
+        connections: raw.connections as StoredConnection[],
+      };
     }
   } catch (e) {
     logger.error({ e }, "Failed to load connections store — using empty store");
@@ -101,11 +109,15 @@ function loadStore(): ConnectionsStore {
 }
 
 function saveStore(store: ConnectionsStore): void {
+  const tempFile = CONNECTIONS_FILE + "." + process.pid + ".tmp";
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(CONNECTIONS_FILE, JSON.stringify(store, null, 2), "utf8");
+    // Atomic replace prevents a restart during a write from leaving a corrupt file.
+    fs.writeFileSync(tempFile, JSON.stringify(store, null, 2), { encoding: "utf8", mode: 0o600 });
+    fs.renameSync(tempFile, CONNECTIONS_FILE);
   } catch (e) {
-    logger.error({ e }, "Failed to save connections store");
+    try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch {}
+    logger.error({ e, file: CONNECTIONS_FILE }, "Failed to save connections store");
   }
 }
 
