@@ -33,6 +33,19 @@ interface DbSetupContextType {
 
 const DbSetupContext = createContext<DbSetupContextType | null>(null);
 
+async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export function DbSetupProvider({ children }: { children: React.ReactNode }) {
   const [isSetupComplete, setIsSetupComplete] = useState<boolean | null>(null);
   const [localConfig, setLocalConfig] = useState<PendingDbConfig | null>(null);
@@ -56,9 +69,10 @@ export function DbSetupProvider({ children }: { children: React.ReactNode }) {
     // Always verify with the server — the local cache may be stale if the
     // admin reset the DB connection from another device or the server restarted.
     try {
-      const res = await fetch(`${getApiBase()}/api/db-connections/active`, {
-        signal: AbortSignal.timeout(5000),
-      });
+      const res = await fetchWithTimeout(
+        `${getApiBase()}/api/db-connections/active`,
+        15000,
+      );
       if (res.ok) {
         const data = await res.json();
         if (data?.connected === true) {
