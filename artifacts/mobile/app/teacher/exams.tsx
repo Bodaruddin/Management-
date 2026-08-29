@@ -21,9 +21,10 @@ export default function TeacherExams() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { exams, classes, subjects, addExam, deleteExam } = useApp();
+  const { exams, classes, subjects, addExam, updateExam, deleteExam } = useApp();
 
   const [showCreate, setShowCreate] = useState(false);
+  const [editingExam, setEditingExam] = useState<Exam | null>(null);
   const todayISO = new Date().toISOString().split('T')[0];
   const [form, setForm] = useState({
     name: '',
@@ -97,7 +98,43 @@ export default function TeacherExams() {
     }));
   };
 
-  const handleCreate = async () => {
+  const openCreateExam = () => {
+    setEditingExam(null);
+    resetForm();
+    setShowCreate(true);
+  };
+
+  const openEditExam = (exam: Exam) => {
+    const assignments = exam.classSubjects && exam.classSubjects.length > 0
+      ? exam.classSubjects
+      : [{
+          class: exam.class,
+          subjects: exam.subjects,
+          subjectSchedule: exam.subjectSchedule,
+        }];
+
+    setEditingExam(exam);
+    setForm({
+      name: exam.name,
+      selectedClasses: assignments.map(assignment => assignment.class),
+      classAssignments: assignments.map(assignment => ({
+        class: assignment.class,
+        selectedSubjects: [...assignment.subjects],
+        subjectSchedules: (assignment.subjectSchedule ?? assignment.subjectSchedules ?? []).map(schedule => ({ ...schedule })),
+      })),
+      defaultDate: exam.date || todayISO,
+      defaultMaxMarks: String(exam.maxMarks || 100),
+    });
+    setShowCreate(true);
+  };
+
+  const closeExamForm = () => {
+    setShowCreate(false);
+    setEditingExam(null);
+    resetForm();
+  };
+
+  const handleSaveExam = async () => {
     if (!form.name.trim()) { Alert.alert('Validation', 'Enter exam name'); return; }
     if (form.selectedClasses.length === 0) { Alert.alert('Validation', 'Select at least one class'); return; }
     const emptyClass = form.classAssignments.find(ca => ca.selectedSubjects.length === 0);
@@ -115,7 +152,7 @@ export default function TeacherExams() {
     const allSubjects = [...new Set(form.classAssignments.flatMap(ca => ca.selectedSubjects))];
     const primarySchedules = primaryAssignment?.subjectSchedules ?? [];
 
-    addExam({
+    const examData = {
       name: form.name.trim(),
       class: form.selectedClasses[0] || '',
       subjects: allSubjects,
@@ -123,10 +160,17 @@ export default function TeacherExams() {
       classSubjects,
       date: primarySchedules[0]?.date || form.defaultDate,
       maxMarks: primarySchedules[0]?.maxMarks || Number(form.defaultMaxMarks) || 100,
-    });
-    resetForm();
-    setShowCreate(false);
-    Alert.alert('Success', 'Exam created successfully!');
+    };
+
+    if (editingExam) {
+      updateExam(editingExam.id, examData);
+      closeExamForm();
+      Alert.alert('Success', 'Exam updated successfully!');
+    } else {
+      addExam(examData);
+      closeExamForm();
+      Alert.alert('Success', 'Exam created successfully!');
+    }
   };
 
   const handleDelete = async () => {
@@ -181,7 +225,7 @@ export default function TeacherExams() {
         <Text style={[s.headerTitle, { color: colors.text }]}>Exam Management</Text>
         <TouchableOpacity
           style={[s.createBtn, { backgroundColor: colors.primary }]}
-          onPress={() => setShowCreate(true)}
+          onPress={openCreateExam}
           activeOpacity={0.8}
         >
           <Feather name="plus" size={18} color="#fff" />
@@ -218,24 +262,35 @@ export default function TeacherExams() {
                 ))}
               </View>
             </View>
-            <TouchableOpacity
-              style={[s.deleteBtn, { backgroundColor: colors.destructive + '15' }]}
-              onPress={() => setConfirmDelete(item)}
-              activeOpacity={0.8}
-            >
-              <Feather name="trash-2" size={15} color={colors.destructive} />
-            </TouchableOpacity>
+            <View style={s.actions}>
+              <TouchableOpacity
+                style={[s.editBtn, { backgroundColor: colors.primary + '15' }]}
+                onPress={() => openEditExam(item)}
+                activeOpacity={0.8}
+                accessibilityLabel={`Edit ${item.name}`}
+              >
+                <Feather name="edit-2" size={15} color={colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.deleteBtn, { backgroundColor: colors.destructive + '15' }]}
+                onPress={() => setConfirmDelete(item)}
+                activeOpacity={0.8}
+                accessibilityLabel={`Delete ${item.name}`}
+              >
+                <Feather name="trash-2" size={15} color={colors.destructive} />
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       />
 
-      {/* Create Exam Modal */}
+      {/* Create / Edit Exam Modal */}
       <Modal visible={showCreate} animationType="slide" transparent>
         <View style={mo.overlay}>
           <View style={[mo.sheet, { backgroundColor: colors.card }]}>
             <View style={[mo.header, { borderBottomColor: colors.border }]}>
-              <Text style={[mo.title, { color: colors.text }]}>Create Exam</Text>
-              <TouchableOpacity onPress={() => { setShowCreate(false); resetForm(); }}>
+              <Text style={[mo.title, { color: colors.text }]}>{editingExam ? 'Edit Exam' : 'Create Exam'}</Text>
+              <TouchableOpacity onPress={closeExamForm}>
                 <Feather name="x" size={22} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
@@ -377,12 +432,12 @@ export default function TeacherExams() {
               <View style={{ height: 20 }} />
             </ScrollView>
             <View style={[mo.footer, { borderTopColor: colors.border }]}>
-              <TouchableOpacity style={[mo.btn, { borderColor: colors.border }]} onPress={() => { setShowCreate(false); resetForm(); }}>
+              <TouchableOpacity style={[mo.btn, { borderColor: colors.border }]} onPress={closeExamForm}>
                 <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[mo.btn, { flex: 2, backgroundColor: colors.primary }]} onPress={handleCreate}>
-                <Feather name="plus" size={16} color="#fff" />
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Create Exam</Text>
+              <TouchableOpacity style={[mo.btn, { flex: 2, backgroundColor: colors.primary }]} onPress={handleSaveExam}>
+                <Feather name={editingExam ? 'check' : 'plus'} size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{editingExam ? 'Save Changes' : 'Create Exam'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -449,6 +504,8 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   examMeta: { fontSize: 12, marginTop: 3 },
   subBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   subBadgeText: { fontSize: 11, fontWeight: '600' },
+  actions: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  editBtn: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   deleteBtn: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   subChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
