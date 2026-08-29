@@ -54,7 +54,7 @@ export default function LoginScreen() {
       }
     } else {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      if (role === 'teacher' && result.error === 'DATABASE_NOT_READY') {
+      if (result.error === 'DATABASE_NOT_READY') {
         setShowNotReadyModal(true);
       } else {
         Alert.alert('Login Failed', result.error ?? 'Invalid credentials');
