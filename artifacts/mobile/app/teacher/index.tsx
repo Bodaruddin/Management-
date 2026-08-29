@@ -12,7 +12,14 @@ import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@/context/AuthContext';
-import { useApp, Student, alumniToStudent, isActiveStudent } from '@/context/AppContext';
+import {
+  useApp,
+  Student,
+  alumniToStudent,
+  isActiveStudent,
+  STUDENT_GENDER_OPTIONS,
+  STUDENT_CASTE_OPTIONS,
+} from '@/context/AppContext';
 import { isBirthdayToday, daysUntilBirthday, extractMMDD } from '@/utils/dateUtils';
 import { sendBirthdayCardWhatsApp, sendReminderWhatsApp } from '@/utils/reminder';
 import PremiumAlert from '@/components/PremiumAlert';
@@ -207,6 +214,7 @@ const EMPTY_STUDENT = {
   name: '', fatherName: '', motherName: '', mobileNumber: '',
   class: '', section: '', admissionNo: '',
   rollNumber: '', dateOfBirth: '', address: '', photo: '' as string,
+  gender: '', caste: '',
   annualFee: '', discountType: 'fixed' as 'fixed' | 'percent', discountValue: '',
 };
 
@@ -222,6 +230,8 @@ export default function TeacherDashboard() {
   const [showClassPicker,       setShowClassPicker]       = useState(false);
   const [classSearch,           setClassSearch]           = useState('');
   const [showSectionPicker,     setShowSectionPicker]     = useState(false);
+  const [showGenderPicker,      setShowGenderPicker]      = useState(false);
+  const [showCastePicker,       setShowCastePicker]       = useState(false);
   const [showSectionsMgr,       setShowSectionsMgr]       = useState(false);
   const [formPausedForSections, setFormPausedForSections] = useState(false);
   const [newSectionName,        setNewSectionName]        = useState('');
@@ -390,6 +400,8 @@ export default function TeacherDashboard() {
       dateOfBirth:  studentForm.dateOfBirth.trim() || `${String(now.getDate()).padStart(2,'0')}-${String(now.getMonth()+1).padStart(2,'0')}-${now.getFullYear()}`,
       address:      studentForm.address || undefined,
       photo:        studentForm.photo || undefined,
+      gender:       studentForm.gender || undefined,
+      caste:        studentForm.caste || undefined,
       annualFee:    annualFeeNum,
       discountType: annualFeeNum ? studentForm.discountType : undefined,
       discountValue: (annualFeeNum && studentForm.discountValue) ? Number(studentForm.discountValue) : undefined,
@@ -935,6 +947,34 @@ export default function TeacherDashboard() {
                 </View>
               ))}
 
+              {/* Gender Picker */}
+              <View style={{ marginBottom: 14 }}>
+                <Text style={mo.mLabel}>Gender</Text>
+                <TouchableOpacity
+                  style={[mo.mInput, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                  onPress={() => setShowGenderPicker(true)}
+                >
+                  <Text style={{ color: studentForm.gender ? '#0F172A' : '#94A3B8', fontSize: 15 }}>
+                    {studentForm.gender || 'Select gender...'}
+                  </Text>
+                  <Feather name="chevron-down" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Caste Picker */}
+              <View style={{ marginBottom: 14 }}>
+                <Text style={mo.mLabel}>Caste</Text>
+                <TouchableOpacity
+                  style={[mo.mInput, { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}
+                  onPress={() => setShowCastePicker(true)}
+                >
+                  <Text style={{ color: studentForm.caste ? '#0F172A' : '#94A3B8', fontSize: 15 }}>
+                    {studentForm.caste || 'Select caste...'}
+                  </Text>
+                  <Feather name="chevron-down" size={16} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+
               {/* Class Picker */}
               <View style={{ marginBottom: 14 }}>
                 <Text style={mo.mLabel}>Class *</Text>
@@ -1055,6 +1095,72 @@ export default function TeacherDashboard() {
                 <Text style={{ color: '#fff', fontWeight: '700' }}>Add Student</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── GENDER PICKER ───────────────────────────────────────────────────── */}
+      <Modal visible={showGenderPicker} animationType="slide" transparent>
+        <View style={mo.overlay}>
+          <View style={[mo.sheet, { backgroundColor: '#fff', maxHeight: 400 }]}>
+            <View style={[mo.mHeader, { borderBottomColor: '#E2E8F0' }]}>
+              <Text style={mo.mTitle}>Select Gender</Text>
+              <TouchableOpacity onPress={() => setShowGenderPicker(false)}>
+                <Feather name="x" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              <TouchableOpacity
+                style={mo.classRow}
+                onPress={() => { setStudentForm(p => ({ ...p, gender: '' })); setShowGenderPicker(false); }}
+              >
+                <Text style={{ fontSize: 15, fontStyle: 'italic', color: !studentForm.gender ? H_MID : '#94A3B8' }}>Not specified</Text>
+                {!studentForm.gender && <Feather name="check" size={18} color={H_MID} />}
+              </TouchableOpacity>
+              {STUDENT_GENDER_OPTIONS.map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={mo.classRow}
+                  onPress={() => { setStudentForm(p => ({ ...p, gender: option })); setShowGenderPicker(false); }}
+                >
+                  <Text style={{ fontSize: 15, color: studentForm.gender === option ? H_MID : '#0F172A' }}>{option}</Text>
+                  {studentForm.gender === option && <Feather name="check" size={18} color={H_MID} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── CASTE PICKER ─────────────────────────────────────────────────────── */}
+      <Modal visible={showCastePicker} animationType="slide" transparent>
+        <View style={mo.overlay}>
+          <View style={[mo.sheet, { backgroundColor: '#fff', maxHeight: 400 }]}>
+            <View style={[mo.mHeader, { borderBottomColor: '#E2E8F0' }]}>
+              <Text style={mo.mTitle}>Select Caste</Text>
+              <TouchableOpacity onPress={() => setShowCastePicker(false)}>
+                <Feather name="x" size={24} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              <TouchableOpacity
+                style={mo.classRow}
+                onPress={() => { setStudentForm(p => ({ ...p, caste: '' })); setShowCastePicker(false); }}
+              >
+                <Text style={{ fontSize: 15, fontStyle: 'italic', color: !studentForm.caste ? H_MID : '#94A3B8' }}>Not specified</Text>
+                {!studentForm.caste && <Feather name="check" size={18} color={H_MID} />}
+              </TouchableOpacity>
+              {STUDENT_CASTE_OPTIONS.map(option => (
+                <TouchableOpacity
+                  key={option}
+                  style={mo.classRow}
+                  onPress={() => { setStudentForm(p => ({ ...p, caste: option })); setShowCastePicker(false); }}
+                >
+                  <Text style={{ fontSize: 15, color: studentForm.caste === option ? H_MID : '#0F172A' }}>{option}</Text>
+                  {studentForm.caste === option && <Feather name="check" size={18} color={H_MID} />}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
