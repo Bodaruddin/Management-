@@ -11,3 +11,7 @@ services:
         value: production
       - key: RENDER_DATABASE_URL
         sync: false
+      # Mount a Render persistent disk at this path when using the in-app
+      # database manager. Without a disk, use RENDER_DATABASE_URL instead.
+      - key: CONNECTIONS_FILE
+        value: /opt/render/project/src/data/connections.json
