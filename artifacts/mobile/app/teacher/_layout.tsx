@@ -10,6 +10,7 @@ export default function TeacherLayout() {
       <Stack.Screen name="salary" />
       <Stack.Screen name="fees" />
       <Stack.Screen name="classes" />
+      <Stack.Screen name="students" />
       <Stack.Screen name="exams" />
     </Stack>
   );
