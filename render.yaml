@@ -4,7 +4,7 @@ services:
     runtime: node
     autoDeploy: true
     healthCheckPath: /
-    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && rm -rf artifacts/api-server/dist && pnpm --filter @workspace/api-server run build
+    buildCommand: bash ./render-build.sh
     startCommand: node --enable-source-maps ./artifacts/api-server/dist/index.mjs
     envVars:
       - key: NODE_ENV
