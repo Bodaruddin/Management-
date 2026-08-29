@@ -30,6 +30,16 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const AUTH_KEY = '@school_auth_user';
+
+async function readApiError(response: Response): Promise<string | undefined> {
+  try {
+    const data = await response.json();
+    return typeof data?.error === 'string' ? data.error : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -48,7 +58,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username: username.trim(), password }),
         });
-        if (!res.ok) throw new Error('Server error');
+        if (res.status === 503) return { success: false, error: 'DATABASE_NOT_READY' };
+        if (!res.ok) {
+          return {
+            success: false,
+            error: (await readApiError(res)) ?? `Server error (${res.status})`,
+          };
+        }
         const data = await res.json();
         if (data.valid) {
           const u: AuthUser = { id: 'admin', name: 'Administrator', username: username.trim(), role: 'admin' };
@@ -70,7 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       if (res.status === 401) return { success: false, error: 'Invalid teacher credentials' };
       if (res.status === 503) return { success: false, error: 'DATABASE_NOT_READY' };
-      if (!res.ok) throw new Error('Server error');
+      if (!res.ok) {
+        return {
+          success: false,
+          error: (await readApiError(res)) ?? `Server error (${res.status})`,
+        };
+      }
       const t: any = await res.json();
       const u: AuthUser = {
         id: t.id, name: t.name, username: t.username, role: 'teacher',
