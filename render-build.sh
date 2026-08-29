@@ -1,21 +1,20 @@
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
-# Install pnpm to home directory (avoids read-only /usr/bin and /usr/lib on Render)
-export PNPM_HOME="$HOME/.local/share/pnpm"
-export PATH="$PNPM_HOME:$PATH"
+# Keep Render on the pnpm version used to create pnpm-lock.yaml. Using npx
+# avoids relying on global install permissions in Render's build container.
+PNPM_VERSION="10.26.1"
+pnpm() {
+  npx --yes "pnpm@${PNPM_VERSION}" "$@"
+}
 
-if ! command -v pnpm &> /dev/null; then
-  curl -fsSL https://get.pnpm.io/install.sh | sh -
-  # Reload PATH after install
-  export PATH="$PNPM_HOME:$PATH"
-fi
+# Install the complete workspace because the API bundle imports shared
+# workspace packages during the build.
+pnpm install --frozen-lockfile
 
-# Install all workspace dependencies using the workspace pnpm allowlist
-pnpm install --no-frozen-lockfile
-
-# Build the api-server
+rm -rf artifacts/api-server/dist
 pnpm --filter @workspace/api-server run build
 
-# Reset connections file so the app prompts DB setup on first run
-echo '{"activeId":null,"connections":[]}' > artifacts/api-server/data/connections.json
+# A deployment starts with the hosted database environment variable. Do not
+# carry a local connection-manager state file into the deployed service.
+printf '%s\n' '{"activeId":null,"connections":[]}' > artifacts/api-server/data/connections.json
