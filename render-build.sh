@@ -15,6 +15,6 @@ pnpm install --frozen-lockfile
 rm -rf artifacts/api-server/dist
 pnpm --filter @workspace/api-server run build
 
-# A deployment starts with the hosted database environment variable. Do not
-# carry a local connection-manager state file into the deployed service.
-printf '%s\n' '{"activeId":null,"connections":[]}' > artifacts/api-server/data/connections.json
+# Connection-manager state is runtime data. Do not reset it during builds;
+# the runtime creates it in CONNECTIONS_FILE when needed. On Render, point
+# CONNECTIONS_FILE at a persistent disk or use RENDER_DATABASE_URL.
