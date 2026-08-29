@@ -30,6 +30,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "0d5c60ed-81ba-49fe-9b64-185d658d9c05"
+      }
+    },
+    "owner": "rabbuls-team1"
   }
 }
