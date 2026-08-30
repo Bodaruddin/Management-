@@ -494,8 +494,17 @@ export async function downloadHtmlAsPdf(
   /* ── Native path ─────────────────────────────────────────────────────── */
   if (Platform.OS !== 'web') {
     console.log('[PDF] Native path — expo-print');
+    // Android's print WebView is more reliable when remote QR requests and
+    // redundant HTML whitespace are removed before layout.  The bulk native
+    // exporter already uses this preparation; use the same path for a single
+    // combined marksheet so it does not remain stuck on the loading overlay.
+    const qrModule = await import('qrcode');
+    const QRCode = (qrModule.default ?? qrModule) as unknown as QRCodeStatic;
+    const nativeHtml = compactNativeHtml(
+      await preEmbedQrCodes(applyNativePrintMargins(html, marginMm), QRCode, 1),
+    );
     const { uri } = await Print.printToFileAsync({
-      html: applyNativePrintMargins(html, marginMm),
+      html: nativeHtml,
     });
     const safeName = filename.replace(/['"\\<>]/g, '').trim() || 'school-documents';
     const destUri = `${FileSystem.documentDirectory}${safeName}.pdf`;
