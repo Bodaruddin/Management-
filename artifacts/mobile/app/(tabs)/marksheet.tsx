@@ -1364,8 +1364,10 @@ export default function MarksheetScreen() {
     const data = buildSingleData(student);
     if (!data) { Alert.alert('No Results', 'No results found.'); return; }
     if (!beginDownload()) return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try { await downloadHtml(buildSingleMarksheetHtml(data, documentBranding, academicSession), `Marksheet – ${student.name}`); }
+    try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await downloadHtml(buildSingleMarksheetHtml(data, documentBranding, academicSession), `Marksheet – ${student.name}`);
+    }
     catch (e: any) { if (!e?.message?.includes('cancel')) Alert.alert('Error', e?.message ?? 'Download failed'); }
     finally { endDownload(); }
   }, [buildSingleData, documentBranding, academicSession]);
@@ -1400,8 +1402,8 @@ export default function MarksheetScreen() {
     const list = bulkSelected.size > 0 ? bulkStudents.filter(s => bulkSelected.has(s.id)) : bulkStudents;
     if (list.length === 0) { Alert.alert('No Students', 'No students with results.'); return; }
     if (!beginDownload()) return;
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const dataList = list.map(s => buildSingleData(s)).filter(Boolean) as MarksheetData[];
       if (dataList.length === 0) { Alert.alert('No Data', 'No marksheet data available.'); return; }
       const filename = `Marksheets – ${selectedClass}`;
@@ -1452,8 +1454,8 @@ export default function MarksheetScreen() {
     const data = buildCombinedData(student);
     if (!data) { Alert.alert('No Results', 'No results found.'); return; }
     if (!beginDownload()) return;
-    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await downloadHtml(
         buildCombinedMarksheetHtml(data, documentBranding, academicSession),
         combinedMarksheetDownloadName(`Combined Marksheet – ${student.name}`),
@@ -1495,8 +1497,8 @@ export default function MarksheetScreen() {
   const bulkCombinedDownload = useCallback(async () => {
     if (combinedStudents.length === 0) { Alert.alert('No Students', 'No students with results.'); return; }
     if (!beginDownload()) return;
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     try {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       const studentsToDownload = bulkSelected.size > 0
         ? combinedStudents.filter(s => bulkSelected.has(s.id))
         : combinedStudents;
