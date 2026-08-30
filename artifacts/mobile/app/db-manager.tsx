@@ -123,6 +123,120 @@ const dtb = StyleSheet.create({
   txt: { fontSize: 10, fontWeight: '700' },
 });
 
+function SuccessNoticeModal({
+  visible, message, onClose,
+}: {
+  visible: boolean;
+  message: string;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={sn.overlay}>
+        <View style={sn.card}>
+          <View style={sn.cardGlow} />
+          <TouchableOpacity
+            style={sn.closeBtn}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Close success message"
+            activeOpacity={0.8}
+          >
+            <Feather name="x" size={18} color="#94A3B8" />
+          </TouchableOpacity>
+
+          <LinearGradient
+            colors={['#2563EB', '#4F46E5']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={sn.iconOuter}
+          >
+            <View style={sn.iconInner}>
+              <Feather name="check" size={28} color="#2563EB" />
+            </View>
+          </LinearGradient>
+
+          <Text style={sn.eyebrow}>DATABASE CONNECTION</Text>
+          <Text style={sn.title}>Connection switched</Text>
+          <Text style={sn.message}>{message}</Text>
+
+          <View style={sn.divider} />
+
+          <TouchableOpacity
+            onPress={onClose}
+            activeOpacity={0.88}
+            accessibilityRole="button"
+            accessibilityLabel="Continue"
+          >
+            <LinearGradient
+              colors={['#2563EB', '#4F46E5']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={sn.actionBtn}
+            >
+              <Text style={sn.actionTxt}>Continue</Text>
+              <Feather name="arrow-right" size={17} color="#fff" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+const sn = StyleSheet.create({
+  overlay: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24,
+    backgroundColor: 'rgba(15,23,42,0.64)',
+  },
+  card: {
+    width: '100%', maxWidth: 360, overflow: 'hidden',
+    alignItems: 'center', paddingHorizontal: 24, paddingTop: 30, paddingBottom: 22,
+    backgroundColor: '#fff', borderRadius: 28,
+    shadowColor: '#0F172A', shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.24, shadowRadius: 28, elevation: 18,
+  },
+  cardGlow: {
+    position: 'absolute', width: 220, height: 120, borderRadius: 110,
+    top: -82, backgroundColor: '#EFF6FF', opacity: 0.9,
+  },
+  closeBtn: {
+    position: 'absolute', top: 14, right: 14, zIndex: 2,
+    width: 32, height: 32, borderRadius: 16,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC',
+  },
+  iconOuter: {
+    width: 76, height: 76, borderRadius: 26, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 18, shadowColor: '#2563EB', shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.22, shadowRadius: 12, elevation: 7,
+  },
+  iconInner: {
+    width: 58, height: 58, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff',
+  },
+  eyebrow: {
+    fontSize: 10, fontWeight: '800', letterSpacing: 1.2, color: '#2563EB', marginBottom: 7,
+  },
+  title: { fontSize: 22, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4, textAlign: 'center' },
+  message: {
+    fontSize: 14, lineHeight: 21, color: '#64748B', textAlign: 'center',
+    marginTop: 9, maxWidth: 290,
+  },
+  divider: { width: '100%', height: 1, backgroundColor: '#EEF2F7', marginVertical: 21 },
+  actionBtn: {
+    minWidth: 180, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    borderRadius: 15, paddingHorizontal: 22, paddingVertical: 13,
+    shadowColor: '#2563EB', shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.22, shadowRadius: 10, elevation: 5,
+  },
+  actionTxt: { color: '#fff', fontSize: 14, fontWeight: '800' },
+});
+
 // ─── Connection card ──────────────────────────────────────────────────────────
 function ConnectionCard({
   conn, testResult, testing, activating,
@@ -510,6 +624,7 @@ export default function DbManagerScreen() {
   const [formVisible, setFormVisible] = useState(false);
   const [editingConn, setEditingConn] = useState<DbConnection | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DbConnection | null>(null);
+  const [successNotice, setSuccessNotice] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
@@ -548,7 +663,7 @@ export default function DbManagerScreen() {
         `/db-connections/${conn.id}/activate`, { method: 'POST' },
       );
       if (result.success) {
-        Alert.alert('✅ Switched', result.message);
+        setSuccessNotice(result.message);
         await load();
       } else {
         Alert.alert('Connection Failed', result.message);
@@ -751,6 +866,12 @@ export default function DbManagerScreen() {
         initial={editingConn ?? undefined}
         onClose={() => { setFormVisible(false); setEditingConn(null); }}
         onSave={handleSave}
+      />
+
+      <SuccessNoticeModal
+        visible={!!successNotice}
+        message={successNotice ?? ''}
+        onClose={() => setSuccessNotice(null)}
       />
 
       {/* Delete confirmation modal */}
