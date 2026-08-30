@@ -32,7 +32,7 @@ router.get("/db-connections/active", (_req, res) => {
   res.json(getActiveConnectionInfo());
 });
 
-router.post("/db-connections", (req, res) => {
+router.post("/db-connections", async (req, res) => {
   const { name, dbType = "postgresql", url, ...fbFields } = req.body;
 
   if (!name) { res.status(400).json({ error: "name is required" }); return; }
@@ -55,7 +55,7 @@ router.post("/db-connections", (req, res) => {
       res.status(400).json({ error: "serviceAccountJson must be valid JSON" });
       return;
     }
-    const conn = createConnectionFirebase({ name, config });
+    const conn = await createConnectionFirebase({ name, config });
     res.status(201).json(conn);
   } else {
     // PostgreSQL (default, backward-compatible)
@@ -64,7 +64,7 @@ router.post("/db-connections", (req, res) => {
       res.status(400).json({ error: "Invalid connection URL" });
       return;
     }
-    const conn = createConnectionPg({ name, url });
+    const conn = await createConnectionPg({ name, url });
     res.status(201).json(conn);
   }
 });
