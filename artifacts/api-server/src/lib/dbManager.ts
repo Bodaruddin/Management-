@@ -77,6 +77,8 @@ interface ConnectionsStore {
   connections: StoredConnection[];
 }
 
+const MANAGER_STORE_KEY = "__school_management_db_connections__";
+
 export interface FirebaseConfig {
   projectId: string;
   apiKey: string;
@@ -108,16 +110,31 @@ function loadStore(): ConnectionsStore {
   return { activeId: null, connections: [] };
 }
 
-function saveStore(store: ConnectionsStore): void {
-  const tempFile = CONNECTIONS_FILE + "." + process.pid + ".tmp";
+let managerStorePool: pg.Pool | null = null;
+let managerStoreUrl: string | null = null;
+
+async function saveStore(store: ConnectionsStore): Promise<void> {
   try {
     if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
     // Atomic replace prevents a restart during a write from leaving a corrupt file.
+    const tempFile = CONNECTIONS_FILE + "." + process.pid + ".tmp";
     fs.writeFileSync(tempFile, JSON.stringify(store, null, 2), { encoding: "utf8", mode: 0o600 });
     fs.renameSync(tempFile, CONNECTIONS_FILE);
   } catch (e) {
-    try { if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile); } catch {}
     logger.error({ e, file: CONNECTIONS_FILE }, "Failed to save connections store");
+  }
+
+  // Render's filesystem can still be reset when a disk is not attached to an
+  // existing service. Keep a second encrypted copy in the bootstrap database.
+  if (managerStorePool) {
+    try {
+      await managerStorePool.query(
+        "INSERT INTO app_settings (key, value, updated_at) VALUES ($1, $2::jsonb, NOW()) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()",
+        [MANAGER_STORE_KEY, JSON.stringify(store)],
+      );
+    } catch (e) {
+      logger.warn({ e }, "DB Manager: failed to persist connection store in bootstrap database");
+    }
   }
 }
 
@@ -138,6 +155,33 @@ async function destroyPool(id: string): Promise<void> {
 
 function buildDrizzle(pool: pg.Pool): NodePgDatabase<typeof schema> {
   return drizzle(pool, { schema }) as NodePgDatabase<typeof schema>;
+}
+
+
+function getEnvironmentDatabaseUrl(): string | undefined {
+  return process.env.RENDER_DATABASE_URL ?? process.env.APP_DATABASE_URL ?? process.env.DATABASE_URL;
+}
+
+async function loadRemoteStore(envUrl: string): Promise<ConnectionsStore | null> {
+  try {
+    const pool = getOrCreatePool("env", envUrl);
+    await pool.query("SELECT 1");
+    // This also creates app_settings for an older bootstrap database.
+    await initPostgresSchema(pool);
+    managerStorePool = pool;
+    managerStoreUrl = envUrl;
+
+    const result = await pool.query("SELECT value FROM app_settings WHERE key = $1 LIMIT 1", [MANAGER_STORE_KEY]);
+    const value = result.rows[0]?.value;
+    if (!value || !Array.isArray(value.connections)) return null;
+    return {
+      activeId: typeof value.activeId === "string" ? value.activeId : null,
+      connections: value.connections.map((c: any) => ({ dbType: "postgresql", ...c })) as StoredConnection[],
+    };
+  } catch (e) {
+    logger.warn({ e }, "DB Manager: bootstrap connection-store lookup failed; using local store");
+    return null;
+  }
 }
 
 // ─── Firebase Admin app cache ────────────────────────────────────────────────
@@ -188,7 +232,13 @@ function parseDisplayInfo(url: string): { host: string; dbName: string } {
 
 // ─── Init (called from src/index.ts before listen) ───────────────────────────
 export async function initDbManager(): Promise<void> {
-  const store = loadStore();
+  const envUrl = getEnvironmentDatabaseUrl();
+  const localStore = loadStore();
+  // Recover the store from the bootstrap database before using the local file.
+  // This survives Render restarts even when its persistent disk is unavailable.
+  const remoteStore = envUrl ? await loadRemoteStore(envUrl) : null;
+  const store = remoteStore ?? localStore;
+  if (managerStorePool) await await saveStore(store);
 
   // An explicit selection is authoritative. Never silently switch a configured
   // Supabase/Firebase connection back to the Render environment database just
@@ -216,13 +266,17 @@ export async function initDbManager(): Promise<void> {
 
   // Only use the hosted database when there is no saved selection. This is the
   // first-run/default path, not a fallback that can override a user's choice.
-  const envUrl =
-    process.env.RENDER_DATABASE_URL ??
-    process.env.APP_DATABASE_URL ??
-    process.env.DATABASE_URL;
   if (envUrl) {
     try {
-      const pool = getOrCreatePool("env", envUrl);
+      let pool: pg.Pool;
+      if (managerStorePool && managerStoreUrl === envUrl) {
+        pool = managerStorePool;
+      } else {
+        await destroyPool("env");
+        pool = getOrCreatePool("env", envUrl);
+        managerStorePool = pool;
+        managerStoreUrl = envUrl;
+      }
       await pool.query("SELECT 1");
       _activeAdapter = createPgAdapter(buildDrizzle(pool));
       _activeId = "env";
@@ -237,7 +291,7 @@ export async function initDbManager(): Promise<void> {
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         });
         store.activeId = "env";
-        saveStore(store);
+        await await saveStore(store);
       }
       logger.info("DB Manager: using hosted database environment variable");
       // Auto-init schema on env connection too
@@ -268,8 +322,14 @@ async function activateConnectionInternal(
     _activeDbType = "firebase";
   } else {
     const url = decrypt(conn.encryptedUrl);
-    await destroyPool(conn.id);
-    const pool = getOrCreatePool(conn.id, url);
+    const useManagerPool = conn.id === "env" && managerStorePool !== null && managerStoreUrl === url;
+    let pool: pg.Pool;
+    if (useManagerPool) {
+      pool = managerStorePool!;
+    } else {
+      await destroyPool(conn.id);
+      pool = getOrCreatePool(conn.id, url);
+    }
     await pool.query("SELECT 1");
     await initPostgresSchema(pool);
     _activeAdapter = createPgAdapter(buildDrizzle(pool));
@@ -279,7 +339,7 @@ async function activateConnectionInternal(
   }
   if (saveAfter) {
     store.activeId = conn.id;
-    saveStore(store);
+    await saveStore(store);
   }
 }
 
@@ -334,7 +394,7 @@ export function listConnections(): PublicConnection[] {
 }
 
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
-export function createConnectionPg(input: { name: string; url: string }): PublicConnection {
+export async function createConnectionPg(input: { name: string; url: string }): Promise<PublicConnection> {
   const store = loadStore();
   const id = crypto.randomUUID();
   const { host, dbName } = parseDisplayInfo(input.url);
@@ -344,11 +404,11 @@ export function createConnectionPg(input: { name: string; url: string }): Public
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   };
   store.connections.push(conn);
-  saveStore(store);
+  await saveStore(store);
   return { id, name: conn.name, dbType: "postgresql", host, dbName, createdAt: conn.createdAt, updatedAt: conn.updatedAt, isActive: false };
 }
 
-export function createConnectionFirebase(input: { name: string; config: FirebaseConfig }): PublicConnection {
+export async function createConnectionFirebase(input: { name: string; config: FirebaseConfig }): PublicConnection {
   const store = loadStore();
   const id = crypto.randomUUID();
   const conn: StoredConnectionFirebase = {
@@ -358,7 +418,7 @@ export function createConnectionFirebase(input: { name: string; config: Firebase
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
   };
   store.connections.push(conn);
-  saveStore(store);
+  await saveStore(store);
   return { id, name: conn.name, dbType: "firebase", projectId: conn.projectId, createdAt: conn.createdAt, updatedAt: conn.updatedAt, isActive: false };
 }
 
@@ -388,7 +448,7 @@ export async function updateConnection(
 
   conn.updatedAt = new Date().toISOString();
   store.connections[idx] = conn;
-  saveStore(store);
+  await saveStore(store);
   return {
     id: conn.id, name: conn.name, dbType: conn.dbType,
     ...(conn.dbType === "postgresql" ? { host: (conn as StoredConnectionPg).host, dbName: (conn as StoredConnectionPg).dbName } : { projectId: (conn as StoredConnectionFirebase).projectId }),
@@ -413,7 +473,7 @@ export async function deleteConnection(id: string): Promise<boolean> {
     _activeName = "None";
     _activeDbType = null;
   }
-  saveStore(store);
+  await saveStore(store);
   return true;
 }
 
