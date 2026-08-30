@@ -324,10 +324,6 @@ export default function TeacherAttendance() {
       setSubmitError('No students found in this class.');
       return;
     }
-    if (activeStudents.length === 0) {
-      setSubmitError('All students in this class are inactive. No attendance to submit.');
-      return;
-    }
 
     const pending = activeStudents.filter(s => !attendance[s.id]);
     if (pending.length > 0) {
@@ -342,14 +338,24 @@ export default function TeacherAttendance() {
 
     setSubmitError('');
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    const records = activeStudents.map(s => ({
-      studentId: s.id,
-      studentName: s.name,
-      class: s.class,
-      date: selectedDate,
-      status: attendance[s.id] as Status,
-      takenBy: user?.name ?? 'Teacher',
-    }));
+    const records = [
+      ...activeStudents.map(s => ({
+        studentId: s.id,
+        studentName: s.name,
+        class: s.class,
+        date: selectedDate,
+        status: attendance[s.id] as Status,
+        takenBy: user?.name ?? 'Teacher',
+      })),
+      ...inactiveStudents.map(s => ({
+        studentId: s.id,
+        studentName: s.name,
+        class: s.class,
+        date: selectedDate,
+        status: 'inactive' as const,
+        takenBy: 'System',
+      })),
+    ];
     addAttendance(records);
     setSubmitSuccess(true);
     setSelectedClass('');
@@ -598,7 +604,7 @@ export default function TeacherAttendance() {
                   );
                 }}
               />
-              {activeStudents.length > 0 && (
+              {classStudents.length > 0 && (
                 <View style={[s.submitBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: botPad }]}>
                   {alreadySubmitted ? (
                     <View style={[s.submitBtn, { backgroundColor: colors.muted, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }]}>

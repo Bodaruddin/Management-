@@ -393,9 +393,51 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
         await batch.commit();
         return results;
       },
-      async checkAndMarkInactive(_date, _cls, _absentStudentIds) {
-        // Firebase stub — auto-inactive logic not implemented for Firestore
-        return [];
+      async checkAndMarkInactive(date, cls, absentStudentIds) {
+        if (!absentStudentIds.length) return [];
+
+        const settingSnap = await col("app_settings").doc("class_absent_limits").get();
+        const limits = (settingSnap.data()?.value ?? {}) as Record<string, number>;
+        const limit = Number(limits[cls]);
+        if (!limit || limit <= 0) return [];
+
+        const inactivated: string[] = [];
+        for (const studentId of absentStudentIds) {
+          const attendanceSnap = await col("attendance_records")
+            .where("studentId", "==", studentId)
+            .get();
+          const records = attendanceSnap.docs
+            .map((doc) => doc.data() as { date?: string; status?: string })
+            .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
+
+          let consecutiveAbsents = 0;
+          for (const record of records) {
+            if (record.status === "absent") consecutiveAbsents++;
+            else break;
+          }
+          if (consecutiveAbsents < limit) continue;
+
+          const studentRef = col("students").doc(studentId);
+          const studentSnap = await studentRef.get();
+          if (!studentSnap.exists || (studentSnap.data()?.status ?? "active") !== "active") continue;
+
+          const currentDateRecords = attendanceSnap.docs.filter((doc) => doc.data().date === date);
+          const batch = fs.batch();
+          currentDateRecords.forEach((doc) => batch.delete(doc.ref));
+          batch.set(col("attendance_records").doc(newId()), stamp({
+            studentId,
+            studentName: studentSnap.data()?.name ?? "",
+            class: cls,
+            date,
+            status: "inactive",
+            takenBy: "System",
+          }));
+          batch.update(studentRef, { status: "inactive" });
+          await batch.commit();
+          inactivated.push(studentId);
+        }
+
+        return inactivated;
       },
     },
 
