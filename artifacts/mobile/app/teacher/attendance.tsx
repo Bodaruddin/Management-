@@ -307,6 +307,7 @@ export default function TeacherAttendance() {
   };
 
   const setStatus = async (studentId: string, status: Status) => {
+    if (inactiveStudents.some(student => student.id === studentId)) return;
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setAttendance(prev => ({ ...prev, [studentId]: status }));
   };
