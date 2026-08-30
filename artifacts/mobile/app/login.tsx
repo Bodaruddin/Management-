@@ -64,6 +64,15 @@ export default function LoginScreen() {
 
   const s = styles(colors);
 
+  // Do not show the login form while the saved session is being restored.
+  if (isLoading || (user && isSetupComplete === null)) {
+    return (
+      <View style={[s.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
+    );
+  }
+
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       <SystemNotReadyModal
