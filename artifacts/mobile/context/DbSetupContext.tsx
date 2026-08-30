@@ -66,6 +66,11 @@ export function DbSetupProvider({ children }: { children: React.ReactNode }) {
     }
     setLocalConfig(savedConfig);
 
+    // Use the cached value immediately so a returning user is not blocked on
+    // the network request before the app can choose the correct route.
+    const localDone = setup[1] === 'true';
+    setIsSetupComplete(localDone);
+
     // Always verify with the server — the local cache may be stale if the
     // admin reset the DB connection from another device or the server restarted.
     try {
@@ -85,8 +90,7 @@ export function DbSetupProvider({ children }: { children: React.ReactNode }) {
       await AsyncStorage.removeItem(SETUP_KEY);
       setIsSetupComplete(false);
     } catch {
-      // Server unreachable — fall back to local cache so staff can still use the app
-      const localDone = setup[1] === 'true';
+      // Server unreachable — keep using the cached value so staff can still use the app.
       setIsSetupComplete(localDone);
     }
   }
