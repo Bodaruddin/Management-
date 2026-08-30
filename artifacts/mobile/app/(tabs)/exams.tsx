@@ -782,6 +782,7 @@ export default function ExamsScreen() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
               {exams.map(ex => {
                 const active = frExamIds.includes(ex.id);
+                const classLabel = getExamClassLabel(ex);
                 return (
                   <TouchableOpacity
                     key={ex.id}
@@ -792,6 +793,9 @@ export default function ExamsScreen() {
                     {active && <Feather name="check" size={12} color="#fff" style={{ marginRight: 4 }} />}
                     <View>
                       <Text style={{ fontSize: 13, fontWeight: active ? '700' : '500', color: active ? '#fff' : colors.text }}>{ex.name}</Text>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: active ? 'rgba(255,255,255,0.82)' : colors.primary }} numberOfLines={1}>
+                        {classLabel}
+                      </Text>
                       <Text style={{ fontSize: 10, color: active ? 'rgba(255,255,255,0.7)' : colors.mutedForeground }}>{ex.date}</Text>
                     </View>
                   </TouchableOpacity>
