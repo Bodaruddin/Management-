@@ -100,7 +100,7 @@ export default function ExamsScreen() {
   // Combined per-student result rows, sorted by roll number
   const frRows = useMemo(() => {
     if (frSelectedExams.length === 0 || !frClass) return [];
-    const cls_students = students.filter(s => s.class === frClass && isActiveStudent(s));
+    const cls_students = students.filter(s => s.class === frClass && !isGraduatedStudent(s));
 
     return cls_students
       .map(st => {
