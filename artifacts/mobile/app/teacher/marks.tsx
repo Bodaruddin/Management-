@@ -143,10 +143,7 @@ export default function TeacherMarks() {
   const examStudents = useMemo(
     () => students
       .filter(s => s.class === selectedClass && !isGraduatedStudent(s))
-      .sort((a, b) => {
-        const activeOrder = (a.status === 'inactive' ? 1 : 0) - (b.status === 'inactive' ? 1 : 0);
-        return activeOrder || compareStudentRollNumbers(a, b);
-      }),
+      .sort(compareStudentRollNumbers),
     [students, selectedClass],
   );
 
@@ -183,10 +180,7 @@ export default function TeacherMarks() {
     setCurrentStudentIndex(0);
     const classStudents = students
       .filter(s => s.class === cls && !isGraduatedStudent(s))
-      .sort((a, b) => {
-        const activeOrder = (a.status === 'inactive' ? 1 : 0) - (b.status === 'inactive' ? 1 : 0);
-        return activeOrder || compareStudentRollNumbers(a, b);
-      });
+      .sort(compareStudentRollNumbers);
     const subs = getExamSubjectsForClass(exam, cls);
 
     const hasResults = classStudents.some(s =>
