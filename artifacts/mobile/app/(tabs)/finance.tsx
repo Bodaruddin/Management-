@@ -18,6 +18,7 @@ import ReminderCard from '@/components/ReminderCard';
 
 type Tab = 'overview' | 'salary' | 'fees' | 'feeTypes' | 'expenses';
 type Period = 'today' | 'week' | 'month' | 'year' | 'all';
+type OverviewFilter = 'fee' | 'teacher';
 
 const EXPENSE_CATEGORIES = ['Supplies', 'Utilities', 'Salaries', 'Maintenance', 'Events', 'Other'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -105,7 +106,7 @@ export default function FinanceScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const {
-    students, feeRecords, addFeeRecord, deleteFeeRecord, documentBranding,
+    students, teachers, feeRecords, addFeeRecord, deleteFeeRecord, documentBranding,
     feeTypes, addFeeType, updateFeeType, deleteFeeType,
     expenses, addExpense, deleteExpense,
     salaryRecords,
@@ -114,6 +115,9 @@ export default function FinanceScreen() {
   const [tab, setTab] = useState<Tab>('overview');
   const [period, setPeriod] = useState<Period>('month');
   const [activeMetric, setActiveMetric] = useState<'fees' | 'expenses' | 'net'>('fees');
+  const [feeFilter, setFeeFilter] = useState('All');
+  const [teacherFilter, setTeacherFilter] = useState('All');
+  const [filterPicker, setFilterPicker] = useState<OverviewFilter | null>(null);
 
   // ── Fee collection state ──
   const [showCollectModal, setShowCollectModal] = useState(false);
@@ -171,6 +175,32 @@ export default function FinanceScreen() {
     }
   }, [feeRecords, period, todayStr, weekStartStr, monthStr, yearStr]);
 
+  const feeFilterOptions = useMemo(() => {
+    const names = feeRecords
+      .map(f => f.feeTypeName ?? f.description ?? 'Other')
+      .filter(Boolean);
+    return ['All', ...Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))];
+  }, [feeRecords]);
+
+  const teacherFilterOptions = useMemo(() => {
+    const names = [
+      ...teachers.map(teacher => teacher.name),
+      ...feeRecords.map(record => record.collectedBy),
+    ].filter(Boolean);
+    return ['All', ...Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))];
+  }, [teachers, feeRecords]);
+
+  const matchesOverviewFilters = (fee: typeof feeRecords[number]) => {
+    const feeName = fee.feeTypeName ?? fee.description ?? 'Other';
+    return (feeFilter === 'All' || feeName === feeFilter)
+      && (teacherFilter === 'All' || fee.collectedBy === teacherFilter);
+  };
+
+  const filteredPeriodFees = useMemo(
+    () => periodFees.filter(matchesOverviewFilters),
+    [periodFees, feeFilter, teacherFilter],
+  );
+
   const periodExpenses = useMemo(() => {
     switch (period) {
       case 'today': return expenses.filter(e => e.date === todayStr);
@@ -181,7 +211,7 @@ export default function FinanceScreen() {
     }
   }, [expenses, period, todayStr, weekStartStr, monthStr, yearStr]);
 
-  const totalFees     = useMemo(() => periodFees.reduce((s, f) => s + f.amount, 0), [periodFees]);
+  const totalFees     = useMemo(() => filteredPeriodFees.reduce((s, f) => s + f.amount, 0), [filteredPeriodFees]);
   const totalExpenses = useMemo(() => periodExpenses.reduce((s, e) => s + e.amount, 0), [periodExpenses]);
   const netBalance    = totalFees - totalExpenses;
 
@@ -218,17 +248,17 @@ export default function FinanceScreen() {
       start: `${monthStr}-${pad(w * 7 + 1)}`,
       end:   `${monthStr}-${pad(Math.min((w + 1) * 7, 31))}`,
     }));
-    return weeks.map(({ label, start, end }) => ({
+     return weeks.map(({ label, start, end }) => ({
       label,
-      fees:     feeRecords.filter(f => f.date >= start && f.date <= end).reduce((s, f) => s + f.amount, 0),
+       fees:     feeRecords.filter(f => f.date >= start && f.date <= end && matchesOverviewFilters(f)).reduce((s, f) => s + f.amount, 0),
       expenses: expenses.filter(e => e.date >= start && e.date <= end).reduce((s, e) => s + e.amount, 0),
     }));
-  }, [feeRecords, expenses, monthStr]);
+  }, [feeRecords, expenses, monthStr, feeFilter, teacherFilter]);
 
   // ── Fee type breakdown for period ────────────────────────────────────────
   const feesByType = useMemo(() => {
     const map: Record<string, number> = {};
-    periodFees.forEach(f => {
+     filteredPeriodFees.forEach(f => {
       const key = f.feeTypeName ?? f.description ?? 'Other';
       map[key] = (map[key] ?? 0) + f.amount;
     });
@@ -236,11 +266,11 @@ export default function FinanceScreen() {
       .map(([name, amount]) => ({ name, amount, pct: totalFees > 0 ? amount / totalFees : 0 }))
       .sort((a, b) => b.amount - a.amount)
       .slice(0, 6);
-  }, [periodFees, totalFees]);
+  }, [filteredPeriodFees, totalFees]);
 
   // ── Recent combined transactions ─────────────────────────────────────────
   const recentTxns = useMemo(() => {
-    const fees = periodFees.map(f => ({
+     const fees = filteredPeriodFees.map(f => ({
       id: f.id, name: f.studentName ?? 'Student',
       sub: f.feeTypeName ?? f.description, amount: f.amount, date: f.date, type: 'fee' as const,
     }));
@@ -249,7 +279,7 @@ export default function FinanceScreen() {
       sub: e.category, amount: -e.amount, date: e.date, type: 'expense' as const,
     }));
     return [...fees, ...exps].sort((a, b) => b.date.localeCompare(a.date)).slice(0, 20);
-  }, [periodFees, periodExpenses]);
+  }, [filteredPeriodFees, periodExpenses]);
 
   // ── Legacy month-based values (used in student fee cards) ────────────────
   const monthFees     = useMemo(() => feeRecords.filter(f => f.date.startsWith(monthStr)).reduce((s, f) => s + f.amount, 0), [feeRecords, monthStr]);
@@ -387,6 +417,38 @@ export default function FinanceScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+
+        {/* Overview filters */}
+        <View style={s.filterRow}>
+          <TouchableOpacity
+            style={s.filterPill}
+            onPress={() => setFilterPicker('fee')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Filter by fee type"
+            testID="finance-fee-filter"
+          >
+            <Feather name="tag" size={13} color="rgba(255,255,255,0.78)" />
+            <Text style={s.filterPillText} numberOfLines={1}>
+              {feeFilter === 'All' ? 'All fees' : feeFilter}
+            </Text>
+            <Feather name="chevron-down" size={13} color="rgba(255,255,255,0.65)" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.filterPill}
+            onPress={() => setFilterPicker('teacher')}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Filter by teacher"
+            testID="finance-teacher-filter"
+          >
+            <Feather name="user" size={13} color="rgba(255,255,255,0.78)" />
+            <Text style={s.filterPillText} numberOfLines={1}>
+              {teacherFilter === 'All' ? 'All teachers' : teacherFilter}
+            </Text>
+            <Feather name="chevron-down" size={13} color="rgba(255,255,255,0.65)" />
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       {/* ── Tab Bar ────────────────────────────────────────────────────────── */}
@@ -791,6 +853,59 @@ export default function FinanceScreen() {
       {/* ════════════════════════════════════════════════════════════════════
           ALL MODALS (unchanged)
          ════════════════════════════════════════════════════════════════════ */}
+
+      {/* Overview Filter Picker */}
+      <Modal visible={!!filterPicker} animationType="slide" transparent>
+        <View style={mo.overlay}>
+          <View style={[mo.sheet, { backgroundColor: colors.card, minHeight: 0, maxHeight: '72%' }]}>
+            <View style={[mo.header, { borderBottomColor: colors.border }]}>
+              <View>
+                <Text style={[mo.title, { color: colors.text }]}>
+                  {filterPicker === 'fee' ? 'Filter by Fee Type' : 'Filter by Teacher'}
+                </Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 3 }}>
+                  Choose which collections to show
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setFilterPicker(null)} accessibilityLabel="Close filter picker">
+                <Feather name="x" size={24} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {(filterPicker === 'fee' ? feeFilterOptions : teacherFilterOptions).map(option => {
+                const selected = filterPicker === 'fee' ? feeFilter === option : teacherFilter === option;
+                const label = option === 'All'
+                  ? filterPicker === 'fee' ? 'All fee types' : 'All teachers'
+                  : option;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    style={[picker.row, { borderBottomColor: colors.border }]}
+                    onPress={() => {
+                      if (filterPicker === 'fee') setFeeFilter(option);
+                      else setTeacherFilter(option);
+                      setFilterPicker(null);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[filterOptionIcon, { backgroundColor: selected ? colors.primary + '15' : colors.muted }]}>
+                      <Feather
+                        name={filterPicker === 'fee' ? 'tag' : 'user'}
+                        size={15}
+                        color={selected ? colors.primary : colors.mutedForeground}
+                      />
+                    </View>
+                    <Text style={[picker.name, { color: selected ? colors.primary : colors.text, fontWeight: selected ? '700' : '500' }]}>
+                      {label}
+                    </Text>
+                    {selected && <Feather name="check" size={18} color={colors.primary} style={{ marginLeft: 'auto' }} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Collect Fee Modal */}
       <Modal visible={showCollectModal} animationType="slide" transparent={false}>
@@ -1242,6 +1357,9 @@ const s = StyleSheet.create({
   periodPillActive: { backgroundColor: '#C8A040', borderColor: '#C8A040' },
   periodPillText: { fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.75)' },
   periodPillTextActive: { color: '#fff' },
+  filterRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  filterPill: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
+  filterPillText: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.88)' },
 
   // Tab bar
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
@@ -1391,6 +1509,15 @@ const picker = StyleSheet.create({
   desc: { fontSize: 12, marginTop: 2 },
   amount: { fontSize: 15, fontWeight: '700' },
 });
+
+const filterOptionIcon = {
+  width: 32,
+  height: 32,
+  borderRadius: 9,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  marginRight: 12,
+};
 
 const hist = StyleSheet.create({
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1 },
