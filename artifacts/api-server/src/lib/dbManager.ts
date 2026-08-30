@@ -190,23 +190,32 @@ function parseDisplayInfo(url: string): { host: string; dbName: string } {
 export async function initDbManager(): Promise<void> {
   const store = loadStore();
 
-  // 1. Try saved active connection
+  // An explicit selection is authoritative. Never silently switch a configured
+  // Supabase/Firebase connection back to the Render environment database just
+  // because the selected database is temporarily unavailable.
   if (store.activeId) {
     const conn = store.connections.find((c) => c.id === store.activeId);
-    if (conn) {
-      try {
-        await activateConnectionInternal(conn, store, false);
-        logger.info({ id: conn.id, name: conn.name, dbType: conn.dbType }, "DB Manager: restored saved connection");
-        return;
-      } catch (e) {
-        logger.warn({ e, id: store.activeId }, "DB Manager: saved connection failed, trying env var");
-        if (conn.dbType === "postgresql") await destroyPool(conn.id);
-        else await destroyFirebase(conn.id);
-      }
+    if (!conn) {
+      logger.error({ id: store.activeId }, "DB Manager: saved active connection was not found; refusing env fallback");
+      return;
+    }
+    try {
+      await activateConnectionInternal(conn, store, false);
+      logger.info({ id: conn.id, name: conn.name, dbType: conn.dbType }, "DB Manager: restored saved connection");
+      return;
+    } catch (e) {
+      logger.error(
+        { e, id: conn.id, name: conn.name, dbType: conn.dbType },
+        "DB Manager: saved connection failed; keeping it selected and refusing env fallback",
+      );
+      if (conn.dbType === "postgresql") await destroyPool(conn.id);
+      else await destroyFirebase(conn.id);
+      return;
     }
   }
 
-  // 2. Fall back to the new hosted database secret, then legacy names for compatibility.
+  // Only use the hosted database when there is no saved selection. This is the
+  // first-run/default path, not a fallback that can override a user's choice.
   const envUrl =
     process.env.RENDER_DATABASE_URL ??
     process.env.APP_DATABASE_URL ??
@@ -217,7 +226,7 @@ export async function initDbManager(): Promise<void> {
       await pool.query("SELECT 1");
       _activeAdapter = createPgAdapter(buildDrizzle(pool));
       _activeId = "env";
-       _activeName = "Render Database";
+      _activeName = "Render Database";
       _activeDbType = "postgresql";
 
       if (!store.connections.find((c) => c.id === "env")) {
