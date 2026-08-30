@@ -94,12 +94,10 @@ export default function AttendanceDetailModal({
                   <Text style={[styles.statLabel, { color: colors.warning }]}>Holiday</Text>
                 </View>
               )}
-              {inactiveDays > 0 && (
-                <View style={[styles.statBox, { backgroundColor: colors.muted + '80' }]}>
-                  <Text style={[styles.statValue, { color: colors.mutedForeground }]}>{inactiveDays}</Text>
-                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Inactive</Text>
-                </View>
-              )}
+              <View style={[styles.statBox, { backgroundColor: colors.muted + '80' }]}>
+                <Text style={[styles.statValue, { color: colors.mutedForeground }]}>{inactiveDays}</Text>
+                <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Inactive</Text>
+              </View>
             </View>
 
             {months.length === 0 ? (
