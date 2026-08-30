@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
-  Modal, ScrollView, Alert, Platform, Image,
+  Modal, ScrollView, Alert, Platform, Image, KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -1396,6 +1396,11 @@ export default function ExamsScreen() {
       {/* ════ Create / Edit Exam Modal ════ */}
       <Modal visible={showCreateModal} animationType="slide" transparent>
         <View style={cmo.overlay}>
+          <KeyboardAvoidingView
+            style={cmo.keyboardAvoiding}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+          >
           <View style={[cmo.sheet, { backgroundColor: colors.card }]}>
             <View style={[cmo.header, { borderBottomColor: colors.border }]}>
               <Text style={[cmo.title, { color: colors.text }]}>{editingExam ? 'Edit Exam' : 'Create Exam'}</Text>
@@ -1403,7 +1408,12 @@ export default function ExamsScreen() {
                 <Feather name="x" size={24} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              style={{ padding: 20 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              automaticallyAdjustKeyboardInsets
+            >
 
               {/* Exam Name */}
               <View style={{ marginBottom: 16 }}>
@@ -1602,6 +1612,7 @@ export default function ExamsScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -1705,7 +1716,8 @@ const mk = StyleSheet.create({
 });
 const cmo = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%', minHeight: '70%' },
+  keyboardAvoiding: { width: '100%', maxHeight: '100%' },
+  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%', minHeight: 0 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
   title: { fontSize: 18, fontWeight: '700' },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 8 },

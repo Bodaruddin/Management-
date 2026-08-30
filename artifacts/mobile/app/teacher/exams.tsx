@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
-  Modal, ScrollView, Alert, Platform,
+  Modal, ScrollView, Alert, Platform, KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -75,13 +75,24 @@ export default function TeacherExams() {
             : [...ca.selectedSubjects, sub],
           subjectSchedules: alreadySelected
             ? ca.subjectSchedules.filter(s => s.subject !== sub)
-            : [...ca.subjectSchedules, { subject: sub, date: p.defaultDate, maxMarks: Number(p.defaultMaxMarks) || 100 }],
+            : [...ca.subjectSchedules, {
+                subject: sub,
+                date: p.defaultDate,
+                maxMarks: Number(p.defaultMaxMarks) || 100,
+                startTime: '',
+                endTime: '',
+              }],
         };
       }),
     }));
   };
 
-  const updateSubjectScheduleForClass = (cls: string, subject: string, field: 'date' | 'maxMarks', value: string) => {
+  const updateSubjectScheduleForClass = (
+    cls: string,
+    subject: string,
+    field: 'date' | 'maxMarks' | 'startTime' | 'endTime',
+    value: string,
+  ) => {
     setForm(p => ({
       ...p,
       classAssignments: p.classAssignments.map(ca => {
@@ -287,14 +298,24 @@ export default function TeacherExams() {
       {/* Create / Edit Exam Modal */}
       <Modal visible={showCreate} animationType="slide" transparent>
         <View style={mo.overlay}>
-          <View style={[mo.sheet, { backgroundColor: colors.card }]}>
+          <KeyboardAvoidingView
+            style={mo.keyboardAvoiding}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+          >
+            <View style={[mo.sheet, { backgroundColor: colors.card }]}>
             <View style={[mo.header, { borderBottomColor: colors.border }]}>
               <Text style={[mo.title, { color: colors.text }]}>{editingExam ? 'Edit Exam' : 'Create Exam'}</Text>
               <TouchableOpacity onPress={closeExamForm}>
                 <Feather name="x" size={22} color={colors.mutedForeground} />
               </TouchableOpacity>
             </View>
-            <ScrollView style={{ padding: 20 }} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              style={{ padding: 20 }}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              automaticallyAdjustKeyboardInsets
+            >
 
               {/* Exam Name */}
               <Text style={[mo.label, { color: colors.text }]}>Exam Name *</Text>
@@ -419,6 +440,30 @@ export default function TeacherExams() {
                               />
                             </View>
                           </View>
+                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>START TIME</Text>
+                              <TextInput
+                                style={[mo.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
+                                value={sched.startTime ?? ''}
+                                onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'startTime', v)}
+                                placeholder="09:00 AM"
+                                placeholderTextColor={colors.mutedForeground}
+                                returnKeyType="next"
+                              />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground, marginBottom: 4 }}>END TIME</Text>
+                              <TextInput
+                                style={[mo.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
+                                value={sched.endTime ?? ''}
+                                onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'endTime', v)}
+                                placeholder="12:00 PM"
+                                placeholderTextColor={colors.mutedForeground}
+                                returnKeyType="done"
+                              />
+                            </View>
+                          </View>
                         </View>
                       ))}
                     </View>
@@ -440,7 +485,8 @@ export default function TeacherExams() {
                 <Text style={{ color: '#fff', fontWeight: '700' }}>{editingExam ? 'Save Changes' : 'Create Exam'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
 
@@ -475,7 +521,8 @@ export default function TeacherExams() {
 
 const mo = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%', minHeight: '70%', overflow: 'hidden' },
+  keyboardAvoiding: { width: '100%', maxHeight: '100%' },
+  sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%', minHeight: 0, overflow: 'hidden' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
   title: { fontSize: 17, fontWeight: '700' },
   label: { fontSize: 13, fontWeight: '600', marginBottom: 8 },
