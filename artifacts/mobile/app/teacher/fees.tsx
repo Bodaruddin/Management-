@@ -47,6 +47,7 @@ export default function TeacherFees() {
   const [studentSearch, setStudentSearch] = useState('');
   const [classFilter, setClassFilter] = useState('All');
   const [showFeeTypePicker, setShowFeeTypePicker] = useState(false);
+  const [showPreviousPayments, setShowPreviousPayments] = useState(false);
 
   // ── Tabs ──
   const canCollect = !!user?.permissions?.feeCollection;
@@ -100,6 +101,18 @@ export default function TeacherFees() {
 
   const selectedStudent = students.find(s => s.id === selectedStudentId && isActiveStudent(s)) ?? null;
   const selectedFeeInfo = selectedStudent ? getStudentFeeInfo(selectedStudent, feeRecords) : null;
+  const previousPayments = useMemo(() => {
+    if (!selectedStudentId) return [];
+    return feeRecords
+      .filter(record => {
+        if (record.studentId !== selectedStudentId) return false;
+        if (!selectedFeeType) return true;
+        return record.feeTypeId === selectedFeeType.id
+          || (!record.feeTypeId && record.feeTypeName?.toLowerCase() === selectedFeeType.name.toLowerCase());
+      })
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  }, [feeRecords, selectedStudentId, selectedFeeType]);
+  const previousPaymentsTotal = previousPayments.reduce((sum, record) => sum + record.amount, 0);
   const amt = Number(amount) || 0;
   const canSubmit = !!selectedStudentId && !!selectedFeeType && amt > 0;
 
@@ -387,6 +400,39 @@ export default function TeacherFees() {
                   : <Feather name="chevron-down" size={16} color={colors.mutedForeground} />}
               </TouchableOpacity>
 
+              {/* Previous collection check */}
+              <TouchableOpacity
+                style={[s.previousCheck, {
+                  backgroundColor: selectedStudent ? colors.primary + '08' : colors.muted,
+                  borderColor: selectedStudent ? colors.primary + '40' : colors.border,
+                }]}
+                onPress={() => setShowPreviousPayments(true)}
+                disabled={!selectedStudent}
+                activeOpacity={0.78}
+                accessibilityRole="button"
+                accessibilityLabel="Check previous fees collected"
+              >
+                <View style={[s.previousCheckIcon, { backgroundColor: selectedStudent ? colors.primary + '18' : colors.border + '70' }]}>
+                  <Feather name="clock" size={15} color={selectedStudent ? colors.primary : colors.mutedForeground} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.previousCheckTitle, { color: colors.text }]}>Previous fee collected</Text>
+                  <Text style={[s.previousCheckSub, { color: colors.mutedForeground }]}>
+                    {!selectedStudent
+                      ? 'Select a student to check payment history'
+                      : previousPayments.length > 0
+                        ? `${previousPayments.length} payment${previousPayments.length === 1 ? '' : 's'} found${selectedFeeType ? ` for ${selectedFeeType.name}` : ''}`
+                        : 'No previous payment found'}
+                  </Text>
+                </View>
+                <View style={[s.previousCheckAction, { backgroundColor: selectedStudent ? colors.primary : colors.border }]}>
+                  <Text style={{ color: selectedStudent ? '#fff' : colors.mutedForeground, fontSize: 12, fontWeight: '700' }}>
+                    {selectedStudent ? 'Check' : '—'}
+                  </Text>
+                  {selectedStudent && <Feather name="chevron-right" size={14} color="#fff" />}
+                </View>
+              </TouchableOpacity>
+
               {/* Amount */}
               <Text style={[s.label, { color: colors.mutedForeground, marginTop: 14 }]}>AMOUNT (₹)</Text>
               <View style={[s.amountBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
@@ -597,6 +643,113 @@ export default function TeacherFees() {
         </View>
       </Modal>
 
+      {/* ════ Previous Payments Modal ════ */}
+      <Modal
+        visible={showPreviousPayments}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowPreviousPayments(false)}
+      >
+        <View style={s.overlay}>
+          <View style={[s.sheet, s.previousSheet, { backgroundColor: colors.card }]}>
+            <View style={[s.sheetHeader, { borderBottomColor: colors.border }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={[s.previousModalIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <Feather name="clock" size={17} color={colors.primary} />
+                </View>
+                <View>
+                  <Text style={[s.sheetTitle, { color: colors.text }]}>Previous fee collected</Text>
+                  {selectedStudent && (
+                    <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 2 }}>
+                      {selectedStudent.name} · {selectedStudent.class}
+                    </Text>
+                  )}
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowPreviousPayments(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Close previous payments"
+              >
+                <Feather name="x" size={22} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <View style={[s.previousSummary, { backgroundColor: colors.primary + '0B', borderColor: colors.primary + '22' }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.previousSummaryLabel, { color: colors.mutedForeground }]}>TOTAL COLLECTED</Text>
+                <Text style={[s.previousSummaryAmount, { color: colors.primary }]}>₹{previousPaymentsTotal.toLocaleString('en-IN')}</Text>
+              </View>
+              <View style={[s.previousSummaryDivider, { backgroundColor: colors.border }]} />
+              <View style={{ flex: 1 }}>
+                <Text style={[s.previousSummaryLabel, { color: colors.mutedForeground }]}>PAYMENTS</Text>
+                <Text style={[s.previousSummaryAmount, { color: colors.text }]}>{previousPayments.length}</Text>
+              </View>
+            </View>
+
+            {selectedFeeType && (
+              <View style={[s.previousFilter, { backgroundColor: colors.muted }]}>
+                <Feather name="filter" size={13} color={colors.primary} />
+                <Text style={{ color: colors.mutedForeground, fontSize: 12, flex: 1 }}>
+                  Showing payments for <Text style={{ color: colors.text, fontWeight: '700' }}>{selectedFeeType.name}</Text>
+                </Text>
+              </View>
+            )}
+
+            <ScrollView
+              style={{ paddingHorizontal: 16 }}
+              contentContainerStyle={{ paddingVertical: 14 }}
+              showsVerticalScrollIndicator={false}
+            >
+              {previousPayments.length === 0 ? (
+                <View style={s.previousEmpty}>
+                  <View style={[s.previousEmptyIcon, { backgroundColor: colors.muted }]}>
+                    <Feather name="inbox" size={24} color={colors.mutedForeground} />
+                  </View>
+                  <Text style={[s.previousEmptyTitle, { color: colors.text }]}>No previous collection</Text>
+                  <Text style={[s.previousEmptyText, { color: colors.mutedForeground }]}>
+                    No fee payment has been recorded for this student{selectedFeeType ? ` under ${selectedFeeType.name}` : ''}.
+                  </Text>
+                </View>
+              ) : (
+                previousPayments.map(record => (
+                  <View key={record.id} style={[s.previousRecord, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                    <View style={[s.previousRecordIcon, { backgroundColor: colors.success + '18' }]}>
+                      <Feather name="check" size={15} color={colors.success} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.previousRecordTitle, { color: colors.text }]} numberOfLines={1}>
+                        {record.feeTypeName || record.description || 'Fee payment'}
+                      </Text>
+                      <Text style={[s.previousRecordMeta, { color: colors.mutedForeground }]}>
+                        {record.date}{record.paymentMethod ? ` · ${record.paymentMethod}` : ''}
+                      </Text>
+                      <Text style={[s.previousRecordMeta, { color: colors.mutedForeground }]}>
+                        Collected by {record.collectedBy || 'Teacher'}
+                      </Text>
+                    </View>
+                    <Text style={[s.previousRecordAmount, { color: colors.success }]}>
+                      ₹{record.amount.toLocaleString('en-IN')}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+
+            <View style={[s.previousFooter, { borderTopColor: colors.border }]}>
+              <TouchableOpacity
+                style={[s.previousDoneBtn, { backgroundColor: colors.primary }]}
+                onPress={() => setShowPreviousPayments(false)}
+                activeOpacity={0.85}
+              >
+                <Feather name="check" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>Done</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* ════ Reminder Modal ════ */}
       <Modal visible={showReminderModal} animationType="slide" transparent>
         <View style={s.overlay}>
@@ -775,6 +928,11 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   pickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13 },
   pickerIcon: { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   pickerText: { flex: 1, fontSize: 15 },
+  previousCheck: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 10, marginTop: 12 },
+  previousCheckIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  previousCheckTitle: { fontSize: 13, fontWeight: '700' },
+  previousCheckSub: { fontSize: 11, marginTop: 2 },
+  previousCheckAction: { flexDirection: 'row', alignItems: 'center', gap: 2, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 7 },
   amountBox: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 14, paddingHorizontal: 14 },
   amountPrefix: { fontSize: 20, fontWeight: '800', marginRight: 6 },
   amountInput: { flex: 1, fontSize: 20, fontWeight: '700', paddingVertical: 14 },
@@ -804,10 +962,28 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   // Modal
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '70%' },
+  previousSheet: { maxHeight: '82%' },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 20, borderBottomWidth: 1 },
   sheetTitle: { fontSize: 17, fontWeight: '700' },
   feeTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1 },
   feeTypeIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  previousModalIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  previousSummary: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 16, padding: 14, borderRadius: 14, borderWidth: 1 },
+  previousSummaryLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.4, marginBottom: 4 },
+  previousSummaryAmount: { fontSize: 18, fontWeight: '800' },
+  previousSummaryDivider: { width: 1, height: 34, marginHorizontal: 14 },
+  previousFilter: { flexDirection: 'row', alignItems: 'center', gap: 7, marginHorizontal: 16, marginTop: 10, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 9 },
+  previousRecord: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 9 },
+  previousRecordIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  previousRecordTitle: { fontSize: 13, fontWeight: '700' },
+  previousRecordMeta: { fontSize: 10, marginTop: 3 },
+  previousRecordAmount: { fontSize: 14, fontWeight: '800' },
+  previousEmpty: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 18 },
+  previousEmptyIcon: { width: 58, height: 58, borderRadius: 18, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  previousEmptyTitle: { fontSize: 15, fontWeight: '700', marginBottom: 5 },
+  previousEmptyText: { fontSize: 12, lineHeight: 18, textAlign: 'center' },
+  previousFooter: { borderTopWidth: 1, padding: 16 },
+  previousDoneBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 14, paddingVertical: 13 },
   feeTypeName: { fontSize: 15, fontWeight: '600' },
   reminderBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 13, paddingVertical: 14 },
   reminderBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
