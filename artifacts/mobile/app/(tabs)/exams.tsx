@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
   Modal, ScrollView, Alert, Platform, Image, KeyboardAvoidingView,
@@ -61,6 +61,7 @@ export default function ExamsScreen() {
     defaultDate: todayISO,
     defaultMaxMarks: '100',
   });
+  const createExamScrollRef = useRef<ScrollView>(null);
 
   // Custom subject input
   const [newSubjectInput, setNewSubjectInput] = useState('');
@@ -315,6 +316,12 @@ export default function ExamsScreen() {
     setEditingExam(null);
     resetCreateForm();
     setShowCreateModal(true);
+  };
+
+  const revealCreateFormInput = () => {
+    if (Platform.OS === 'web') return;
+    // Let Android resize the modal first, then reveal the focused schedule field.
+    setTimeout(() => createExamScrollRef.current?.scrollToEnd({ animated: true }), 150);
   };
 
   const openEditExam = (exam: Exam) => {
@@ -1413,9 +1420,11 @@ export default function ExamsScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView
-              style={{ padding: 20 }}
+              ref={createExamScrollRef}
+              contentContainerStyle={{ padding: 20, paddingBottom: 180 }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+              nestedScrollEnabled
               automaticallyAdjustKeyboardInsets
             >
 
@@ -1557,6 +1566,7 @@ export default function ExamsScreen() {
                                 style={[cmo.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13 }]}
                                 value={sched.date}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'date', v)}
+                                onFocus={revealCreateFormInput}
                                 placeholder="YYYY-MM-DD"
                                 placeholderTextColor={colors.mutedForeground}
                               />
@@ -1581,6 +1591,7 @@ export default function ExamsScreen() {
                                 style={[cmo.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
                                 value={sched.startTime ?? ''}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'startTime', v)}
+                                onFocus={revealCreateFormInput}
                                 placeholder="09:00 AM"
                                 placeholderTextColor={colors.mutedForeground}
                               />
@@ -1591,6 +1602,7 @@ export default function ExamsScreen() {
                                 style={[cmo.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
                                 value={sched.endTime ?? ''}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'endTime', v)}
+                                onFocus={revealCreateFormInput}
                                 placeholder="12:00 PM"
                                 placeholderTextColor={colors.mutedForeground}
                               />
@@ -1720,7 +1732,7 @@ const mk = StyleSheet.create({
 });
 const cmo = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  keyboardAvoiding: { width: '100%', maxHeight: '100%' },
+  keyboardAvoiding: { flex: 1, width: '100%', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%', minHeight: 0 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
   title: { fontSize: 18, fontWeight: '700' },
