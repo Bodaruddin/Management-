@@ -9,7 +9,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useColors } from '@/hooks/useColors';
 import {
-  useApp, Student, getStudentFeeInfo, isActiveStudent, compareStudentRollNumbers,
+  useApp, Student, getStudentFeeInfo, isGraduatedStudent, compareStudentRollNumbers,
   STUDENT_CASTE_OPTIONS, STUDENT_GENDER_OPTIONS,
 } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
@@ -159,7 +159,7 @@ export default function StudentsScreen({ teacherMode = false }: { teacherMode?: 
   const filtered = useMemo(() =>
     students
       .filter(s =>
-        isActiveStudent(s) &&
+        !isGraduatedStudent(s) &&
         (filterClass === 'All' || s.class === filterClass) &&
         (s.name.toLowerCase().includes(search.toLowerCase()) ||
          s.rollNumber.includes(search) ||
@@ -358,6 +358,11 @@ export default function StudentsScreen({ teacherMode = false }: { teacherMode?: 
                   <Text style={cardStyles.name}>{st.name}</Text>
                   <Text style={cardStyles.sub}>{classSection} • Roll: {st.rollNumber}</Text>
                   {st.admissionNo ? <Text style={[cardStyles.sub, { color: colors.primary, fontWeight: '600' }]}>Adm: {st.admissionNo}</Text> : null}
+                  {st.status === 'inactive' ? (
+                    <View style={[cardStyles.statusBadge, { backgroundColor: '#FEF3C7', alignSelf: 'flex-start', marginTop: 4 }]}>
+                      <Text style={[cardStyles.statusText, { color: '#B45309' }]}>Inactive</Text>
+                    </View>
+                  ) : null}
                 </View>
                 <View style={cardStyles.actions}>
                   <TouchableOpacity onPress={() => setShowAttendance(st)} style={[cardStyles.actionBtn, { backgroundColor: colors.info + '15' }]}>
