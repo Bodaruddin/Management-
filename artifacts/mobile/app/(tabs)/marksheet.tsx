@@ -362,7 +362,7 @@ function buildSingleMarksheetHtml(
   // 7 % reduction even with very few subjects (estimation errors can't cause clipping).
   // Base 910 = header~260 + info~140 + table-header~50 + summary~145 + remarks~45 + sigs~80 + footer~45 + gaps~95
   const _innerContentH = 910 + exam.subjects.length * 27;
-  const _innerZoomVal = Math.min(0.93, 920 / _innerContentH);
+  const _innerZoomVal = Math.min(0.98, 1020 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
   return `<!DOCTYPE html>
@@ -411,7 +411,7 @@ function buildSingleMarksheetHtml(
 
   /* ---------- info box ---------- */
   .info-box { border:1.5px solid #c8a040; border-radius:8px; display:flex; gap:0; margin-top:8px; overflow:hidden; background:#fdfcf5; }
-  .info-col { flex:1; padding:5px 10px; }
+  .info-col { flex:1; padding:8px 12px; }
   .info-col + .info-col { border-left:1px solid #e8d9a8; }
   .irow { display:flex; align-items:center; gap:6px; height:17px; margin-bottom:1px; font-size:11px; line-height:1; }
   .irow:last-child { margin-bottom:0; }
@@ -799,7 +799,7 @@ function buildCombinedMarksheetHtml(
   // 7 % reduction even with very few subjects (estimation errors can't cause clipping).
   // Base 840 = header~275 + info~135 + table-header~60 + summary~140 + remarks~45 + sigs~80 + footer~45 + gaps~60
   const _innerContentH = 840 + subjectRows.length * 30;
-  const _innerZoomVal = Math.min(0.93, 920 / _innerContentH);
+  const _innerZoomVal = Math.min(0.98, 1020 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
   return `<!DOCTYPE html>
@@ -840,7 +840,7 @@ function buildCombinedMarksheetHtml(
   .comb-title .stars { font-size:11px; color:#c8a040; letter-spacing:5px; margin-top:2px; }
   /* info box */
   .info-box { border:1.5px solid #c8a040; border-radius:8px; display:flex; margin-top:7px; overflow:hidden; background:#fdfcf5; }
-  .info-col { flex:1; padding:5px 10px; }
+  .info-col { flex:1; padding:8px 12px; }
   .info-col + .info-col { border-left:1px solid #e8d9a8; }
   .irow { display:flex; align-items:center; gap:6px; height:17px; margin-bottom:1px; font-size:11px; line-height:1; }
   .irow:last-child { margin-bottom:0; }
