@@ -16,6 +16,18 @@ import AttendanceDetailModal from '@/components/AttendanceDetailModal';
 
 type Status = 'present' | 'absent' | 'holiday';
 type ReportRange = 'all' | 'monthly' | 'yearly' | 'custom';
+type ReportStudent = {
+  id: string;
+  name: string;
+  cls: string;
+  rollNumber: string;
+  status: 'active' | 'inactive';
+  present: number;
+  absent: number;
+  holiday: number;
+  inactive: number;
+  total: number;
+};
 
 // ─── Reactivation Request Modal ────────────────────────────────────────────────
 function ReactivationModal({
@@ -404,6 +416,66 @@ export default function TeacherAttendance() {
     return [...records].sort((a, b) => b.date.localeCompare(a.date));
   }, [attendanceRecords, filterReportClass, reportRange, reportMonth, reportYear, customStartDate, customEndDate]);
 
+  const reportStudents = useMemo<ReportStudent[]>(() => {
+    const stats = new Map<string, ReportStudent>();
+
+    // Start with the current student register so students with no attendance
+    // record in the selected range still appear in the report.
+    students
+      .filter(student => !isGraduatedStudent(student))
+      .filter(student => filterReportClass === 'All' || student.class === filterReportClass)
+      .forEach(student => {
+        if (!stats.has(student.id)) {
+          stats.set(student.id, {
+            id: student.id,
+            name: student.name,
+            cls: student.class,
+            rollNumber: student.rollNumber,
+            status: student.status === 'inactive' ? 'inactive' : 'active',
+            present: 0,
+            absent: 0,
+            holiday: 0,
+            inactive: 0,
+            total: 0,
+          });
+        }
+      });
+
+    // Add attendance totals without creating a separate row for each date.
+    // Keep an orphaned record visible if its student was removed from the
+    // register, so historical attendance is not silently lost.
+    reportRecords.forEach(record => {
+      if (!stats.has(record.studentId)) {
+        if (filterReportClass !== 'All' && record.class !== filterReportClass) return;
+        stats.set(record.studentId, {
+          id: record.studentId,
+          name: record.studentName,
+          cls: record.class,
+          rollNumber: '',
+          status: record.status === 'inactive' ? 'inactive' : 'active',
+          present: 0,
+          absent: 0,
+          holiday: 0,
+          inactive: 0,
+          total: 0,
+        });
+      }
+
+      const student = stats.get(record.studentId);
+      if (!student) return;
+      student[record.status] += 1;
+      student.total += 1;
+    });
+
+    return [...stats.values()].sort((a, b) => {
+      const rollOrder = compareStudentRollNumbers(
+        { rollNumber: a.rollNumber, name: a.name },
+        { rollNumber: b.rollNumber, name: b.name },
+      );
+      return rollOrder || a.name.localeCompare(b.name);
+    });
+  }, [students, reportRecords, filterReportClass]);
+
   const customRangeValid = /^\d{4}-\d{2}-\d{2}$/.test(customStartDate)
     && /^\d{4}-\d{2}-\d{2}$/.test(customEndDate)
     && customStartDate <= customEndDate;
@@ -722,31 +794,46 @@ export default function TeacherAttendance() {
             </ScrollView>
           </View>
           <FlatList
-            data={reportRecords}
-            keyExtractor={i => i.id}
+            data={reportStudents}
+            keyExtractor={student => student.id}
             contentContainerStyle={{ padding: 16, paddingBottom: botPad, flexGrow: 1 }}
-            ListEmptyComponent={<EmptyState icon="calendar" title="No Records" subtitle="No attendance records found" />}
-            renderItem={({ item }) => {
-              let color = colors.success;
-              if (item.status === 'absent') color = colors.destructive;
-              else if (item.status === 'holiday') color = colors.warning;
+            ListEmptyComponent={<EmptyState icon="users" title="No Students" subtitle="No active or inactive students found" />}
+            renderItem={({ item: student }) => {
+              const attendanceDays = student.present + student.absent + student.inactive;
+              const pct = attendanceDays > 0 ? Math.round((student.present / attendanceDays) * 100) : 0;
+              const isInactive = student.status === 'inactive';
+              const statusColor = isInactive ? colors.destructive : colors.success;
               return (
                 <TouchableOpacity
                   style={[rp.row, { backgroundColor: colors.card }]}
-                  onPress={() => setDetailStudent({ id: item.studentId, name: item.studentName, cls: item.class })}
+                  onPress={() => setDetailStudent({ id: student.id, name: student.name, cls: student.cls })}
                   activeOpacity={0.75}
                 >
                   <View style={[rp.dateBadge, { backgroundColor: colors.secondary }]}>
-                    <Text style={[rp.dateText, { color: colors.primary }]}>{item.date.split('-').slice(1).join('/')}</Text>
+                    <Text style={[rp.dateText, { color: colors.primary }]}>
+                      {student.rollNumber || '—'}
+                    </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[rp.stuName, { color: colors.text }]}>{item.studentName}</Text>
-                    <Text style={[rp.meta, { color: colors.mutedForeground }]}>{item.class} · By {item.takenBy}</Text>
-                  </View>
-                  <View style={[rp.statusBadge, { backgroundColor: color + '20' }]}>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: color }}>
-                      {item.status.charAt(0).toUpperCase()}
+                    <Text style={[rp.stuName, { color: colors.text }]}>{student.name}</Text>
+                    <Text style={[rp.meta, { color: colors.mutedForeground }]}>
+                      {student.cls} · {isInactive ? 'Inactive' : 'Active'}
                     </Text>
+                    <Text style={[rp.counts, { color: colors.mutedForeground }]}>
+                      {student.total > 0
+                        ? `P: ${student.present}  A: ${student.absent}  H: ${student.holiday}  I: ${student.inactive}`
+                        : 'No attendance records in this period'}
+                    </Text>
+                  </View>
+                  <View style={[rp.statusColumn]}>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: student.total > 0 ? (pct >= 75 ? colors.success : pct >= 50 ? colors.warning : colors.destructive) : colors.mutedForeground }}>
+                      {student.total > 0 ? `${pct}%` : '—'}
+                    </Text>
+                    <View style={[rp.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: statusColor }}>
+                        {student.status}
+                      </Text>
+                    </View>
                   </View>
                   <Feather name="chevron-right" size={14} color={colors.mutedForeground} />
                 </TouchableOpacity>
@@ -786,7 +873,9 @@ const rp = StyleSheet.create({
   dateText: { fontSize: 12, fontWeight: '700' },
   stuName: { fontSize: 14, fontWeight: '600' },
   meta: { fontSize: 12, marginTop: 2 },
-  statusBadge: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  counts: { fontSize: 11, marginTop: 4 },
+  statusColumn: { alignItems: 'flex-end', gap: 4 },
+  statusBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 12 },
 });
 const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1 },
