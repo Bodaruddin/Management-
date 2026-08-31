@@ -408,7 +408,7 @@ export async function createConnectionPg(input: { name: string; url: string }): 
   return { id, name: conn.name, dbType: "postgresql", host, dbName, createdAt: conn.createdAt, updatedAt: conn.updatedAt, isActive: false };
 }
 
-export async function createConnectionFirebase(input: { name: string; config: FirebaseConfig }): PublicConnection {
+export async function createConnectionFirebase(input: { name: string; config: FirebaseConfig }): Promise<PublicConnection> {
   const store = loadStore();
   const id = crypto.randomUUID();
   const conn: StoredConnectionFirebase = {
