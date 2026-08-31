@@ -40,6 +40,48 @@ async function readApiError(response: Response): Promise<string | undefined> {
   }
 }
 
+async function loginTeacher(
+  username: string,
+  password: string,
+): Promise<{ success: boolean; user?: AuthUser; error?: string }> {
+  try {
+    // Teacher credentials are verified by the API so staff do not need to
+    // configure a database on their own device.
+    const res = await fetch(`${getApiBase()}/api/teachers/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username.trim(), password }),
+    });
+    if (res.status === 401) return { success: false, error: 'Invalid teacher credentials' };
+    if (res.status === 503) return { success: false, error: 'DATABASE_NOT_READY' };
+    if (!res.ok) {
+      return {
+        success: false,
+        error: (await readApiError(res)) ?? `Server error (${res.status})`,
+      };
+    }
+    const t: any = await res.json();
+    const u: AuthUser = {
+      id: t.id, name: t.name, username: t.username, role: 'teacher',
+      permissions: {
+        addStudent: false,
+        feeCollection: false,
+        manageClasses: false,
+        manageExams: false,
+        manageResults: false,
+        promoteStudents: false,
+        sendFeeReminder: false,
+        allowMarkEdit: false,
+        ...(t.permissions ?? {}),
+      },
+    };
+    await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(u));
+    return { success: true, user: u };
+  } catch {
+    return { success: false, error: 'Could not connect to server. Please try again.' };
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,47 +114,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(u);
           return { success: true };
         }
-        return { success: false, error: 'Invalid admin credentials' };
+        // Staff can sign in directly with their teacher credentials even when
+        // the role toggle is still set to Admin (its default value).
+        const teacherResult = await loginTeacher(username, password);
+        if (teacherResult.success && 'user' in teacherResult && teacherResult.user) {
+          setUser(teacherResult.user);
+          return { success: true };
+        }
+        return { success: false, error: teacherResult.error ?? 'Invalid credentials' };
       } catch {
         return { success: false, error: 'Could not connect to server. Please try again.' };
       }
     }
-    try {
-      // Use server-side login — avoids exposing all teacher credentials to the client.
-      const res = await fetch(`${getApiBase()}/api/teachers/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim(), password }),
-      });
-      if (res.status === 401) return { success: false, error: 'Invalid teacher credentials' };
-      if (res.status === 503) return { success: false, error: 'DATABASE_NOT_READY' };
-      if (!res.ok) {
-        return {
-          success: false,
-          error: (await readApiError(res)) ?? `Server error (${res.status})`,
-        };
-      }
-      const t: any = await res.json();
-      const u: AuthUser = {
-        id: t.id, name: t.name, username: t.username, role: 'teacher',
-        permissions: {
-          addStudent: false,
-          feeCollection: false,
-          manageClasses: false,
-          manageExams: false,
-          manageResults: false,
-          promoteStudents: false,
-          sendFeeReminder: false,
-          allowMarkEdit: false,
-          ...(t.permissions ?? {}),
-        },
-      };
-      await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(u));
-      setUser(u);
+    const teacherResult = await loginTeacher(username, password);
+    if (teacherResult.success && 'user' in teacherResult && teacherResult.user) {
+      setUser(teacherResult.user);
       return { success: true };
-    } catch {
-      return { success: false, error: 'Could not connect to server. Please try again.' };
     }
+    return { success: false, error: teacherResult.error ?? 'Invalid teacher credentials' };
   };
 
   const logout = async () => {
