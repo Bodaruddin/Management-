@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PENDING_CONFIG_KEY, PendingDbConfig } from '@/context/DbSetupContext';
+import { PENDING_CONFIG_KEY, PendingDbConfig, useDbSetup } from '@/context/DbSetupContext';
 import { getApiBase } from '@/constants/api';
+import { useAuth } from '@/context/AuthContext';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export interface Student {
@@ -693,6 +694,8 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(DEFAULT_STATE);
   const loadedRef = React.useRef(false);
+  const { user } = useAuth();
+  const { isSetupComplete } = useDbSetup();
 
   const loadAllData = React.useCallback(async (): Promise<boolean> => {
     try {
@@ -803,6 +806,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
 
+    // Do not hydrate every data collection while the user is still on the
+    // login or database setup screen. This avoids a burst of API requests on
+    // every cold start and loads the same data once the app is ready.
+    if (!user || isSetupComplete !== true) return;
+
     const attempt = async (delay = 0) => {
       if (cancelled) return;
       if (delay > 0) await new Promise(r => setTimeout(r, delay));
@@ -822,7 +830,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-  }, [loadAllData]);
+  }, [loadAllData, user, isSetupComplete]);
 
   // ── Students ──
   const addStudent = useCallback((s: Omit<Student, 'id'>) => {
