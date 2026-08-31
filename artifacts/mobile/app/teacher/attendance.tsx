@@ -418,6 +418,7 @@ export default function TeacherAttendance() {
 
   const reportStudents = useMemo<ReportStudent[]>(() => {
     const stats = new Map<string, ReportStudent>();
+    const registeredStudents = new Map(students.map(student => [student.id, student]));
 
     // Start with the current student register so students with no attendance
     // record in the selected range still appear in the report.
@@ -446,6 +447,8 @@ export default function TeacherAttendance() {
     // register, so historical attendance is not silently lost.
     reportRecords.forEach(record => {
       if (!stats.has(record.studentId)) {
+        const registeredStudent = registeredStudents.get(record.studentId);
+        if (registeredStudent && isGraduatedStudent(registeredStudent)) return;
         if (filterReportClass !== 'All' && record.class !== filterReportClass) return;
         stats.set(record.studentId, {
           id: record.studentId,
