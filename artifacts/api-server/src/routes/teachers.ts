@@ -25,7 +25,10 @@ router.post("/teachers/login", async (req, res) => {
     }
     throw error;
   }
-  const teacher = teachers.find((t) => t.username === username && t.password === password);
+  const normalizedUsername = String(username).trim().toLowerCase();
+  const teacher = teachers.find(
+    (t) => String(t.username ?? "").trim().toLowerCase() === normalizedUsername && t.password === password,
+  );
   if (!teacher) {
     res.status(401).json({ error: "Invalid credentials" });
     return;
