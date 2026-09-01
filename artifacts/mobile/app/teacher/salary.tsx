@@ -15,7 +15,10 @@ export default function TeacherSalary() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { salaryRecords, teachers, documentBranding } = useApp();
+  const {
+    salaryRecords, teachers, documentBranding, teacherAttendanceRecords,
+    teacherHolidays, teacherLeaves,
+  } = useApp();
 
   const myRecords = useMemo(() =>
     salaryRecords.filter(s => s.teacherId === user?.id).sort(compareSalaryRecordsNewestFirst),
@@ -28,6 +31,39 @@ export default function TeacherSalary() {
 
   const currentMonthRecord = myRecords.find(r => r.month === curMonth && r.year === curYear);
   const myTeacher = teachers.find(t => t.id === user?.id);
+
+  const getBreakdown = (record: typeof myRecords[number]) => {
+    const monthIndex = monthNames.indexOf(record.month);
+    const monthKey = `${record.year}-${String(monthIndex + 1).padStart(2, '0')}`;
+    const holidayDates = new Set(
+      teacherHolidays.filter(holiday => holiday.date.startsWith(monthKey)).map(holiday => holiday.date),
+    );
+    const leaveDates = new Set<string>();
+    teacherLeaves.filter(leave => leave.teacherId === user?.id && leave.status === 'approved').forEach(leave => {
+      const cursor = new Date(`${leave.startDate}T12:00:00Z`);
+      const end = new Date(`${leave.endDate}T12:00:00Z`);
+      while (cursor <= end) {
+        const date = cursor.toISOString().slice(0, 10);
+        if (date.startsWith(monthKey)) leaveDates.add(date);
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
+      }
+    });
+    const daysInMonth = new Date(Date.UTC(record.year, monthIndex + 1, 0)).getUTCDate();
+    const workingDays = Array.from({ length: daysInMonth }, (_, index) => {
+      const date = `${monthKey}-${String(index + 1).padStart(2, '0')}`;
+      const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+      return weekday !== 0 && weekday !== 6 && !holidayDates.has(date) && !leaveDates.has(date);
+    }).filter(Boolean).length;
+    const rows = teacherAttendanceRecords.filter(item => item.teacherId === user?.id && item.date.startsWith(monthKey));
+    const present = rows.filter(item => item.status === 'present').length;
+    const late = rows.filter(item => item.status === 'late').length;
+    const absent = Math.max(0, workingDays - present - late);
+    return {
+      present, late, absent, holidays: holidayDates.size, leave: leaveDates.size,
+      deduction: Math.max(0, (myTeacher?.salary ?? record.amount) - record.amount),
+      payable: record.amount,
+    };
+  };
 
   const handlePrintReceipt = (record: any) => {
     if (myTeacher) {
@@ -63,6 +99,21 @@ export default function TeacherSalary() {
                 {currentMonthRecord?.status === 'paid' ? `Paid on ${currentMonthRecord.paidDate ?? ''}` : 'Not paid yet'}
               </Text>
             </View>
+            {currentMonthRecord && (
+              <View style={[s.breakdown, { backgroundColor: colors.muted }]}>
+                {(() => {
+                  const breakdown = getBreakdown(currentMonthRecord);
+                  return (
+                    <>
+                      <Text style={[s.breakdownTitle, { color: colors.text }]}>Attendance breakdown</Text>
+                      <Text style={[s.breakdownText, { color: colors.mutedForeground }]}>Present {breakdown.present} · Late {breakdown.late} · Absent {breakdown.absent}</Text>
+                      <Text style={[s.breakdownText, { color: colors.mutedForeground }]}>Holiday {breakdown.holidays} · Approved leave {breakdown.leave}</Text>
+                      <Text style={[s.breakdownText, { color: colors.destructive }]}>Deduction ₹{breakdown.deduction.toLocaleString('en-IN')} · Payable ₹{breakdown.payable.toLocaleString('en-IN')}</Text>
+                    </>
+                  );
+                })()}
+              </View>
+            )}
           </View>
         </View>
 
@@ -94,6 +145,10 @@ export default function TeacherSalary() {
             <View style={{ flex: 1 }}>
               <Text style={[s.histMonth, { color: colors.text }]}>{item.month} {item.year}</Text>
               {item.paidDate && <Text style={[s.histMeta, { color: colors.mutedForeground }]}>Paid: {item.paidDate}</Text>}
+              {(() => {
+                const breakdown = getBreakdown(item);
+                return <Text style={[s.histMeta, { color: colors.mutedForeground }]}>P {breakdown.present} · L {breakdown.late} · A {breakdown.absent} · Deduction ₹{breakdown.deduction.toLocaleString('en-IN')}</Text>;
+              })()}
             </View>
             <View style={{ alignItems: 'flex-end', gap: 6 }}>
               <Text style={[s.histAmount, { color: colors.text }]}>₹{item.amount.toLocaleString('en-IN')}</Text>
@@ -121,6 +176,9 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   currentAmount: { fontSize: 26, fontWeight: '800', marginBottom: 8 },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, alignSelf: 'flex-start' },
   statusText: { fontSize: 12, fontWeight: '600' },
+  breakdown: { borderRadius: 10, padding: 10, marginTop: 12 },
+  breakdownTitle: { fontSize: 12, fontWeight: '800', marginBottom: 4 },
+  breakdownText: { fontSize: 11, lineHeight: 17 },
   summaryRow: { flexDirection: 'row', gap: 10 },
   sumCard: { flex: 1, borderRadius: 12, padding: 12, alignItems: 'center', gap: 4 },
   sumVal: { fontSize: 16, fontWeight: '800' },

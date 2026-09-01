@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, jsonb, timestamp, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, timestamp, unique, doublePrecision } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const classesTable = pgTable("classes", {
@@ -147,6 +147,45 @@ export const salaryRecordsTable = pgTable("salary_records", {
   status: text("status").notNull().default("pending"),
   paidDate: text("paid_date"),
   receiptNumber: text("receipt_number"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const teacherAttendanceRecordsTable = pgTable("teacher_attendance_records", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  teacherId: text("teacher_id").notNull(),
+  teacherName: text("teacher_name").notNull().default(""),
+  date: text("date").notNull(),
+  status: text("status").notNull().default("present"),
+  checkInAt: timestamp("check_in_at", { withTimezone: true }),
+  checkOutAt: timestamp("check_out_at", { withTimezone: true }),
+  checkInLatitude: doublePrecision("check_in_latitude"),
+  checkInLongitude: doublePrecision("check_in_longitude"),
+  checkOutLatitude: doublePrecision("check_out_latitude"),
+  checkOutLongitude: doublePrecision("check_out_longitude"),
+  distanceFromSchool: doublePrecision("distance_from_school"),
+  faceVerified: text("face_verified").notNull().default("false"),
+  faceVerificationMethod: text("face_verification_method"),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [unique().on(t.teacherId, t.date)]);
+
+export const teacherLeaveApplicationsTable = pgTable("teacher_leave_applications", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  teacherId: text("teacher_id").notNull(),
+  teacherName: text("teacher_name").notNull().default(""),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("pending"),
+  adminNote: text("admin_note"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const teacherHolidaysTable = pgTable("teacher_holidays", {
+  id: text("id").primaryKey().default(sql`gen_random_uuid()`),
+  date: text("date").notNull().unique(),
+  name: text("name").notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 

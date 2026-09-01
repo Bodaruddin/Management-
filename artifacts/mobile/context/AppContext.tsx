@@ -125,6 +125,76 @@ export interface AttendanceRecord {
   takenBy: string;
 }
 
+export interface TeacherAttendanceSettings {
+  schoolLatitude: number | null;
+  schoolLongitude: number | null;
+  radiusMeters: number;
+  checkInStart: string;
+  checkInEnd: string;
+  checkOutStart: string;
+  checkOutEnd: string;
+  requireFaceVerification: boolean;
+  workingDaysPerMonth: number;
+  lateGraceMinutes: number;
+  lateDeductionAmount: number;
+  deductionType: 'daily_rate' | 'fixed';
+}
+
+export interface TeacherAttendanceRecord {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  date: string;
+  status: 'present' | 'late' | 'absent' | 'leave';
+  checkInAt?: string;
+  checkOutAt?: string;
+  checkInLatitude?: number;
+  checkInLongitude?: number;
+  checkOutLatitude?: number;
+  checkOutLongitude?: number;
+  distanceFromSchool?: number;
+  faceVerified: boolean;
+  faceVerificationMethod?: string;
+  note?: string;
+}
+
+export interface TeacherLeaveApplication {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  adminNote?: string;
+  reviewedAt?: string;
+  createdAt: string;
+}
+
+export interface TeacherHoliday {
+  id: string;
+  date: string;
+  name: string;
+  createdAt?: string;
+}
+
+export interface TeacherPayrollResult {
+  teacherId: string;
+  teacherName: string;
+  month: string;
+  year: number;
+  baseSalary: number;
+  presentDays: number;
+  lateDays: number;
+  absentDays: number;
+  excludedHolidayDays: number;
+  excludedLeaveDays: number;
+  absentDeduction: number;
+  lateDeduction: number;
+  payableAmount: number;
+  salaryRecord?: SalaryRecord;
+}
+
 export interface InactivationRequest {
   id: string;
   studentId: string;
@@ -366,6 +436,10 @@ interface AppState {
   classAbsentLimits: Record<string, number>;
   documentBranding: DocumentBranding;
   alumni: Alumni[];
+  teacherAttendanceRecords: TeacherAttendanceRecord[];
+  teacherLeaves: TeacherLeaveApplication[];
+  teacherHolidays: TeacherHoliday[];
+  teacherAttendanceSettings: TeacherAttendanceSettings;
 }
 
 export interface DocumentBranding {
@@ -435,6 +509,19 @@ interface AppContextType extends AppState {
   updateAlumni: (id: string, a: Partial<Alumni>) => void;
   deleteAlumni: (id: string) => void;
   bulkAddAlumni: (records: Omit<Alumni, 'id' | 'batch'>[], batch: string) => Promise<void>;
+  refreshTeacherAttendance: (teacherId?: string) => Promise<void>;
+  checkInTeacher: (data: {
+    teacherId: string; teacherName: string; latitude: number; longitude: number;
+    faceVerified: boolean; faceVerificationMethod?: string; date?: string;
+  }) => Promise<TeacherAttendanceRecord>;
+  checkOutTeacher: (id: string, data: { teacherId: string; latitude: number; longitude: number }) => Promise<TeacherAttendanceRecord>;
+  applyTeacherLeave: (data: Omit<TeacherLeaveApplication, 'id' | 'status' | 'createdAt'>) => Promise<TeacherLeaveApplication>;
+  reviewTeacherLeave: (id: string, status: 'approved' | 'rejected', adminNote?: string) => Promise<void>;
+  addTeacherHoliday: (data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => Promise<TeacherHoliday>;
+  updateTeacherHoliday: (id: string, data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => Promise<void>;
+  deleteTeacherHoliday: (id: string) => Promise<void>;
+  updateTeacherAttendanceSettings: (settings: TeacherAttendanceSettings) => Promise<void>;
+  calculateTeacherPayroll: (month: string, year: number) => Promise<{ month: string; year: number; workingDays: number; result: TeacherPayrollResult[] }>;
 }
 
 // ─── Seed data ───────────────────────────────────────────────────────────────
@@ -487,6 +574,13 @@ const DEFAULT_STATE: AppState = {
   attendanceRecords: [], exams: [], examResults: [], feeRecords: [], expenses: [],
   salaryRecords: [], promotionRecords: [], markSubmissions: [], markAuditLog: [],
   inactivationRequests: [], classAbsentLimits: {}, alumni: [],
+  teacherAttendanceRecords: [], teacherLeaves: [], teacherHolidays: [],
+  teacherAttendanceSettings: {
+    schoolLatitude: null, schoolLongitude: null, radiusMeters: 150,
+    checkInStart: '08:00', checkInEnd: '09:30', checkOutStart: '15:00', checkOutEnd: '18:00',
+    requireFaceVerification: true, workingDaysPerMonth: 26, lateGraceMinutes: 0,
+    lateDeductionAmount: 0, deductionType: 'daily_rate',
+  },
   documentBranding: {
     logoDataUrl: null,
     signatureDataUrl: null,
@@ -670,6 +764,45 @@ function mapInactivationRequest(r: any): InactivationRequest {
   };
 }
 
+function mapTeacherAttendance(r: any): TeacherAttendanceRecord {
+  return {
+    id: r.id,
+    teacherId: r.teacherId ?? r.teacher_id,
+    teacherName: r.teacherName ?? r.teacher_name ?? '',
+    date: r.date,
+    status: r.status ?? 'present',
+    checkInAt: r.checkInAt ?? r.check_in_at ?? undefined,
+    checkOutAt: r.checkOutAt ?? r.check_out_at ?? undefined,
+    checkInLatitude: r.checkInLatitude ?? r.check_in_latitude ?? undefined,
+    checkInLongitude: r.checkInLongitude ?? r.check_in_longitude ?? undefined,
+    checkOutLatitude: r.checkOutLatitude ?? r.check_out_latitude ?? undefined,
+    checkOutLongitude: r.checkOutLongitude ?? r.check_out_longitude ?? undefined,
+    distanceFromSchool: r.distanceFromSchool ?? r.distance_from_school ?? undefined,
+    faceVerified: r.faceVerified === true || r.faceVerified === 'true',
+    faceVerificationMethod: r.faceVerificationMethod ?? r.face_verification_method ?? undefined,
+    note: r.note ?? undefined,
+  };
+}
+
+function mapTeacherLeave(r: any): TeacherLeaveApplication {
+  return {
+    id: r.id,
+    teacherId: r.teacherId ?? r.teacher_id,
+    teacherName: r.teacherName ?? r.teacher_name ?? '',
+    startDate: r.startDate ?? r.start_date,
+    endDate: r.endDate ?? r.end_date,
+    reason: r.reason ?? '',
+    status: r.status ?? 'pending',
+    adminNote: r.adminNote ?? r.admin_note ?? undefined,
+    reviewedAt: r.reviewedAt ?? r.reviewed_at ?? undefined,
+    createdAt: r.createdAt ?? r.created_at ?? '',
+  };
+}
+
+function mapTeacherHoliday(r: any): TeacherHoliday {
+  return { id: r.id, date: r.date, name: r.name, createdAt: r.createdAt ?? r.created_at ?? undefined };
+}
+
 // ─── Seed helpers ─────────────────────────────────────────────────────────────
 async function seedAllData() {
   try {
@@ -699,7 +832,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const loadAllData = React.useCallback(async (): Promise<boolean> => {
     try {
-      const [classes, sections, students, teachers, subjects, feeTypes, attendance, exams, results, fees, expenses, salaries, promotions, markSubs, auditLog, inactivationReqs, classAbsentLimitsRaw, documentBranding, alumniRows] = await Promise.all([
+      const [classes, sections, students, teachers, subjects, feeTypes, attendance, exams, results, fees, expenses, salaries, promotions, markSubs, auditLog, inactivationReqs, classAbsentLimitsRaw, documentBranding, alumniRows, teacherAttendance, teacherLeaves, teacherHolidays, teacherAttendanceSettings] = await Promise.all([
         apiGet<string[]>('/classes'),
         apiGet<string[]>('/sections').catch(() => [] as string[]),
         apiGet<any[]>('/students?includeGraduated=true'),
@@ -719,13 +852,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         apiGet<Record<string, number>>('/settings/class-absent-limits').catch(() => ({} as Record<string, number>)),
         apiGet<DocumentBranding>('/settings/document-branding').catch(() => DEFAULT_STATE.documentBranding),
         apiGet<any[]>('/alumni').catch(() => [] as any[]),
+        apiGet<any[]>('/teacher-attendance').catch(() => [] as any[]),
+        apiGet<any[]>('/teacher-leaves').catch(() => [] as any[]),
+        apiGet<any[]>('/teacher-holidays').catch(() => [] as any[]),
+        apiGet<TeacherAttendanceSettings>('/settings/teacher-attendance').catch(() => DEFAULT_STATE.teacherAttendanceSettings),
       ]);
 
       const isEmpty = classes.length === 0 && students.length === 0 && teachers.length === 0;
 
       if (isEmpty) {
         await seedAllData();
-        const [c2, sec2, s2, t2, sub2, ft2, att2, ex2, res2, fee2, exp2, sal2, pro2, ms2, auditLog2, ir2, cal2, branding2, alumni2] = await Promise.all([
+        const [c2, sec2, s2, t2, sub2, ft2, att2, ex2, res2, fee2, exp2, sal2, pro2, ms2, auditLog2, ir2, cal2, branding2, alumni2, ta2, tl2, th2, tas2] = await Promise.all([
           apiGet<string[]>('/classes'), apiGet<string[]>('/sections').catch(() => [] as string[]),
           apiGet<any[]>('/students?includeGraduated=true'), apiGet<any[]>('/teachers'),
           apiGet<string[]>('/subjects'), apiGet<any[]>('/fee-types'), apiGet<any[]>('/attendance'),
@@ -737,6 +874,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           apiGet<Record<string, number>>('/settings/class-absent-limits').catch(() => ({} as Record<string, number>)),
           apiGet<DocumentBranding>('/settings/document-branding').catch(() => DEFAULT_STATE.documentBranding),
           apiGet<any[]>('/alumni').catch(() => [] as any[]),
+          apiGet<any[]>('/teacher-attendance').catch(() => [] as any[]),
+          apiGet<any[]>('/teacher-leaves').catch(() => [] as any[]),
+          apiGet<any[]>('/teacher-holidays').catch(() => [] as any[]),
+          apiGet<TeacherAttendanceSettings>('/settings/teacher-attendance').catch(() => DEFAULT_STATE.teacherAttendanceSettings),
         ]);
         setState({
           classes: c2.sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })), sections: sec2, students: s2.map(mapStudent), teachers: t2.map(mapTeacher),
@@ -748,6 +889,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           classAbsentLimits: cal2,
           documentBranding: branding2,
           alumni: alumni2,
+          teacherAttendanceRecords: ta2.map(mapTeacherAttendance),
+          teacherLeaves: tl2.map(mapTeacherLeave),
+          teacherHolidays: th2.map(mapTeacherHoliday),
+          teacherAttendanceSettings: tas2,
         });
       } else {
         setState({
@@ -760,6 +905,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           classAbsentLimits: classAbsentLimitsRaw,
           documentBranding,
           alumni: alumniRows,
+          teacherAttendanceRecords: teacherAttendance.map(mapTeacherAttendance),
+          teacherLeaves: teacherLeaves.map(mapTeacherLeave),
+          teacherHolidays: teacherHolidays.map(mapTeacherHoliday),
+          teacherAttendanceSettings,
         });
       }
       return true;
@@ -1190,6 +1339,95 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     apiDelete(`/salary-records/${id}`).catch(console.error);
   }, []);
 
+  // ── Teacher attendance, leave, holidays and month-end payroll ──
+  const refreshTeacherAttendance = useCallback(async (teacherId?: string) => {
+    const query = teacherId ? `?teacherId=${encodeURIComponent(teacherId)}` : '';
+    const [records, leaves, holidays, settings] = await Promise.all([
+      apiGet<any[]>(`/teacher-attendance${query}`),
+      apiGet<any[]>(teacherId ? `/teacher-leaves?teacherId=${encodeURIComponent(teacherId)}` : '/teacher-leaves'),
+      apiGet<any[]>('/teacher-holidays'),
+      apiGet<TeacherAttendanceSettings>('/settings/teacher-attendance'),
+    ]);
+    setState(prev => ({
+      ...prev,
+      teacherAttendanceRecords: records.map(mapTeacherAttendance),
+      teacherLeaves: leaves.map(mapTeacherLeave),
+      teacherHolidays: holidays.map(mapTeacherHoliday),
+      teacherAttendanceSettings: settings,
+    }));
+  }, []);
+
+  const checkInTeacher = useCallback(async (data: {
+    teacherId: string; teacherName: string; latitude: number; longitude: number;
+    faceVerified: boolean; faceVerificationMethod?: string; date?: string;
+  }) => {
+    const row = await apiPost<any>('/teacher-attendance/check-in', data);
+    const record = mapTeacherAttendance(row);
+    setState(prev => ({ ...prev, teacherAttendanceRecords: [record, ...prev.teacherAttendanceRecords.filter(item => item.id !== record.id)] }));
+    return record;
+  }, []);
+
+  const checkOutTeacher = useCallback(async (id: string, data: { teacherId: string; latitude: number; longitude: number }) => {
+    const row = await apiPost<any>(`/teacher-attendance/${id}/check-out`, data);
+    const record = mapTeacherAttendance(row);
+    setState(prev => ({ ...prev, teacherAttendanceRecords: prev.teacherAttendanceRecords.map(item => item.id === id ? record : item) }));
+    return record;
+  }, []);
+
+  const applyTeacherLeave = useCallback(async (data: Omit<TeacherLeaveApplication, 'id' | 'status' | 'createdAt'>) => {
+    const row = await apiPost<any>('/teacher-leaves', data);
+    const leave = mapTeacherLeave(row);
+    setState(prev => ({ ...prev, teacherLeaves: [leave, ...prev.teacherLeaves] }));
+    return leave;
+  }, []);
+
+  const reviewTeacherLeave = useCallback(async (id: string, status: 'approved' | 'rejected', adminNote?: string) => {
+    const row = await apiPut<any>(`/teacher-leaves/${id}/${status}`, { adminId: 'admin', adminNote });
+    const leave = mapTeacherLeave(row);
+    setState(prev => ({ ...prev, teacherLeaves: prev.teacherLeaves.map(item => item.id === id ? leave : item) }));
+  }, []);
+
+  const addTeacherHoliday = useCallback(async (data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => {
+    const row = await apiPost<any>('/teacher-holidays', { ...data, adminId: 'admin' });
+    const holiday = mapTeacherHoliday(row);
+    setState(prev => ({ ...prev, teacherHolidays: [...prev.teacherHolidays, holiday].sort((a, b) => a.date.localeCompare(b.date)) }));
+    return holiday;
+  }, []);
+
+  const updateTeacherHoliday = useCallback(async (id: string, data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => {
+    const row = await apiPut<any>(`/teacher-holidays/${id}`, { ...data, adminId: 'admin' });
+    const holiday = mapTeacherHoliday(row);
+    setState(prev => ({ ...prev, teacherHolidays: prev.teacherHolidays.map(item => item.id === id ? holiday : item).sort((a, b) => a.date.localeCompare(b.date)) }));
+  }, []);
+
+  const deleteTeacherHoliday = useCallback(async (id: string) => {
+    await apiDelete(`/teacher-holidays/${id}?adminId=admin`);
+    setState(prev => ({ ...prev, teacherHolidays: prev.teacherHolidays.filter(item => item.id !== id) }));
+  }, []);
+
+  const updateTeacherAttendanceSettings = useCallback(async (settings: TeacherAttendanceSettings) => {
+    const saved = await apiPut<TeacherAttendanceSettings>('/settings/teacher-attendance', { ...settings, adminId: 'admin' });
+    setState(prev => ({ ...prev, teacherAttendanceSettings: saved }));
+  }, []);
+
+  const calculateTeacherPayroll = useCallback(async (month: string, year: number) => {
+    const report = await apiPost<any>('/teacher-attendance/payroll/calculate', { month, year, adminId: 'admin' });
+    const result = (report.result ?? []).map((item: any) => ({
+      ...item,
+      salaryRecord: item.salaryRecord ? mapSalary(item.salaryRecord) : undefined,
+    })) as TeacherPayrollResult[];
+    if (result.some(item => item.salaryRecord)) {
+      setState(prev => ({
+        ...prev,
+        salaryRecords: [
+          ...prev.salaryRecords.filter(existing => !result.some(item => item.salaryRecord?.teacherId === existing.teacherId && item.salaryRecord?.month === existing.month && item.salaryRecord?.year === existing.year)),
+          ...result.flatMap(item => item.salaryRecord ? [item.salaryRecord] : []),
+        ],
+      }));
+    }
+    return { month: report.month, year: report.year, workingDays: report.workingDays, result };
+  }, []);
+
   // ── Promotions ──
   const promoteStudent = useCallback((studentId: string, toClass: string, promotedBy: string) => {
     const promotionId = genId();
@@ -1392,6 +1630,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteInactivationRequestDocument, deleteInactivationRequest,
       refreshInactivationRequests, setStudentStatus, setClassAbsentLimit, updateDocumentBranding,
       addAlumni, updateAlumni, deleteAlumni, bulkAddAlumni,
+      refreshTeacherAttendance, checkInTeacher, checkOutTeacher, applyTeacherLeave,
+      reviewTeacherLeave, addTeacherHoliday, updateTeacherHoliday, deleteTeacherHoliday,
+      updateTeacherAttendanceSettings, calculateTeacherPayroll,
     }}>
       {children}
     </AppContext.Provider>

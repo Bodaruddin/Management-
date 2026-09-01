@@ -10,6 +10,12 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: teacher-attendance
+    description: GPS and biometric-backed teacher attendance
+  - name: teacher-leaves
+    description: Teacher leave applications
+  - name: teacher-holidays
+    description: Teacher holidays
 paths:
   /healthz:
     get:
@@ -24,7 +30,256 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /settings/teacher-attendance:
+    get:
+      operationId: getTeacherAttendanceSettings
+      tags: [teacher-attendance]
+      responses:
+        "200":
+          description: Attendance settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAttendanceSettings"
+    put:
+      operationId: updateTeacherAttendanceSettings
+      tags: [teacher-attendance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherAttendanceSettingsUpdate"
+      responses:
+        "200":
+          description: Updated attendance settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAttendanceSettings"
+  /teacher-attendance:
+    get:
+      operationId: listTeacherAttendance
+      tags: [teacher-attendance]
+      parameters:
+        - $ref: "#/components/parameters/TeacherId"
+        - $ref: "#/components/parameters/Month"
+      responses:
+        "200":
+          description: Teacher attendance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeacherAttendanceRecord"
+  /teacher-attendance/check-in:
+    post:
+      operationId: teacherCheckIn
+      tags: [teacher-attendance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherCheckIn"
+      responses:
+        "201":
+          description: Attendance created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAttendanceRecord"
+  /teacher-attendance/{id}/check-out:
+    post:
+      operationId: teacherCheckOut
+      tags: [teacher-attendance]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherCheckOut"
+      responses:
+        "200":
+          description: Attendance updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAttendanceRecord"
+  /teacher-leaves:
+    get:
+      operationId: listTeacherLeaves
+      tags: [teacher-leaves]
+      parameters:
+        - $ref: "#/components/parameters/TeacherId"
+        - $ref: "#/components/parameters/Status"
+      responses:
+        "200":
+          description: Teacher leave applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeacherLeave"
+    post:
+      operationId: applyForTeacherLeave
+      tags: [teacher-leaves]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherLeaveCreate"
+      responses:
+        "201":
+          description: Leave application created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherLeave"
+  /teacher-leaves/{id}/approve:
+    put:
+      operationId: approveTeacherLeave
+      tags: [teacher-leaves]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAction"
+      responses:
+        "200":
+          description: Approved leave
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherLeave"
+  /teacher-leaves/{id}/reject:
+    put:
+      operationId: rejectTeacherLeave
+      tags: [teacher-leaves]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminAction"
+      responses:
+        "200":
+          description: Rejected leave
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherLeave"
+  /teacher-holidays:
+    get:
+      operationId: listTeacherHolidays
+      tags: [teacher-holidays]
+      responses:
+        "200":
+          description: Teacher holidays
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TeacherHoliday"
+    post:
+      operationId: createTeacherHoliday
+      tags: [teacher-holidays]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherHolidayCreate"
+      responses:
+        "201":
+          description: Holiday created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherHoliday"
+  /teacher-holidays/{id}:
+    put:
+      operationId: updateTeacherHoliday
+      tags: [teacher-holidays]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherHolidayCreate"
+      responses:
+        "200":
+          description: Holiday updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherHoliday"
+    delete:
+      operationId: deleteTeacherHoliday
+      tags: [teacher-holidays]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+        - $ref: "#/components/parameters/AdminId"
+      responses:
+        "204":
+          description: Holiday deleted
+  /teacher-attendance/payroll/calculate:
+    post:
+      operationId: calculateTeacherPayroll
+      tags: [teacher-attendance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PayrollCalculate"
+      responses:
+        "200":
+          description: Month-end payroll report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PayrollReport"
 components:
+  parameters:
+    TeacherId:
+      name: teacherId
+      in: query
+      required: false
+      schema: { type: string }
+    Month:
+      name: month
+      in: query
+      required: false
+      schema: { type: string }
+    Status:
+      name: status
+      in: query
+      required: false
+      schema: { type: string }
+    RecordId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    AdminId:
+      name: adminId
+      in: query
+      required: true
+      schema: { type: string }
   schemas:
     HealthStatus:
       type: object
@@ -33,4 +288,116 @@ components:
           type: string
       required:
         - status
+    TeacherAttendanceSettings:
+      type: object
+      properties:
+        schoolLatitude: { type: [number, "null"] }
+        schoolLongitude: { type: [number, "null"] }
+        radiusMeters: { type: number }
+        checkInStart: { type: string }
+        checkInEnd: { type: string }
+        checkOutStart: { type: string }
+        checkOutEnd: { type: string }
+        requireFaceVerification: { type: boolean }
+        workingDaysPerMonth: { type: integer }
+        lateGraceMinutes: { type: integer }
+        lateDeductionAmount: { type: number }
+        deductionType: { type: string, enum: [daily_rate, fixed] }
+    TeacherAttendanceSettingsUpdate:
+      allOf:
+        - $ref: "#/components/schemas/TeacherAttendanceSettings"
+      required: [adminId]
+      properties:
+        adminId: { type: string }
+    TeacherAttendanceRecord:
+      type: object
+      properties:
+        id: { type: string }
+        teacherId: { type: string }
+        teacherName: { type: string }
+        date: { type: string }
+        status: { type: string, enum: [present, late, absent, leave] }
+        checkInAt: { type: [string, "null"], format: date-time }
+        checkOutAt: { type: [string, "null"], format: date-time }
+        checkInLatitude: { type: [number, "null"] }
+        checkInLongitude: { type: [number, "null"] }
+        checkOutLatitude: { type: [number, "null"] }
+        checkOutLongitude: { type: [number, "null"] }
+        distanceFromSchool: { type: [number, "null"] }
+        faceVerified: { type: string }
+        faceVerificationMethod: { type: [string, "null"] }
+    TeacherCheckIn:
+      type: object
+      required: [teacherId, teacherName, latitude, longitude, faceVerified]
+      properties:
+        teacherId: { type: string }
+        teacherName: { type: string }
+        date: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        faceVerified: { type: boolean }
+        faceVerificationMethod: { type: string }
+    TeacherCheckOut:
+      type: object
+      required: [teacherId, latitude, longitude]
+      properties:
+        teacherId: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+    TeacherLeave:
+      type: object
+      properties:
+        id: { type: string }
+        teacherId: { type: string }
+        teacherName: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        reason: { type: string }
+        status: { type: string, enum: [pending, approved, rejected] }
+        adminNote: { type: [string, "null"] }
+    TeacherLeaveCreate:
+      type: object
+      required: [teacherId, teacherName, startDate, endDate, reason]
+      properties:
+        teacherId: { type: string }
+        teacherName: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        reason: { type: string }
+    AdminAction:
+      type: object
+      required: [adminId]
+      properties:
+        adminId: { type: string }
+        adminNote: { type: string }
+    TeacherHoliday:
+      type: object
+      properties:
+        id: { type: string }
+        date: { type: string, format: date }
+        name: { type: string }
+    TeacherHolidayCreate:
+      type: object
+      required: [adminId, date, name]
+      properties:
+        adminId: { type: string }
+        date: { type: string, format: date }
+        name: { type: string }
+    PayrollCalculate:
+      type: object
+      required: [adminId, month, year]
+      properties:
+        adminId: { type: string }
+        month: { type: string }
+        year: { type: integer }
+    PayrollReport:
+      type: object
+      properties:
+        month: { type: string }
+        year: { type: integer }
+        workingDays: { type: integer }
+        result:
+          type: array
+          items:
+            type: object
 

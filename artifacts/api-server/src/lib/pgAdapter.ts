@@ -21,6 +21,9 @@ const {
   feeTypesTable,
   feeRecordsTable,
   salaryRecordsTable,
+  teacherAttendanceRecordsTable,
+  teacherLeaveApplicationsTable,
+  teacherHolidaysTable,
   expensesTable,
   promotionRecordsTable,
   appSettingsTable,
@@ -687,8 +690,9 @@ export function createPgAdapter(db: DB): DataAdapter {
           .limit(1);
 
         if (existing.length > 0) {
-          const [row] = await db.update(salaryRecordsTable).set({
-            status: data.status, paidDate: data.paidDate ?? null, receiptNumber: data.receiptNumber ?? null,
+           const [row] = await db.update(salaryRecordsTable).set({
+             status: data.status, paidDate: data.paidDate ?? null, receiptNumber: data.receiptNumber ?? null,
+             amount: data.amount ?? existing[0].amount,
           }).where(eq(salaryRecordsTable.id, existing[0].id)).returning();
           return { row, created: false };
         } else {
@@ -702,6 +706,89 @@ export function createPgAdapter(db: DB): DataAdapter {
       },
       async delete(id) {
         await db.delete(salaryRecordsTable).where(eq(salaryRecordsTable.id, id));
+      },
+    },
+
+    // ── Teacher Attendance ─────────────────────────────────────────────────────
+    teacherAttendance: {
+      async list(filters = {}) {
+        const conditions = [];
+        if (filters.teacherId) conditions.push(eq(teacherAttendanceRecordsTable.teacherId, filters.teacherId));
+        if (filters.month) conditions.push(drizzleSql`${teacherAttendanceRecordsTable.date} LIKE ${filters.month + "%"}`);
+        const query = db.select().from(teacherAttendanceRecordsTable).orderBy(desc(teacherAttendanceRecordsTable.date));
+        return conditions.length ? query.where(and(...conditions)) : query;
+      },
+      async getByTeacherDate(teacherId, date) {
+        const [row] = await db.select().from(teacherAttendanceRecordsTable)
+          .where(and(eq(teacherAttendanceRecordsTable.teacherId, teacherId), eq(teacherAttendanceRecordsTable.date, date))).limit(1);
+        return row ?? null;
+      },
+      async create(data) {
+        const values: any = {
+          teacherId: data.teacherId, teacherName: data.teacherName ?? "", date: data.date,
+          status: data.status ?? "present", checkInAt: data.checkInAt ? new Date(data.checkInAt) : new Date(),
+          checkInLatitude: data.checkInLatitude ?? null, checkInLongitude: data.checkInLongitude ?? null,
+          distanceFromSchool: data.distanceFromSchool ?? null, faceVerified: String(Boolean(data.faceVerified)),
+          faceVerificationMethod: data.faceVerificationMethod ?? null, note: data.note ?? null,
+        };
+        if (data.id) values.id = data.id;
+        const [row] = await db.insert(teacherAttendanceRecordsTable).values(values).returning();
+        return row;
+      },
+      async updateCheckOut(id, data) {
+        const [row] = await db.update(teacherAttendanceRecordsTable).set({
+          checkOutAt: data.checkOutAt ? new Date(data.checkOutAt) : new Date(),
+          checkOutLatitude: data.checkOutLatitude ?? null, checkOutLongitude: data.checkOutLongitude ?? null,
+        }).where(eq(teacherAttendanceRecordsTable.id, id)).returning();
+        return row ?? null;
+      },
+    },
+
+    // ── Teacher Leave Applications ─────────────────────────────────────────────
+    teacherLeaveApplications: {
+      async list(filters = {}) {
+        const conditions = [];
+        if (filters.teacherId) conditions.push(eq(teacherLeaveApplicationsTable.teacherId, filters.teacherId));
+        if (filters.status) conditions.push(eq(teacherLeaveApplicationsTable.status, filters.status));
+        const query = db.select().from(teacherLeaveApplicationsTable).orderBy(desc(teacherLeaveApplicationsTable.createdAt));
+        return conditions.length ? query.where(and(...conditions)) : query;
+      },
+      async create(data) {
+        const values: any = {
+          teacherId: data.teacherId, teacherName: data.teacherName ?? "", startDate: data.startDate,
+          endDate: data.endDate, reason: data.reason, status: "pending",
+        };
+        if (data.id) values.id = data.id;
+        const [row] = await db.insert(teacherLeaveApplicationsTable).values(values).returning();
+        return row;
+      },
+      async updateStatus(id, status, adminNote) {
+        const [row] = await db.update(teacherLeaveApplicationsTable)
+          .set({ status, adminNote: adminNote ?? null, reviewedAt: new Date() })
+          .where(eq(teacherLeaveApplicationsTable.id, id)).returning();
+        return row ?? null;
+      },
+    },
+
+    // ── Teacher Holidays ───────────────────────────────────────────────────────
+    teacherHolidays: {
+      async list() {
+        return db.select().from(teacherHolidaysTable).orderBy(asc(teacherHolidaysTable.date));
+      },
+      async create(data) {
+        const values: any = { date: data.date, name: data.name };
+        if (data.id) values.id = data.id;
+        const [row] = await db.insert(teacherHolidaysTable).values(values).returning();
+        return row;
+      },
+      async update(id, data) {
+        const [row] = await db.update(teacherHolidaysTable).set({
+          date: data.date, name: data.name,
+        }).where(eq(teacherHolidaysTable.id, id)).returning();
+        return row ?? null;
+      },
+      async delete(id) {
+        await db.delete(teacherHolidaysTable).where(eq(teacherHolidaysTable.id, id));
       },
     },
 

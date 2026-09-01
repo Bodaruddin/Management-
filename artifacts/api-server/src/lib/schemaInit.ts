@@ -202,6 +202,46 @@ CREATE TABLE IF NOT EXISTS salary_records (
   created_at    TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS teacher_attendance_records (
+  id                         TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+  teacher_id                 TEXT NOT NULL,
+  teacher_name               TEXT NOT NULL DEFAULT '',
+  date                       TEXT NOT NULL,
+  status                     TEXT NOT NULL DEFAULT 'present',
+  check_in_at                TIMESTAMPTZ,
+  check_out_at               TIMESTAMPTZ,
+  check_in_latitude          DOUBLE PRECISION,
+  check_in_longitude         DOUBLE PRECISION,
+  check_out_latitude         DOUBLE PRECISION,
+  check_out_longitude        DOUBLE PRECISION,
+  distance_from_school       DOUBLE PRECISION,
+  face_verified              TEXT NOT NULL DEFAULT 'false',
+  face_verification_method   TEXT,
+  note                       TEXT,
+  created_at                 TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  UNIQUE (teacher_id, date)
+);
+
+CREATE TABLE IF NOT EXISTS teacher_leave_applications (
+  id           TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+  teacher_id   TEXT NOT NULL,
+  teacher_name TEXT NOT NULL DEFAULT '',
+  start_date   TEXT NOT NULL,
+  end_date     TEXT NOT NULL,
+  reason       TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending',
+  admin_note   TEXT,
+  reviewed_at  TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS teacher_holidays (
+  id         TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
+  date       TEXT NOT NULL UNIQUE,
+  name       TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS expenses (
   id          TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
   description TEXT NOT NULL,

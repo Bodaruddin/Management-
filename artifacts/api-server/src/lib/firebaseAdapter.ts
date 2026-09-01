@@ -768,7 +768,7 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
           .get();
 
         if (!snap.empty) {
-          const updates = { status: data.status, paidDate: data.paidDate ?? null, receiptNumber: data.receiptNumber ?? null };
+           const updates = { status: data.status, paidDate: data.paidDate ?? null, receiptNumber: data.receiptNumber ?? null, amount: data.amount ?? snap.docs[0].data().amount ?? 0 };
           await snap.docs[0].ref.update(updates);
           return { row: { id: snap.docs[0].id, ...snap.docs[0].data(), ...updates }, created: false };
         } else {
@@ -784,6 +784,99 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
       },
       async delete(id) {
         await col("salary_records").doc(id).delete();
+      },
+    },
+
+    // ── Teacher Attendance ─────────────────────────────────────────────────────
+    teacherAttendance: {
+      async list(filters = {}) {
+        const snap = await col("teacher_attendance_records").orderBy("date", "desc").get();
+        return snap.docs.map(mapDoc).filter((row: any) =>
+          (!filters.teacherId || row.teacherId === filters.teacherId) &&
+          (!filters.month || String(row.date ?? "").startsWith(filters.month)),
+        );
+      },
+      async getByTeacherDate(teacherId, date) {
+        const snap = await col("teacher_attendance_records")
+          .where("teacherId", "==", teacherId).where("date", "==", date).limit(1).get();
+        return snap.empty ? null : mapDoc(snap.docs[0]);
+      },
+      async create(data) {
+        const id = data.id ?? newId();
+        const doc = stamp({
+          teacherId: data.teacherId, teacherName: data.teacherName ?? "", date: data.date,
+          status: data.status ?? "present", checkInAt: data.checkInAt ?? now(),
+          checkInLatitude: data.checkInLatitude ?? null, checkInLongitude: data.checkInLongitude ?? null,
+          distanceFromSchool: data.distanceFromSchool ?? null, faceVerified: String(Boolean(data.faceVerified)),
+          faceVerificationMethod: data.faceVerificationMethod ?? null, note: data.note ?? null,
+        });
+        await col("teacher_attendance_records").doc(id).set(doc);
+        return { id, ...doc };
+      },
+      async updateCheckOut(id, data) {
+        const ref = col("teacher_attendance_records").doc(id);
+        const existing = await ref.get();
+        if (!existing.exists) return null;
+        const updates = {
+          checkOutAt: data.checkOutAt ?? now(),
+          checkOutLatitude: data.checkOutLatitude ?? null,
+          checkOutLongitude: data.checkOutLongitude ?? null,
+        };
+        await ref.update(updates);
+        return { id, ...existing.data(), ...updates };
+      },
+    },
+
+    // ── Teacher Leave Applications ─────────────────────────────────────────────
+    teacherLeaveApplications: {
+      async list(filters = {}) {
+        const snap = await col("teacher_leave_applications").orderBy("createdAt", "desc").get();
+        return snap.docs.map(mapDoc).filter((row: any) =>
+          (!filters.teacherId || row.teacherId === filters.teacherId) &&
+          (!filters.status || row.status === filters.status),
+        );
+      },
+      async create(data) {
+        const id = data.id ?? newId();
+        const doc = stamp({
+          teacherId: data.teacherId, teacherName: data.teacherName ?? "",
+          startDate: data.startDate, endDate: data.endDate, reason: data.reason, status: "pending",
+        });
+        await col("teacher_leave_applications").doc(id).set(doc);
+        return { id, ...doc };
+      },
+      async updateStatus(id, status, adminNote) {
+        const ref = col("teacher_leave_applications").doc(id);
+        const existing = await ref.get();
+        if (!existing.exists) return null;
+        const updates = { status, adminNote: adminNote ?? null, reviewedAt: now() };
+        await ref.update(updates);
+        return { id, ...existing.data(), ...updates };
+      },
+    },
+
+    // ── Teacher Holidays ───────────────────────────────────────────────────────
+    teacherHolidays: {
+      async list() {
+        const snap = await col("teacher_holidays").orderBy("date").get();
+        return snap.docs.map(mapDoc);
+      },
+      async create(data) {
+        const id = data.id ?? newId();
+        const doc = stamp({ date: data.date, name: data.name });
+        await col("teacher_holidays").doc(id).set(doc);
+        return { id, ...doc };
+      },
+      async update(id, data) {
+        const ref = col("teacher_holidays").doc(id);
+        const existing = await ref.get();
+        if (!existing.exists) return null;
+        const updates = { date: data.date, name: data.name };
+        await ref.update(updates);
+        return { id, ...existing.data(), ...updates };
+      },
+      async delete(id) {
+        await col("teacher_holidays").doc(id).delete();
       },
     },
 

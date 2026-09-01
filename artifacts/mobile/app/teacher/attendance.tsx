@@ -516,7 +516,13 @@ export default function TeacherAttendance() {
           <Feather name="arrow-left" size={24} color={colors.cardForeground} />
         </TouchableOpacity>
         <Text style={[s.headerTitle, { color: colors.cardForeground }]}>Attendance</Text>
-        <View style={{ width: 40 }} />
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 7, borderRadius: 9, backgroundColor: colors.primary + '18' }}
+          onPress={() => router.push('/teacher/my-attendance' as any)}
+        >
+          <Feather name="map-pin" size={14} color={colors.primary} />
+          <Text style={{ color: colors.primary, fontSize: 11, fontWeight: '800' }}>My</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tab Switcher */}

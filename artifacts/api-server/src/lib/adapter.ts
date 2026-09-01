@@ -82,6 +82,23 @@ export interface DataAdapter {
     ): Promise<{ row: any; created: boolean }>;
     delete(id: string): Promise<void>;
   };
+  teacherAttendance: {
+    list(filters?: { teacherId?: string; month?: string }): Promise<any[]>;
+    getByTeacherDate(teacherId: string, date: string): Promise<any | null>;
+    create(data: any): Promise<any>;
+    updateCheckOut(id: string, data: any): Promise<any | null>;
+  };
+  teacherLeaveApplications: {
+    list(filters?: { teacherId?: string; status?: string }): Promise<any[]>;
+    create(data: any): Promise<any>;
+    updateStatus(id: string, status: "approved" | "rejected", adminNote?: string): Promise<any | null>;
+  };
+  teacherHolidays: {
+    list(): Promise<any[]>;
+    create(data: any): Promise<any>;
+    update(id: string, data: any): Promise<any | null>;
+    delete(id: string): Promise<void>;
+  };
   expenses: {
     list(): Promise<any[]>;
     create(data: any): Promise<any>;
