@@ -67,20 +67,26 @@ export default function TeacherFees() {
   const todayStr = now.toISOString().split('T')[0];
 
   // ── Derived ──
-  const uniqueClasses = useMemo(() =>
+  const collectableStudents = useMemo(
+    () => students.filter(s => s.status !== 'graduated'),
+    [students],
+  );
+  const collectUniqueClasses = useMemo(() =>
+    ['All', ...Array.from(new Set(collectableStudents.map(s => s.class))).sort()],
+    [collectableStudents]);
+  const reminderUniqueClasses = useMemo(() =>
     ['All', ...Array.from(new Set(students.filter(isActiveStudent).map(s => s.class))).sort()],
     [students]);
 
-  const filteredStudents = useMemo(() => students
+  const filteredStudents = useMemo(() => collectableStudents
     .filter(s => {
-      if (!isActiveStudent(s)) return false;
       const matchSearch = studentSearch === '' || s.name.toLowerCase().includes(studentSearch.toLowerCase());
       const matchClass  = classFilter === 'All' || s.class === classFilter;
       return matchSearch && matchClass;
     })
     .sort((a, b) => classFilter === 'All'
       ? a.class.localeCompare(b.class, undefined, { numeric: true, sensitivity: 'base' }) || compareStudentRollNumbers(a, b)
-      : compareStudentRollNumbers(a, b)), [students, studentSearch, classFilter]);
+      : compareStudentRollNumbers(a, b)), [collectableStudents, studentSearch, classFilter]);
 
   const filteredReminderStudents = useMemo(() => students
     .filter(s => {
@@ -99,7 +105,7 @@ export default function TeacherFees() {
       .sort((a, b) => b.id.localeCompare(a.id)),
     [feeRecords, todayStr, user]);
 
-  const selectedStudent = students.find(s => s.id === selectedStudentId && isActiveStudent(s)) ?? null;
+  const selectedStudent = collectableStudents.find(s => s.id === selectedStudentId) ?? null;
   const selectedFeeInfo = selectedStudent ? getStudentFeeInfo(selectedStudent, feeRecords) : null;
   const previousPayments = useMemo(() => {
     if (!selectedStudentId) return [];
@@ -296,7 +302,7 @@ export default function TeacherFees() {
 
               {/* Class chips */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 10 }}>
-                {uniqueClasses.map(cls => (
+                {collectUniqueClasses.map(cls => (
                   <TouchableOpacity
                     key={cls}
                     style={[s.chip, { backgroundColor: classFilter === cls ? colors.primary : colors.muted, borderColor: classFilter === cls ? colors.primary : colors.border }]}
@@ -571,7 +577,7 @@ export default function TeacherFees() {
               {reminderSearch !== '' && <TouchableOpacity onPress={() => setReminderSearch('')}><Feather name="x" size={14} color={colors.mutedForeground} /></TouchableOpacity>}
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-              {uniqueClasses.map(cls => (
+              {reminderUniqueClasses.map(cls => (
                 <TouchableOpacity key={cls} style={[s.chip, { backgroundColor: reminderClassFilter === cls ? '#FF9800' : colors.muted, borderColor: reminderClassFilter === cls ? '#FF9800' : colors.border }]} onPress={() => setReminderClassFilter(cls)}>
                   <Text style={[s.chipText, { color: reminderClassFilter === cls ? '#fff' : colors.mutedForeground }]}>{cls}</Text>
                 </TouchableOpacity>
