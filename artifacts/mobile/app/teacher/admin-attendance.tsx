@@ -12,6 +12,48 @@ import {
 } from '@/context/AppContext';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const TIME_SETTING_KEYS = ['checkInStart', 'checkInEnd', 'checkOutStart', 'checkOutEnd'] as const;
+type TimeSettingKey = typeof TIME_SETTING_KEYS[number];
+
+const TIME_SETTING_LABELS: Record<TimeSettingKey, string> = {
+  checkInStart: 'Check-in starts',
+  checkInEnd: 'Check-in closes',
+  checkOutStart: 'Check-out starts',
+  checkOutEnd: 'Check-out closes',
+};
+
+function formatTime12Hour(value: string): string {
+  const match = String(value).trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return value;
+  const hours = Number(match[1]);
+  const minutes = match[2];
+  if (hours < 0 || hours > 23) return value;
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 || 12;
+  return `${hour12}:${minutes} ${period}`;
+}
+
+function parseTime12Hour(value: string): string | null {
+  const normalized = value.trim().toUpperCase().replace(/\s+/g, ' ');
+  const twelveHour = normalized.match(/^(\d{1,2})(?::([0-5]\d))?\s*(AM|PM)$/);
+  if (twelveHour) {
+    const hour = Number(twelveHour[1]);
+    if (hour < 1 || hour > 12) return null;
+    const minute = twelveHour[2] ?? '00';
+    const hour24 = (hour % 12) + (twelveHour[3] === 'PM' ? 12 : 0);
+    return `${String(hour24).padStart(2, '0')}:${minute}`;
+  }
+
+  const twentyFourHour = normalized.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  return twentyFourHour ? `${twentyFourHour[1]}:${twentyFourHour[2]}` : null;
+}
+
+function createTimeDrafts(settings: TeacherAttendanceSettings): Record<TimeSettingKey, string> {
+  return TIME_SETTING_KEYS.reduce((drafts, key) => {
+    drafts[key] = formatTime12Hour(settings[key]);
+    return drafts;
+  }, {} as Record<TimeSettingKey, string>);
+}
 
 async function readAdminLocation(): Promise<{ latitude: number; longitude: number }> {
   if (Platform.OS === 'web') {
@@ -38,6 +80,7 @@ export default function AdminTeacherAttendance() {
     addTeacherHoliday, updateTeacherHoliday, deleteTeacherHoliday, calculateTeacherPayroll,
   } = useApp();
   const [settings, setSettings] = useState<TeacherAttendanceSettings>(teacherAttendanceSettings);
+  const [timeDrafts, setTimeDrafts] = useState<Record<TimeSettingKey, string>>(() => createTimeDrafts(teacherAttendanceSettings));
   const [holidayDate, setHolidayDate] = useState(new Date().toISOString().slice(0, 10));
   const [holidayName, setHolidayName] = useState('');
   const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null);
@@ -50,7 +93,10 @@ export default function AdminTeacherAttendance() {
     refreshTeacherAttendance().catch(error => console.error('[AdminTeacherAttendance]', error));
   }, [refreshTeacherAttendance]);
 
-  useEffect(() => setSettings(teacherAttendanceSettings), [teacherAttendanceSettings]);
+  useEffect(() => {
+    setSettings(teacherAttendanceSettings);
+    setTimeDrafts(createTimeDrafts(teacherAttendanceSettings));
+  }, [teacherAttendanceSettings]);
 
   const save = async (action: () => Promise<void>) => {
     setSaving(true);
@@ -66,18 +112,31 @@ export default function AdminTeacherAttendance() {
 
   const useCurrentLocation = () => save(async () => {
     const coordinates = await readAdminLocation();
-    const nextSettings = { ...settings, schoolLatitude: coordinates.latitude, schoolLongitude: coordinates.longitude };
+    const nextSettings = { ...getSettingsForSave(), schoolLatitude: coordinates.latitude, schoolLongitude: coordinates.longitude };
     setSettings(nextSettings);
     await updateTeacherAttendanceSettings(nextSettings);
   });
 
-  const saveSettings = () => save(() => updateTeacherAttendanceSettings({
-    ...settings,
-    radiusMeters: Number(settings.radiusMeters),
-    workingDaysPerMonth: Number(settings.workingDaysPerMonth),
-    lateGraceMinutes: Number(settings.lateGraceMinutes),
-    lateDeductionAmount: Number(settings.lateDeductionAmount),
-  }));
+  const getSettingsForSave = (): TeacherAttendanceSettings => {
+    const nextSettings = {
+      ...settings,
+      radiusMeters: Number(settings.radiusMeters),
+      workingDaysPerMonth: Number(settings.workingDaysPerMonth),
+      lateGraceMinutes: Number(settings.lateGraceMinutes),
+      lateDeductionAmount: Number(settings.lateDeductionAmount),
+    };
+
+    for (const key of TIME_SETTING_KEYS) {
+      const parsed = parseTime12Hour(timeDrafts[key]);
+      if (!parsed) {
+        throw new Error(`${TIME_SETTING_LABELS[key]} must use a time like 1:00 AM or 1:00 PM.`);
+      }
+      nextSettings[key] = parsed;
+    }
+    return nextSettings;
+  };
+
+  const saveSettings = () => save(() => updateTeacherAttendanceSettings(getSettingsForSave()));
 
   const resetHolidayForm = () => {
     setEditingHolidayId(null);
@@ -115,17 +174,31 @@ export default function AdminTeacherAttendance() {
   const reportMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const monthlyRecords = teacherAttendanceRecords.filter(record => record.date.startsWith(reportMonthKey));
 
-  const field = (label: string, key: keyof TeacherAttendanceSettings, keyboardType: 'default' | 'numeric' = 'default') => (
-    <View style={s.field} key={key}>
-      <Text style={[s.label, { color: colors.text }]}>{label}</Text>
-      <TextInput
-        value={String(settings[key] ?? '')}
-        onChangeText={value => setSettings(previous => ({ ...previous, [key]: keyboardType === 'numeric' ? value.replace(/[^\d.]/g, '') : value }))}
-        keyboardType={keyboardType}
-        style={[s.input, { color: colors.text, backgroundColor: colors.card, borderColor: colors.border }]}
-      />
-    </View>
-  );
+  const field = (label: string, key: keyof TeacherAttendanceSettings, keyboardType: 'default' | 'numeric' = 'default') => {
+    const isTimeField = TIME_SETTING_KEYS.includes(key as TimeSettingKey);
+    const timeKey = key as TimeSettingKey;
+    return (
+      <View style={s.field} key={key}>
+        <Text style={[s.label, { color: colors.text }]}>{label}</Text>
+        <TextInput
+          value={isTimeField ? timeDrafts[timeKey] : String(settings[key] ?? '')}
+          onChangeText={value => {
+            if (isTimeField) {
+              setTimeDrafts(previous => ({ ...previous, [timeKey]: value }));
+              const parsed = parseTime12Hour(value);
+              if (parsed) setSettings(previous => ({ ...previous, [key]: parsed }));
+              return;
+            }
+            setSettings(previous => ({ ...previous, [key]: keyboardType === 'numeric' ? value.replace(/[^\d.]/g, '') : value }));
+          }}
+          keyboardType={isTimeField ? 'default' : keyboardType}
+          placeholder={isTimeField ? 'e.g. 1:00 PM' : undefined}
+          placeholderTextColor={colors.mutedForeground}
+          style={[s.input, { color: colors.text, backgroundColor: colors.card, borderColor: colors.border }]}
+        />
+      </View>
+    );
+  };
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
@@ -145,7 +218,7 @@ export default function AdminTeacherAttendance() {
           <View style={s.sectionHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[s.sectionTitle, { color: colors.text }]}>Attendance rules</Text>
-              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>These rules apply to every teacher check-in.</Text>
+              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>These rules apply to every teacher check-in. Times use 12-hour format, such as 1:00 AM or 1:00 PM.</Text>
             </View>
             <Feather name="shield" size={20} color={colors.primary} />
           </View>
