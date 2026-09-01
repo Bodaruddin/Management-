@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
+  Alert, Modal, Platform, ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -88,6 +88,9 @@ export default function AdminTeacherAttendance() {
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [payroll, setPayroll] = useState<any>(null);
   const [saving, setSaving] = useState(false);
+  const [leaveView, setLeaveView] = useState<'pending' | 'history'>('pending');
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'approved' | 'rejected'>('all');
+  const [selectedLeaveHistory, setSelectedLeaveHistory] = useState<TeacherLeaveApplication | null>(null);
 
   useEffect(() => {
     refreshTeacherAttendance().catch(error => console.error('[AdminTeacherAttendance]', error));
@@ -173,6 +176,12 @@ export default function AdminTeacherAttendance() {
   const pendingLeaves = teacherLeaves.filter(leave => leave.status === 'pending');
   const reportMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const monthlyRecords = teacherAttendanceRecords.filter(record => record.date.startsWith(reportMonthKey));
+  const leaveHistory = teacherLeaves
+    .filter(leave => leave.status !== 'pending')
+    .sort((a, b) => (b.reviewedAt ?? b.createdAt).localeCompare(a.reviewedAt ?? a.createdAt));
+  const visibleLeaveHistory = historyFilter === 'all'
+    ? leaveHistory
+    : leaveHistory.filter(leave => leave.status === historyFilter);
 
   const field = (label: string, key: keyof TeacherAttendanceSettings, keyboardType: 'default' | 'numeric' = 'default') => {
     const isTimeField = TIME_SETTING_KEYS.includes(key as TimeSettingKey);
@@ -328,30 +337,102 @@ export default function AdminTeacherAttendance() {
         <View style={[s.section, { backgroundColor: colors.card }]}>
           <View style={s.sectionHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={[s.sectionTitle, { color: colors.text }]}>Leave approvals</Text>
-              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>{pendingLeaves.length} pending application{pendingLeaves.length === 1 ? '' : 's'}</Text>
+              <Text style={[s.sectionTitle, { color: colors.text }]}>Leave approvals & history</Text>
+              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>
+                {leaveView === 'pending'
+                  ? `${pendingLeaves.length} pending application${pendingLeaves.length === 1 ? '' : 's'}`
+                  : `${leaveHistory.length} reviewed application${leaveHistory.length === 1 ? '' : 's'}`}
+              </Text>
             </View>
             <Feather name="inbox" size={20} color={colors.warning} />
           </View>
-          {pendingLeaves.length === 0 ? <Text style={[s.mutedText, { color: colors.mutedForeground }]}>No pending leave applications.</Text> : pendingLeaves.map((leave: TeacherLeaveApplication) => (
-            <View key={leave.id} style={[s.leaveCard, { borderColor: colors.border }]}>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.historyTitle, { color: colors.text }]}>{leave.teacherName}</Text>
-                <Text style={[s.historyMeta, { color: colors.mutedForeground }]}>{leave.startDate} → {leave.endDate}</Text>
-                <Text style={[s.historyMeta, { color: colors.text }]}>{leave.reason}</Text>
+          <View style={[s.leaveTabs, { backgroundColor: colors.muted }]}>
+            {([
+              ['pending', `Pending (${pendingLeaves.length})`],
+              ['history', `History (${leaveHistory.length})`],
+            ] as const).map(([value, label]) => (
+              <TouchableOpacity
+                key={value}
+                style={[s.leaveTab, leaveView === value && { backgroundColor: colors.card, borderColor: colors.primary }]}
+                onPress={() => setLeaveView(value)}
+                activeOpacity={0.8}
+              >
+                <Text style={[s.leaveTabText, { color: leaveView === value ? colors.primary : colors.mutedForeground }]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {leaveView === 'pending' ? (
+            pendingLeaves.length === 0
+              ? <Text style={[s.mutedText, { color: colors.mutedForeground }]}>No pending leave applications.</Text>
+              : pendingLeaves.map((leave: TeacherLeaveApplication) => (
+                <View key={leave.id} style={[s.leaveCard, { borderColor: colors.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.historyTitle, { color: colors.text }]}>{leave.teacherName}</Text>
+                    <Text style={[s.historyMeta, { color: colors.mutedForeground }]}>{leave.startDate} → {leave.endDate}</Text>
+                    <Text style={[s.historyMeta, { color: colors.text }]}>{leave.reason}</Text>
+                  </View>
+                  <View style={{ gap: 7 }}>
+                    <TouchableOpacity style={[s.approve, { backgroundColor: colors.success }]} onPress={() => save(() => reviewTeacherLeave(leave.id, 'approved'))}>
+                      <Feather name="check" size={14} color="#fff" />
+                      <Text style={s.actionText}>Approve</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.reject, { borderColor: colors.destructive }]} onPress={() => save(() => reviewTeacherLeave(leave.id, 'rejected'))}>
+                      <Feather name="x" size={14} color={colors.destructive} />
+                      <Text style={[s.rejectText, { color: colors.destructive }]}>Reject</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+          ) : (
+            <>
+              <View style={s.historyFilters}>
+                {([
+                  ['all', 'All'],
+                  ['approved', 'Approved'],
+                  ['rejected', 'Rejected'],
+                ] as const).map(([value, label]) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={[s.historyFilter, { borderColor: historyFilter === value ? colors.primary : colors.border, backgroundColor: historyFilter === value ? colors.primary + '12' : colors.card }]}
+                    onPress={() => setHistoryFilter(value)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.historyFilterText, { color: historyFilter === value ? colors.primary : colors.mutedForeground }]}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-              <View style={{ gap: 7 }}>
-                <TouchableOpacity style={[s.approve, { backgroundColor: colors.success }]} onPress={() => save(() => reviewTeacherLeave(leave.id, 'approved'))}>
-                  <Feather name="check" size={14} color="#fff" />
-                  <Text style={s.actionText}>Approve</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[s.reject, { borderColor: colors.destructive }]} onPress={() => save(() => reviewTeacherLeave(leave.id, 'rejected'))}>
-                  <Feather name="x" size={14} color={colors.destructive} />
-                  <Text style={[s.rejectText, { color: colors.destructive }]}>Reject</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))}
+              {visibleLeaveHistory.length === 0
+                ? <Text style={[s.mutedText, { color: colors.mutedForeground }]}>No reviewed leave applications found.</Text>
+                : visibleLeaveHistory.map((leave: TeacherLeaveApplication) => {
+                  const approved = leave.status === 'approved';
+                  const statusColor = approved ? colors.success : colors.destructive;
+                  return (
+                    <TouchableOpacity
+                      key={leave.id}
+                      style={[s.historyLeaveCard, { borderColor: colors.border }]}
+                      onPress={() => setSelectedLeaveHistory(leave)}
+                      activeOpacity={0.78}
+                    >
+                      <View style={[s.historyStatusIcon, { backgroundColor: statusColor + '18' }]}>
+                        <Feather name={approved ? 'check' : 'x'} size={15} color={statusColor} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[s.historyTitle, { color: colors.text }]}>{leave.teacherName}</Text>
+                        <Text style={[s.historyMeta, { color: colors.mutedForeground }]}>{leave.startDate} → {leave.endDate}</Text>
+                        <Text style={[s.historyMeta, { color: colors.mutedForeground }]} numberOfLines={1}>{leave.reason}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end', gap: 5 }}>
+                        <View style={[s.historyStatusBadge, { backgroundColor: statusColor + '18' }]}>
+                          <Text style={[s.historyStatusText, { color: statusColor }]}>{approved ? 'Approved' : 'Rejected'}</Text>
+                        </View>
+                        <Feather name="chevron-right" size={15} color={colors.mutedForeground} />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+            </>
+          )}
         </View>
 
         <View style={[s.section, { backgroundColor: colors.card }]}>
@@ -401,6 +482,58 @@ export default function AdminTeacherAttendance() {
           ))}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={!!selectedLeaveHistory}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedLeaveHistory(null)}
+      >
+        <View style={s.modalOverlay}>
+          <View style={[s.historyModal, { backgroundColor: colors.card }]}>
+            <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.modalTitle, { color: colors.text }]}>Leave application</Text>
+                <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Reviewed history details</Text>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedLeaveHistory(null)} hitSlop={8}>
+                <Feather name="x" size={22} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+            {selectedLeaveHistory && (
+              <View style={{ gap: 13 }}>
+                <View style={s.detailRow}>
+                  <Text style={[s.detailLabel, { color: colors.mutedForeground }]}>TEACHER</Text>
+                  <Text style={[s.detailValue, { color: colors.text }]}>{selectedLeaveHistory.teacherName}</Text>
+                </View>
+                <View style={s.detailRow}>
+                  <Text style={[s.detailLabel, { color: colors.mutedForeground }]}>DATES</Text>
+                  <Text style={[s.detailValue, { color: colors.text }]}>{selectedLeaveHistory.startDate} → {selectedLeaveHistory.endDate}</Text>
+                </View>
+                <View style={s.detailRow}>
+                  <Text style={[s.detailLabel, { color: colors.mutedForeground }]}>REASON</Text>
+                  <Text style={[s.detailValue, { color: colors.text }]}>{selectedLeaveHistory.reason}</Text>
+                </View>
+                <View style={s.detailRow}>
+                  <Text style={[s.detailLabel, { color: colors.mutedForeground }]}>DECISION</Text>
+                  <Text style={[s.detailValue, { color: selectedLeaveHistory.status === 'approved' ? colors.success : colors.destructive, textTransform: 'capitalize' }]}>{selectedLeaveHistory.status}</Text>
+                </View>
+                <View style={s.detailRow}>
+                  <Text style={[s.detailLabel, { color: colors.mutedForeground }]}>REVIEWED</Text>
+                  <Text style={[s.detailValue, { color: colors.text }]}>{selectedLeaveHistory.reviewedAt ?? '—'}</Text>
+                </View>
+                <View style={s.detailRow}>
+                  <Text style={[s.detailLabel, { color: colors.mutedForeground }]}>ADMIN NOTE</Text>
+                  <Text style={[s.detailValue, { color: colors.text }]}>{selectedLeaveHistory.adminNote || 'No note added'}</Text>
+                </View>
+              </View>
+            )}
+            <TouchableOpacity style={[s.primaryButton, { backgroundColor: colors.primary, marginTop: 20 }]} onPress={() => setSelectedLeaveHistory(null)}>
+              <Text style={s.primaryText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -438,6 +571,23 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   historyTitle: { fontSize: 13, fontWeight: '700' },
   historyMeta: { fontSize: 12, lineHeight: 17, marginTop: 3 },
   amount: { fontSize: 15, fontWeight: '800' },
+  leaveTabs: { flexDirection: 'row', borderRadius: 10, padding: 3, gap: 4, marginBottom: 12 },
+  leaveTab: { flex: 1, alignItems: 'center', borderRadius: 8, borderWidth: 1, borderColor: 'transparent', paddingVertical: 9 },
+  leaveTabText: { fontSize: 12, fontWeight: '800' },
+  historyFilters: { flexDirection: 'row', gap: 7, marginBottom: 10 },
+  historyFilter: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 7 },
+  historyFilterText: { fontSize: 11, fontWeight: '700' },
+  historyLeaveCard: { flexDirection: 'row', alignItems: 'center', gap: 9, borderWidth: 1, borderRadius: 11, padding: 10, marginBottom: 8 },
+  historyStatusIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  historyStatusBadge: { borderRadius: 7, paddingHorizontal: 7, paddingVertical: 4 },
+  historyStatusText: { fontSize: 10, fontWeight: '800' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.5)', justifyContent: 'flex-end' },
+  historyModal: { borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, paddingBottom: 28 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingBottom: 13, marginBottom: 16 },
+  modalTitle: { fontSize: 17, fontWeight: '800' },
+  detailRow: { gap: 4 },
+  detailLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+  detailValue: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
   leaveCard: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 11, padding: 11, marginBottom: 9 },
   approve: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8 },
   actionText: { color: '#fff', fontSize: 11, fontWeight: '800' },
