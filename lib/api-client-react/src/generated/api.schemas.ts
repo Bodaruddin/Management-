@@ -118,6 +118,13 @@ export interface TeacherLeaveCreate {
   reason: string;
 }
 
+export interface TeacherLeaveUpdate {
+  teacherId: string;
+  startDate: string;
+  endDate: string;
+  reason: string;
+}
+
 export interface AdminAction {
   adminId: string;
   adminNote?: string;
@@ -166,6 +173,10 @@ month?: MonthParameter;
 export type ListTeacherLeavesParams = {
 teacherId?: TeacherIdParameter;
 status?: StatusParameter;
+};
+
+export type DeleteTeacherLeaveParams = {
+teacherId: string;
 };
 
 export type DeleteTeacherHolidayParams = {

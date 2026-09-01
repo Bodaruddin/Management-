@@ -845,6 +845,23 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
         await col("teacher_leave_applications").doc(id).set(doc);
         return { id, ...doc };
       },
+      async update(id, teacherId, data) {
+        const ref = col("teacher_leave_applications").doc(id);
+        const existing = await ref.get();
+        const current = existing.data() as any;
+        if (!existing.exists || current.teacherId !== teacherId || current.status !== "pending") return null;
+        const updates = { startDate: data.startDate, endDate: data.endDate, reason: data.reason };
+        await ref.update(updates);
+        return { id, ...current, ...updates };
+      },
+      async delete(id, teacherId) {
+        const ref = col("teacher_leave_applications").doc(id);
+        const existing = await ref.get();
+        const current = existing.data() as any;
+        if (!existing.exists || current.teacherId !== teacherId || current.status !== "pending") return false;
+        await ref.delete();
+        return true;
+      },
       async updateStatus(id, status, adminNote) {
         const ref = col("teacher_leave_applications").doc(id);
         const existing = await ref.get();

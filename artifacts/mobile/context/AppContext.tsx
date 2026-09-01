@@ -516,6 +516,8 @@ interface AppContextType extends AppState {
   }) => Promise<TeacherAttendanceRecord>;
   checkOutTeacher: (id: string, data: { teacherId: string; latitude: number; longitude: number }) => Promise<TeacherAttendanceRecord>;
   applyTeacherLeave: (data: Omit<TeacherLeaveApplication, 'id' | 'status' | 'createdAt'>) => Promise<TeacherLeaveApplication>;
+  updateTeacherLeave: (id: string, data: Pick<TeacherLeaveApplication, 'teacherId' | 'startDate' | 'endDate' | 'reason'>) => Promise<TeacherLeaveApplication>;
+  deleteTeacherLeave: (id: string, teacherId: string) => Promise<void>;
   reviewTeacherLeave: (id: string, status: 'approved' | 'rejected', adminNote?: string) => Promise<void>;
   addTeacherHoliday: (data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => Promise<TeacherHoliday>;
   updateTeacherHoliday: (id: string, data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => Promise<void>;
@@ -1381,6 +1383,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return leave;
   }, []);
 
+  const updateTeacherLeave = useCallback(async (id: string, data: Pick<TeacherLeaveApplication, 'teacherId' | 'startDate' | 'endDate' | 'reason'>) => {
+    const row = await apiPut<any>(`/teacher-leaves/${id}`, data);
+    const leave = mapTeacherLeave(row);
+    setState(prev => ({ ...prev, teacherLeaves: prev.teacherLeaves.map(item => item.id === id ? leave : item) }));
+    return leave;
+  }, []);
+
+  const deleteTeacherLeave = useCallback(async (id: string, teacherId: string) => {
+    await apiDelete(`/teacher-leaves/${id}?teacherId=${encodeURIComponent(teacherId)}`);
+    setState(prev => ({ ...prev, teacherLeaves: prev.teacherLeaves.filter(item => item.id !== id) }));
+  }, []);
+
   const reviewTeacherLeave = useCallback(async (id: string, status: 'approved' | 'rejected', adminNote?: string) => {
     const action = status === 'approved' ? 'approve' : 'reject';
     const row = await apiPut<any>(`/teacher-leaves/${id}/${action}`, { adminId: 'admin', adminNote });
@@ -1632,6 +1646,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refreshInactivationRequests, setStudentStatus, setClassAbsentLimit, updateDocumentBranding,
       addAlumni, updateAlumni, deleteAlumni, bulkAddAlumni,
       refreshTeacherAttendance, checkInTeacher, checkOutTeacher, applyTeacherLeave,
+      updateTeacherLeave, deleteTeacherLeave,
       reviewTeacherLeave, addTeacherHoliday, updateTeacherHoliday, deleteTeacherHoliday,
       updateTeacherAttendanceSettings, calculateTeacherPayroll,
     }}>

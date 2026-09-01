@@ -141,6 +141,37 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeacherLeave"
+  /teacher-leaves/{id}:
+    put:
+      operationId: updateTeacherLeave
+      tags: [teacher-leaves]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherLeaveUpdate"
+      responses:
+        "200":
+          description: Updated pending leave application
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherLeave"
+    delete:
+      operationId: deleteTeacherLeave
+      tags: [teacher-leaves]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+        - name: teacherId
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Pending leave application deleted
   /teacher-leaves/{id}/approve:
     put:
       operationId: approveTeacherLeave
@@ -361,6 +392,14 @@ components:
       properties:
         teacherId: { type: string }
         teacherName: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        reason: { type: string }
+    TeacherLeaveUpdate:
+      type: object
+      required: [teacherId, startDate, endDate, reason]
+      properties:
+        teacherId: { type: string }
         startDate: { type: string, format: date }
         endDate: { type: string, format: date }
         reason: { type: string }

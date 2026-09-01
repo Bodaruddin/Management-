@@ -184,6 +184,40 @@ export const ApplyForTeacherLeaveResponse = zod.object({
 })
 
 
+export const UpdateTeacherLeaveParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateTeacherLeaveBody = zod.object({
+  "teacherId": zod.string(),
+  "startDate": zod.coerce.date(),
+  "endDate": zod.coerce.date(),
+  "reason": zod.string()
+})
+
+export const UpdateTeacherLeaveResponse = zod.object({
+  "id": zod.string().optional(),
+  "teacherId": zod.string().optional(),
+  "teacherName": zod.string().optional(),
+  "startDate": zod.coerce.date().optional(),
+  "endDate": zod.coerce.date().optional(),
+  "reason": zod.string().optional(),
+  "status": zod.enum(['pending', 'approved', 'rejected']).optional(),
+  "adminNote": zod.string().nullish()
+})
+
+
+export const DeleteTeacherLeaveParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteTeacherLeaveQueryParams = zod.object({
+  "teacherId": zod.coerce.string()
+})
+
+export const DeleteTeacherLeaveResponse = zod.void()
+
+
 export const ApproveTeacherLeaveParams = zod.object({
   "id": zod.coerce.string()
 })

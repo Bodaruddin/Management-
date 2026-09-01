@@ -86,6 +86,7 @@ export default function MyTeacherAttendance() {
   const {
     teacherAttendanceRecords, teacherLeaves, teacherAttendanceSettings,
     refreshTeacherAttendance, checkInTeacher, checkOutTeacher, applyTeacherLeave,
+    updateTeacherLeave, deleteTeacherLeave,
   } = useApp();
   const [tab, setTab] = useState<Tab>('today');
   const [busy, setBusy] = useState(false);
@@ -93,6 +94,7 @@ export default function MyTeacherAttendance() {
   const [leaveStart, setLeaveStart] = useState(new Date().toISOString().slice(0, 10));
   const [leaveEnd, setLeaveEnd] = useState(new Date().toISOString().slice(0, 10));
   const [leaveReason, setLeaveReason] = useState('');
+  const [editingLeaveId, setEditingLeaveId] = useState<string | null>(null);
 
   const today = new Date().toISOString().slice(0, 10);
   const myRecords = useMemo(
@@ -153,12 +155,51 @@ export default function MyTeacherAttendance() {
     if (!leaveStart || !leaveEnd || leaveStart > leaveEnd || !leaveReason.trim()) {
       throw new Error('Enter a valid date range and reason');
     }
-    await applyTeacherLeave({
-      teacherId: user.id, teacherName: user.name, startDate: leaveStart, endDate: leaveEnd, reason: leaveReason.trim(),
-    });
+    if (editingLeaveId) {
+      await updateTeacherLeave(editingLeaveId, {
+        teacherId: user.id, startDate: leaveStart, endDate: leaveEnd, reason: leaveReason.trim(),
+      });
+    } else {
+      await applyTeacherLeave({
+        teacherId: user.id, teacherName: user.name, startDate: leaveStart, endDate: leaveEnd, reason: leaveReason.trim(),
+      });
+    }
+    setEditingLeaveId(null);
+    setLeaveStart(today);
+    setLeaveEnd(today);
     setLeaveReason('');
-    Alert.alert('Application sent', 'Your leave application is waiting for admin approval.');
+    Alert.alert(
+      editingLeaveId ? 'Application updated' : 'Application sent',
+      editingLeaveId ? 'Your pending leave application was updated.' : 'Your leave application is waiting for admin approval.',
+    );
   });
+
+  const editLeave = (leave: TeacherLeaveApplication) => {
+    setEditingLeaveId(leave.id);
+    setLeaveStart(leave.startDate);
+    setLeaveEnd(leave.endDate);
+    setLeaveReason(leave.reason);
+  };
+
+  const cancelLeaveEdit = () => {
+    setEditingLeaveId(null);
+    setLeaveStart(today);
+    setLeaveEnd(today);
+    setLeaveReason('');
+  };
+
+  const removeLeave = (leave: TeacherLeaveApplication) => {
+    if (!user) return;
+    const remove = () => runAction(() => deleteTeacherLeave(leave.id, user.id));
+    if (Platform.OS === 'web') {
+      if (window.confirm('Delete this pending leave application?')) remove();
+      return;
+    }
+    Alert.alert('Delete application?', 'This pending leave application will be removed.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: remove },
+    ]);
+  };
 
   const s = styles(colors);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -296,9 +337,14 @@ export default function MyTeacherAttendance() {
             <TextInput value={leaveReason} onChangeText={setLeaveReason} multiline numberOfLines={4} textAlignVertical="top" placeholder="Why do you need leave?" placeholderTextColor={colors.mutedForeground} style={[s.input, s.multiline, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]} />
           </View>
           <TouchableOpacity style={[s.primaryButton, { backgroundColor: busy ? colors.muted : colors.primary }]} disabled={busy} onPress={handleLeave}>
-            <Feather name="send" size={17} color="#fff" />
-            <Text style={s.primaryButtonText}>{busy ? 'Sending…' : 'Send application'}</Text>
+            <Feather name={editingLeaveId ? 'save' : 'send'} size={17} color="#fff" />
+            <Text style={s.primaryButtonText}>{busy ? (editingLeaveId ? 'Saving…' : 'Sending…') : (editingLeaveId ? 'Save changes' : 'Send application')}</Text>
           </TouchableOpacity>
+          {editingLeaveId && (
+            <TouchableOpacity style={[s.cancelButton, { borderColor: colors.border }]} disabled={busy} onPress={cancelLeaveEdit}>
+              <Text style={[s.cancelButtonText, { color: colors.mutedForeground }]}>Cancel edit</Text>
+            </TouchableOpacity>
+          )}
 
           <Text style={[s.sectionTitle, { color: colors.text, marginTop: 28 }]}>My applications</Text>
           {myLeaves.length === 0 ? <Text style={[s.emptyText, { color: colors.mutedForeground }]}>No leave applications yet.</Text> : myLeaves.map((leave: TeacherLeaveApplication) => (
@@ -306,8 +352,23 @@ export default function MyTeacherAttendance() {
               <View style={{ flex: 1 }}>
                 <Text style={[s.historyTitle, { color: colors.text }]}>{leave.startDate} → {leave.endDate}</Text>
                 <Text style={[s.historyMeta, { color: colors.mutedForeground }]}>{leave.reason}</Text>
+                {leave.status === 'pending' && <Text style={[s.pendingHint, { color: colors.mutedForeground }]}>You can edit or delete while pending.</Text>}
               </View>
-              <Text style={[s.statusText, { color: leave.status === 'approved' ? colors.success : leave.status === 'rejected' ? colors.destructive : colors.warning }]}>{leave.status.toUpperCase()}</Text>
+              <View style={s.leaveSide}>
+                <Text style={[s.statusText, { color: leave.status === 'approved' ? colors.success : leave.status === 'rejected' ? colors.destructive : colors.warning }]}>{leave.status.toUpperCase()}</Text>
+                {leave.status === 'pending' && (
+                  <View style={s.leaveActions}>
+                    <TouchableOpacity style={[s.leaveAction, { borderColor: colors.primary }]} disabled={busy} onPress={() => editLeave(leave)} hitSlop={6}>
+                      <Feather name="edit-2" size={12} color={colors.primary} />
+                      <Text style={[s.leaveActionText, { color: colors.primary }]}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[s.leaveAction, { borderColor: colors.destructive }]} disabled={busy} onPress={() => removeLeave(leave)} hitSlop={6}>
+                      <Feather name="trash-2" size={12} color={colors.destructive} />
+                      <Text style={[s.leaveActionText, { color: colors.destructive }]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             </View>
           ))}
         </ScrollView>
@@ -362,5 +423,12 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, fontSize: 14 },
   multiline: { minHeight: 100 },
   emptyText: { fontSize: 13 },
+  cancelButton: { minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, marginBottom: 12 },
+  cancelButtonText: { fontSize: 13, fontWeight: '700' },
   leaveRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 13, padding: 13, marginBottom: 9, gap: 10 },
+  leaveSide: { alignItems: 'flex-end', gap: 8 },
+  leaveActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  leaveAction: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 6 },
+  leaveActionText: { fontSize: 10, fontWeight: '800' },
+  pendingHint: { fontSize: 10, marginTop: 5 },
 });

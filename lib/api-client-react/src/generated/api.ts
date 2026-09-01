@@ -22,6 +22,7 @@ import type {
 import type {
   AdminAction,
   DeleteTeacherHolidayParams,
+  DeleteTeacherLeaveParams,
   HealthStatus,
   ListTeacherAttendanceParams,
   ListTeacherLeavesParams,
@@ -35,7 +36,8 @@ import type {
   TeacherHoliday,
   TeacherHolidayCreate,
   TeacherLeave,
-  TeacherLeaveCreate
+  TeacherLeaveCreate,
+  TeacherLeaveUpdate
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -629,6 +631,146 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getApplyForTeacherLeaveMutationOptions(options));
+    }
+
+export const getUpdateTeacherLeaveUrl = (id: string,) => {
+
+
+
+
+  return `/api/teacher-leaves/${id}`
+}
+
+export const updateTeacherLeave = async (id: string,
+    teacherLeaveUpdate: TeacherLeaveUpdate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherLeave> => {
+
+  return customFetch<TeacherLeave>(getUpdateTeacherLeaveUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(teacherLeaveUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateTeacherLeaveMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherLeave>>, TError,{id: string;data: BodyType<TeacherLeaveUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTeacherLeave>>, TError,{id: string;data: BodyType<TeacherLeaveUpdate>}, TContext> => {
+
+const mutationKey = ['updateTeacherLeave'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTeacherLeave>>, {id: string;data: BodyType<TeacherLeaveUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTeacherLeave(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTeacherLeaveMutationResult = NonNullable<Awaited<ReturnType<typeof updateTeacherLeave>>>
+    export type UpdateTeacherLeaveMutationBody = BodyType<TeacherLeaveUpdate>
+    export type UpdateTeacherLeaveMutationError = ErrorType<unknown>
+
+    export const useUpdateTeacherLeave = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherLeave>>, TError,{id: string;data: BodyType<TeacherLeaveUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTeacherLeave>>,
+        TError,
+        {id: string;data: BodyType<TeacherLeaveUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTeacherLeaveMutationOptions(options));
+    }
+
+export const getDeleteTeacherLeaveUrl = (id: string,
+    params: DeleteTeacherLeaveParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/teacher-leaves/${id}?${stringifiedParams}` : `/api/teacher-leaves/${id}`
+}
+
+export const deleteTeacherLeave = async (id: string,
+    params: DeleteTeacherLeaveParams, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteTeacherLeaveUrl(id,params),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteTeacherLeaveMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherLeave>>, TError,{id: string;params: DeleteTeacherLeaveParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherLeave>>, TError,{id: string;params: DeleteTeacherLeaveParams}, TContext> => {
+
+const mutationKey = ['deleteTeacherLeave'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTeacherLeave>>, {id: string;params: DeleteTeacherLeaveParams}> = (props) => {
+          const {id,params} = props ?? {};
+
+          return  deleteTeacherLeave(id,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTeacherLeaveMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTeacherLeave>>>
+
+    export type DeleteTeacherLeaveMutationError = ErrorType<unknown>
+
+    export const useDeleteTeacherLeave = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherLeave>>, TError,{id: string;params: DeleteTeacherLeaveParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTeacherLeave>>,
+        TError,
+        {id: string;params: DeleteTeacherLeaveParams},
+        TContext
+      > => {
+      return useMutation(getDeleteTeacherLeaveMutationOptions(options));
     }
 
 export const getApproveTeacherLeaveUrl = (id: string,) => {

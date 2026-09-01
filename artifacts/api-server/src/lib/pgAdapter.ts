@@ -762,6 +762,27 @@ export function createPgAdapter(db: DB): DataAdapter {
         const [row] = await db.insert(teacherLeaveApplicationsTable).values(values).returning();
         return row;
       },
+      async update(id, teacherId, data) {
+        const [row] = await db.update(teacherLeaveApplicationsTable)
+          .set({ startDate: data.startDate, endDate: data.endDate, reason: data.reason })
+          .where(and(
+            eq(teacherLeaveApplicationsTable.id, id),
+            eq(teacherLeaveApplicationsTable.teacherId, teacherId),
+            eq(teacherLeaveApplicationsTable.status, "pending"),
+          ))
+          .returning();
+        return row ?? null;
+      },
+      async delete(id, teacherId) {
+        const deleted = await db.delete(teacherLeaveApplicationsTable)
+          .where(and(
+            eq(teacherLeaveApplicationsTable.id, id),
+            eq(teacherLeaveApplicationsTable.teacherId, teacherId),
+            eq(teacherLeaveApplicationsTable.status, "pending"),
+          ))
+          .returning({ id: teacherLeaveApplicationsTable.id });
+        return deleted.length > 0;
+      },
       async updateStatus(id, status, adminNote) {
         const [row] = await db.update(teacherLeaveApplicationsTable)
           .set({ status, adminNote: adminNote ?? null, reviewedAt: new Date() })

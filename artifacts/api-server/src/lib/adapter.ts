@@ -91,6 +91,8 @@ export interface DataAdapter {
   teacherLeaveApplications: {
     list(filters?: { teacherId?: string; status?: string }): Promise<any[]>;
     create(data: any): Promise<any>;
+    update(id: string, teacherId: string, data: any): Promise<any | null>;
+    delete(id: string, teacherId: string): Promise<boolean>;
     updateStatus(id: string, status: "approved" | "rejected", adminNote?: string): Promise<any | null>;
   };
   teacherHolidays: {

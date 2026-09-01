@@ -217,6 +217,41 @@ router.post("/teacher-leaves", async (req, res) => {
   res.status(201).json(row);
 });
 
+router.put("/teacher-leaves/:id", async (req, res) => {
+  const body = req.body ?? {};
+  const teacherId = String(body.teacherId ?? "");
+  if (!teacherId || !/^\d{4}-\d{2}-\d{2}$/.test(body.startDate)
+    || !/^\d{4}-\d{2}-\d{2}$/.test(body.endDate) || body.startDate > body.endDate
+    || !String(body.reason ?? "").trim()) {
+    res.status(400).json({ error: "teacher, valid date range, and reason are required" });
+    return;
+  }
+  const row = await getAdapter().teacherLeaveApplications.update(req.params.id, teacherId, {
+    startDate: body.startDate,
+    endDate: body.endDate,
+    reason: String(body.reason).trim(),
+  });
+  if (!row) {
+    res.status(404).json({ error: "Only your pending leave applications can be edited" });
+    return;
+  }
+  res.json(row);
+});
+
+router.delete("/teacher-leaves/:id", async (req, res) => {
+  const teacherId = typeof req.query.teacherId === "string" ? req.query.teacherId : "";
+  if (!teacherId) {
+    res.status(400).json({ error: "teacherId is required" });
+    return;
+  }
+  const deleted = await getAdapter().teacherLeaveApplications.delete(req.params.id, teacherId);
+  if (!deleted) {
+    res.status(404).json({ error: "Only your pending leave applications can be deleted" });
+    return;
+  }
+  res.status(204).send();
+});
+
 router.put("/teacher-leaves/:id/approve", async (req, res) => {
   if (req.body?.adminId !== "admin") { res.status(403).json({ error: "Only administrators can approve leave" }); return; }
   const row = await getAdapter().teacherLeaveApplications.updateStatus(req.params.id, "approved", req.body?.adminNote);
