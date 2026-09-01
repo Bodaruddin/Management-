@@ -155,10 +155,10 @@ export async function shareBirthdayCardImage(cardRef: any, student: Student): Pr
   });
 }
 
-// ─── Send birthday card directly to the registered WhatsApp number ────────────
-// Android's whatsapp:// URL can open a chat or carry text, but it cannot attach
-// a local PNG. Use a targeted ACTION_SEND intent so WhatsApp opens directly
-// with the captured card image and the student's registered number.
+// ─── Send birthday card to the registered WhatsApp number ──────────────────────
+// Try WhatsApp's direct contact activity first. Some WhatsApp versions do not
+// expose that activity, so fall back to the native image share chooser instead
+// of showing an error even though WhatsApp is installed.
 export async function sendBirthdayCardWhatsApp(
   cardRef: any,
   student: Student,
@@ -181,35 +181,101 @@ export async function sendBirthdayCardWhatsApp(
   });
 
   if (Platform.OS === 'android') {
-    const contentUri = await FileSystem.getContentUriAsync(imageUri);
     let lastError: unknown;
-    for (const packageName of ['com.whatsapp', 'com.whatsapp.w4b']) {
-      try {
-        const contactPickerClass = `${packageName}.ContactPicker`;
-        await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
-          type: 'image/*',
-          packageName,
-          // expo-intent-launcher only applies packageName when className is
-          // also supplied. ContactPicker accepts ACTION_SEND image intents
-          // and keeps the send inside the targeted WhatsApp app.
-          className: contactPickerClass,
-          flags: 1, // Intent.FLAG_GRANT_READ_URI_PERMISSION
-          extra: {
-            'android.intent.extra.STREAM': contentUri,
-            'android.intent.extra.TEXT': caption,
-            jid: `${phone}@s.whatsapp.net`,
-          },
+    try {
+      const contentUri = await FileSystem.getContentUriAsync(imageUri);
+      for (const packageName of ['com.whatsapp', 'com.whatsapp.w4b']) {
+        try {
+          const contactPickerClass = `${packageName}.ContactPicker`;
+          await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
+            type: 'image/*',
+            packageName,
+            // expo-intent-launcher only applies packageName when className is
+            // also supplied. ContactPicker accepts ACTION_SEND image intents
+            // and keeps the send inside the targeted WhatsApp app.
+            className: contactPickerClass,
+            flags: 1, // Intent.FLAG_GRANT_READ_URI_PERMISSION
+            extra: {
+              'android.intent.extra.STREAM': contentUri,
+              'android.intent.extra.TEXT': caption,
+              jid: `${phone}@s.whatsapp.net`,
+            },
+          });
+          return;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+    } catch (error) {
+      lastError = error;
+    }
+
+    // ContactPicker is not exported by every WhatsApp build. An implicit
+    // ACTION_SEND still includes WhatsApp in the chooser and preserves both
+    // the image and caption; the jid is honored by builds that support it.
+    try {
+      const contentUri = await FileSystem.getContentUriAsync(imageUri);
+      await IntentLauncher.startActivityAsync('android.intent.action.SEND', {
+        type: 'image/*',
+        flags: 1,
+        extra: {
+          'android.intent.extra.STREAM': contentUri,
+          'android.intent.extra.TEXT': caption,
+          jid: `${phone}@s.whatsapp.net`,
+        },
+      });
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+
+    // Expo's share sheet is a final native fallback for devices where the
+    // implicit intent cannot be resolved. The user can choose WhatsApp and
+    // attach the card to the student's chat without losing the image.
+    try {
+      const available = await Sharing.isAvailableAsync();
+      if (available) {
+        await Sharing.shareAsync(imageUri, {
+          mimeType: 'image/png',
+          dialogTitle: `Happy Birthday – ${student.name}`,
+          UTI: 'public.png',
         });
         return;
-      } catch (error) {
-        lastError = error;
       }
+    } catch (error) {
+      lastError = error;
     }
-    throw new Error('WhatsApp is not installed or could not open the selected chat.', { cause: lastError });
+
+    throw new Error('Could not open the Android sharing options. Please try again.', { cause: lastError });
   }
 
   if (Platform.OS === 'web') {
-    throw new Error('Direct birthday-card sending is available in the Android app.');
+    // Browsers cannot target a WhatsApp chat while attaching a local image.
+    // Use Web Share when available, then fall back to the registered chat link.
+    try {
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        const response = await fetch(imageUri);
+        const blob = await response.blob();
+        const file = new File(
+          [blob],
+          `Birthday_${student.name.replace(/\s+/g, '_')}.png`,
+          { type: 'image/png' },
+        );
+        if ((navigator as any).canShare?.({ files: [file] })) {
+          await (navigator as any).share({
+            files: [file],
+            text: caption,
+            title: `Happy Birthday – ${student.name}`,
+          });
+          return;
+        }
+      }
+    } catch {
+      // Continue to the WhatsApp chat-link fallback.
+    }
+
+    await Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(caption)}`);
+    return;
   }
 
   // iOS does not expose the same package-targeted Android intent. Keep its
