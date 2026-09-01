@@ -1382,7 +1382,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const reviewTeacherLeave = useCallback(async (id: string, status: 'approved' | 'rejected', adminNote?: string) => {
-    const row = await apiPut<any>(`/teacher-leaves/${id}/${status}`, { adminId: 'admin', adminNote });
+    const action = status === 'approved' ? 'approve' : 'reject';
+    const row = await apiPut<any>(`/teacher-leaves/${id}/${action}`, { adminId: 'admin', adminNote });
     const leave = mapTeacherLeave(row);
     setState(prev => ({ ...prev, teacherLeaves: prev.teacherLeaves.map(item => item.id === id ? leave : item) }));
   }, []);

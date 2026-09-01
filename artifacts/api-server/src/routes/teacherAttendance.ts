@@ -246,6 +246,10 @@ router.post("/teacher-holidays", async (req, res) => {
 
 router.put("/teacher-holidays/:id", async (req, res) => {
   if (req.body?.adminId !== "admin") { res.status(403).json({ error: "Only administrators can edit holidays" }); return; }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(req.body?.date) || !String(req.body?.name ?? "").trim()) {
+    res.status(400).json({ error: "A valid date and holiday name are required" });
+    return;
+  }
   const row = await getAdapter().teacherHolidays.update(req.params.id, { date: req.body.date, name: String(req.body.name ?? "").trim() });
   if (!row) { res.status(404).json({ error: "Holiday not found" }); return; }
   res.json(row);

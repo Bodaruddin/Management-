@@ -35,11 +35,12 @@ export default function AdminTeacherAttendance() {
   const {
     teacherAttendanceSettings, teacherAttendanceRecords, teacherLeaves, teacherHolidays, teachers,
     refreshTeacherAttendance, updateTeacherAttendanceSettings, reviewTeacherLeave,
-    addTeacherHoliday, deleteTeacherHoliday, calculateTeacherPayroll,
+    addTeacherHoliday, updateTeacherHoliday, deleteTeacherHoliday, calculateTeacherPayroll,
   } = useApp();
   const [settings, setSettings] = useState<TeacherAttendanceSettings>(teacherAttendanceSettings);
   const [holidayDate, setHolidayDate] = useState(new Date().toISOString().slice(0, 10));
   const [holidayName, setHolidayName] = useState('');
+  const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null);
   const [month, setMonth] = useState(MONTHS[new Date().getMonth()]);
   const [year, setYear] = useState(String(new Date().getFullYear()));
   const [payroll, setPayroll] = useState<any>(null);
@@ -78,11 +79,29 @@ export default function AdminTeacherAttendance() {
     lateDeductionAmount: Number(settings.lateDeductionAmount),
   }));
 
-  const addHoliday = () => save(async () => {
-    if (!holidayDate || !holidayName.trim()) throw new Error('Enter a date and holiday name');
-    await addTeacherHoliday({ date: holidayDate, name: holidayName.trim() });
+  const resetHolidayForm = () => {
+    setEditingHolidayId(null);
+    setHolidayDate(new Date().toISOString().slice(0, 10));
     setHolidayName('');
+  };
+
+  const saveHoliday = () => save(async () => {
+    if (!holidayDate || !holidayName.trim()) throw new Error('Enter a date and holiday name');
+    if (editingHolidayId) {
+      await updateTeacherHoliday(editingHolidayId, { date: holidayDate, name: holidayName.trim() });
+    } else {
+      await addTeacherHoliday({ date: holidayDate, name: holidayName.trim() });
+    }
+    resetHolidayForm();
   });
+
+  const editHoliday = (id: string, date: string, name: string) => {
+    setEditingHolidayId(id);
+    setHolidayDate(date);
+    setHolidayName(name);
+  };
+
+  const removeHoliday = (id: string) => save(() => deleteTeacherHoliday(id));
 
   const runPayroll = () => save(async () => {
     const report = await calculateTeacherPayroll(month, Number(year));
@@ -280,19 +299,31 @@ export default function AdminTeacherAttendance() {
               <TextInput value={holidayName} onChangeText={setHolidayName} placeholder="Holiday name" placeholderTextColor={colors.mutedForeground} style={[s.input, { color: colors.text, backgroundColor: colors.card, borderColor: colors.border }]} />
             </View>
           </View>
-          <TouchableOpacity style={[s.secondaryButton, { borderColor: colors.primary }]} onPress={addHoliday} disabled={saving}>
-            <Feather name="plus" size={16} color={colors.primary} />
-            <Text style={[s.secondaryText, { color: colors.primary }]}>Add holiday</Text>
+          <TouchableOpacity style={[s.secondaryButton, { borderColor: colors.primary }]} onPress={saveHoliday} disabled={saving}>
+            <Feather name={editingHolidayId ? 'save' : 'plus'} size={16} color={colors.primary} />
+            <Text style={[s.secondaryText, { color: colors.primary }]}>{editingHolidayId ? 'Save holiday changes' : 'Add holiday'}</Text>
           </TouchableOpacity>
+          {editingHolidayId && (
+            <TouchableOpacity style={[s.cancelButton, { borderColor: colors.border }]} onPress={resetHolidayForm} disabled={saving}>
+              <Text style={[s.cancelText, { color: colors.mutedForeground }]}>Cancel edit</Text>
+            </TouchableOpacity>
+          )}
           {teacherHolidays.map(holiday => (
             <View key={holiday.id} style={[s.holidayRow, { borderBottomColor: colors.border }]}>
               <View style={{ flex: 1 }}>
                 <Text style={[s.historyTitle, { color: colors.text }]}>{holiday.name}</Text>
                 <Text style={[s.historyMeta, { color: colors.mutedForeground }]}>{holiday.date}</Text>
               </View>
-              <TouchableOpacity onPress={() => save(() => deleteTeacherHoliday(holiday.id))} hitSlop={8}>
-                <Feather name="trash-2" size={16} color={colors.destructive} />
-              </TouchableOpacity>
+              <View style={s.holidayActions}>
+                <TouchableOpacity style={[s.holidayAction, { borderColor: colors.primary }]} onPress={() => editHoliday(holiday.id, holiday.date, holiday.name)} disabled={saving} hitSlop={6}>
+                  <Feather name="edit-2" size={13} color={colors.primary} />
+                  <Text style={[s.holidayActionText, { color: colors.primary }]}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[s.holidayAction, { borderColor: colors.destructive }]} onPress={() => removeHoliday(holiday.id)} disabled={saving} hitSlop={6}>
+                  <Feather name="trash-2" size={13} color={colors.destructive} />
+                  <Text style={[s.holidayActionText, { color: colors.destructive }]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
         </View>
@@ -327,6 +358,8 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   choiceText: { fontSize: 13, fontWeight: '600' },
   secondaryButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1.5, marginBottom: 12 },
   secondaryText: { fontSize: 14, fontWeight: '800' },
+  cancelButton: { minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, marginBottom: 10 },
+  cancelText: { fontSize: 12, fontWeight: '700' },
   payrollBox: { borderRadius: 11, padding: 11, marginTop: 2 },
   payrollRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
   historyTitle: { fontSize: 13, fontWeight: '700' },
@@ -337,5 +370,8 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   actionText: { color: '#fff', fontSize: 11, fontWeight: '800' },
   reject: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
   rejectText: { fontSize: 11, fontWeight: '800' },
-  holidayRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderBottomWidth: 1 },
+  holidayRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, borderBottomWidth: 1 },
+  holidayActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  holidayAction: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 6 },
+  holidayActionText: { fontSize: 10, fontWeight: '800' },
 });
