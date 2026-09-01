@@ -10,4 +10,6 @@ export interface TeacherCheckOut {
   teacherId: string;
   latitude: number;
   longitude: number;
+  /** Camera selfie used to match the enrolled teacher face template */
+  faceImageBase64?: string;
 }

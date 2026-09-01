@@ -134,6 +134,7 @@ export interface TeacherAttendanceSettings {
   checkOutStart: string;
   checkOutEnd: string;
   requireFaceVerification: boolean;
+  allowLateCheckIn: boolean;
   workingDaysPerMonth: number;
   lateGraceMinutes: number;
   lateDeductionAmount: number;
@@ -512,9 +513,9 @@ interface AppContextType extends AppState {
   refreshTeacherAttendance: (teacherId?: string) => Promise<void>;
   checkInTeacher: (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
-    faceVerified: boolean; faceVerificationMethod?: string; date?: string;
+    faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string; date?: string;
   }) => Promise<TeacherAttendanceRecord>;
-  checkOutTeacher: (id: string, data: { teacherId: string; latitude: number; longitude: number }) => Promise<TeacherAttendanceRecord>;
+  checkOutTeacher: (id: string, data: { teacherId: string; latitude: number; longitude: number; faceImageBase64?: string }) => Promise<TeacherAttendanceRecord>;
   applyTeacherLeave: (data: Omit<TeacherLeaveApplication, 'id' | 'status' | 'createdAt'>) => Promise<TeacherLeaveApplication>;
   updateTeacherLeave: (id: string, data: Pick<TeacherLeaveApplication, 'teacherId' | 'startDate' | 'endDate' | 'reason'>) => Promise<TeacherLeaveApplication>;
   deleteTeacherLeave: (id: string, teacherId: string) => Promise<void>;
@@ -580,7 +581,7 @@ const DEFAULT_STATE: AppState = {
   teacherAttendanceSettings: {
     schoolLatitude: null, schoolLongitude: null, radiusMeters: 150,
     checkInStart: '08:00', checkInEnd: '09:30', checkOutStart: '15:00', checkOutEnd: '18:00',
-    requireFaceVerification: true, workingDaysPerMonth: 26, lateGraceMinutes: 0,
+    requireFaceVerification: true, allowLateCheckIn: false, workingDaysPerMonth: 26, lateGraceMinutes: 0,
     lateDeductionAmount: 0, deductionType: 'daily_rate',
   },
   documentBranding: {
@@ -1361,7 +1362,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const checkInTeacher = useCallback(async (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
-    faceVerified: boolean; faceVerificationMethod?: string; date?: string;
+    faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string; date?: string;
   }) => {
     const row = await apiPost<any>('/teacher-attendance/check-in', data);
     const record = mapTeacherAttendance(row);
@@ -1369,7 +1370,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return record;
   }, []);
 
-  const checkOutTeacher = useCallback(async (id: string, data: { teacherId: string; latitude: number; longitude: number }) => {
+  const checkOutTeacher = useCallback(async (id: string, data: { teacherId: string; latitude: number; longitude: number; faceImageBase64?: string }) => {
     const row = await apiPost<any>(`/teacher-attendance/${id}/check-out`, data);
     const record = mapTeacherAttendance(row);
     setState(prev => ({ ...prev, teacherAttendanceRecords: prev.teacherAttendanceRecords.map(item => item.id === id ? record : item) }));

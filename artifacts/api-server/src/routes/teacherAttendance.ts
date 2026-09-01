@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
+import { createFaceTemplate, faceMatches } from "../lib/faceTemplate.js";
 
 const router = Router();
 const SETTINGS_KEY = "teacher_attendance_settings";
+const FACE_PROFILES_KEY = "teacher_face_profiles";
+const SCHOOL_TIME_ZONE = process.env.SCHOOL_TIME_ZONE ?? "Asia/Kolkata";
 
 const DEFAULT_SETTINGS = {
   schoolLatitude: null as number | null,
@@ -13,6 +16,7 @@ const DEFAULT_SETTINGS = {
   checkOutStart: "15:00",
   checkOutEnd: "18:00",
   requireFaceVerification: true,
+  allowLateCheckIn: false,
   workingDaysPerMonth: 26,
   lateGraceMinutes: 0,
   lateDeductionAmount: 0,
@@ -21,8 +25,9 @@ const DEFAULT_SETTINGS = {
 
 function asDate(value: unknown): string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? value
-    : new Date().toISOString().slice(0, 10);
+    ? value : new Intl.DateTimeFormat("en-CA", {
+      timeZone: SCHOOL_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+    }).format(new Date());
 }
 
 function timeToMinutes(value: string): number {
@@ -31,8 +36,12 @@ function timeToMinutes(value: string): number {
 }
 
 function currentTimeMinutes(): number {
-  const now = new Date();
-  return now.getHours() * 60 + now.getMinutes();
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: SCHOOL_TIME_ZONE, hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(new Date());
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
+  return hour * 60 + minute;
 }
 
 function isValidCoordinate(value: unknown, min: number, max: number): value is number {
@@ -65,6 +74,25 @@ async function getSettings() {
   return { ...DEFAULT_SETTINGS, ...(saved?.value ?? {}) };
 }
 
+async function getFaceProfiles(): Promise<Record<string, string>> {
+  const saved = await getAdapter().appSettings.get(FACE_PROFILES_KEY);
+  return saved?.value && typeof saved.value === "object" ? saved.value as Record<string, string> : {};
+}
+
+async function verifyOrEnrollFace(teacherId: string, imageBase64: string) {
+  const profiles = await getFaceProfiles();
+  const existing = profiles[teacherId];
+  if (!existing) {
+    profiles[teacherId] = createFaceTemplate(imageBase64);
+    await getAdapter().appSettings.set(FACE_PROFILES_KEY, profiles);
+    return { method: "camera_face_enrollment" };
+  }
+  if (!faceMatches(existing, imageBase64)) {
+    throw new Error("Face did not match the enrolled teacher. Please look directly at the camera and try again.");
+  }
+  return { method: "camera_face_match" };
+}
+
 router.get("/settings/teacher-attendance", async (_req, res) => {
   res.json(await getSettings());
 });
@@ -85,6 +113,7 @@ router.put("/settings/teacher-attendance", async (req, res) => {
     checkOutStart: String(body.checkOutStart),
     checkOutEnd: String(body.checkOutEnd),
     requireFaceVerification: Boolean(body.requireFaceVerification),
+    allowLateCheckIn: Boolean(body.allowLateCheckIn),
     workingDaysPerMonth: Number(body.workingDaysPerMonth),
     lateGraceMinutes: Number(body.lateGraceMinutes),
     lateDeductionAmount: Number(body.lateDeductionAmount),
@@ -136,16 +165,29 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
     res.status(403).json({ error: `You are ${Math.round(distance)}m from school; check-in is allowed within ${settings.radiusMeters}m` });
     return;
   }
-  if (settings.requireFaceVerification && body.faceVerified !== true) {
-    res.status(400).json({ error: "Face verification is required before checking in" });
-    return;
-  }
   const nowMinutes = currentTimeMinutes();
   const checkInStart = timeToMinutes(settings.checkInStart);
   const checkInEnd = timeToMinutes(settings.checkInEnd);
-  if (nowMinutes < checkInStart || nowMinutes > checkInEnd) {
+  if (nowMinutes < checkInStart) {
     res.status(403).json({ error: `Check-in is available from ${settings.checkInStart} to ${settings.checkInEnd}` });
     return;
+  }
+  if (nowMinutes > checkInEnd && !settings.allowLateCheckIn) {
+    res.status(403).json({ error: `Check-in closed at ${settings.checkInEnd}. Ask an administrator to allow late check-in.` });
+    return;
+  }
+  let faceVerificationMethod = "disabled_by_admin";
+  if (settings.requireFaceVerification) {
+    if (typeof body.faceImageBase64 !== "string" || !body.faceImageBase64) {
+      res.status(400).json({ error: "A camera selfie is required for face verification" });
+      return;
+    }
+    try {
+      faceVerificationMethod = (await verifyOrEnrollFace(teacherId, body.faceImageBase64)).method;
+    } catch (error: any) {
+      res.status(403).json({ error: error?.message ?? "Face verification failed" });
+      return;
+    }
   }
   const existing = await getAdapter().teacherAttendance.getByTeacherDate(teacherId, date);
   if (existing) {
@@ -158,8 +200,10 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
     status: late ? "late" : "present",
     checkInAt: body.checkInAt ?? new Date().toISOString(),
     checkInLatitude: latitude, checkInLongitude: longitude,
-    distanceFromSchool: distance, faceVerified: true,
-    faceVerificationMethod: body.faceVerificationMethod ?? "device_biometric",
+    distanceFromSchool: distance, faceVerified: settings.requireFaceVerification,
+    faceVerificationMethod: settings.requireFaceVerification
+      ? faceVerificationMethod
+      : "disabled_by_admin",
     note: typeof body.note === "string" ? body.note.trim() : null,
   });
   res.status(201).json(row);
@@ -189,6 +233,18 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
   if (currentTimeMinutes() < timeToMinutes(settings.checkOutStart)) {
     res.status(403).json({ error: `Check-out is available from ${settings.checkOutStart} to ${settings.checkOutEnd}` });
     return;
+  }
+  if (settings.requireFaceVerification) {
+    if (typeof body.faceImageBase64 !== "string" || !body.faceImageBase64) {
+      res.status(400).json({ error: "A camera selfie is required for face verification" });
+      return;
+    }
+    try {
+      await verifyOrEnrollFace(teacherId, body.faceImageBase64);
+    } catch (error: any) {
+      res.status(403).json({ error: error?.message ?? "Face verification failed" });
+      return;
+    }
   }
   const row = await getAdapter().teacherAttendance.updateCheckOut(req.params.id, {
     checkOutAt: body.checkOutAt ?? new Date().toISOString(),

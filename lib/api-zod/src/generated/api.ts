@@ -26,6 +26,7 @@ export const GetTeacherAttendanceSettingsResponse = zod.object({
   "checkOutStart": zod.string().optional(),
   "checkOutEnd": zod.string().optional(),
   "requireFaceVerification": zod.boolean().optional(),
+  "allowLateCheckIn": zod.boolean().optional(),
   "workingDaysPerMonth": zod.number().int().optional(),
   "lateGraceMinutes": zod.number().int().optional(),
   "lateDeductionAmount": zod.number().optional(),
@@ -42,6 +43,7 @@ export const UpdateTeacherAttendanceSettingsBody = zod.object({
   "checkOutStart": zod.string().optional(),
   "checkOutEnd": zod.string().optional(),
   "requireFaceVerification": zod.boolean().optional(),
+  "allowLateCheckIn": zod.boolean().optional(),
   "workingDaysPerMonth": zod.number().int().optional(),
   "lateGraceMinutes": zod.number().int().optional(),
   "lateDeductionAmount": zod.number().optional(),
@@ -59,6 +61,7 @@ export const UpdateTeacherAttendanceSettingsResponse = zod.object({
   "checkOutStart": zod.string().optional(),
   "checkOutEnd": zod.string().optional(),
   "requireFaceVerification": zod.boolean().optional(),
+  "allowLateCheckIn": zod.boolean().optional(),
   "workingDaysPerMonth": zod.number().int().optional(),
   "lateGraceMinutes": zod.number().int().optional(),
   "lateDeductionAmount": zod.number().optional(),
@@ -97,7 +100,8 @@ export const TeacherCheckInBody = zod.object({
   "latitude": zod.number(),
   "longitude": zod.number(),
   "faceVerified": zod.boolean(),
-  "faceVerificationMethod": zod.string().optional()
+  "faceVerificationMethod": zod.string().optional(),
+  "faceImageBase64": zod.string().optional().describe('Camera selfie used to enroll or match the teacher face template')
 })
 
 export const TeacherCheckInResponse = zod.object({
@@ -125,7 +129,8 @@ export const TeacherCheckOutParams = zod.object({
 export const TeacherCheckOutBody = zod.object({
   "teacherId": zod.string(),
   "latitude": zod.number(),
-  "longitude": zod.number()
+  "longitude": zod.number(),
+  "faceImageBase64": zod.string().optional().describe('Camera selfie used to match the enrolled teacher face template')
 })
 
 export const TeacherCheckOutResponse = zod.object({

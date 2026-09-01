@@ -5,8 +5,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
-import * as LocalAuthentication from 'expo-local-authentication';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -41,26 +41,13 @@ async function readCurrentLocation(): Promise<Coordinates> {
   return { latitude: location.coords.latitude, longitude: location.coords.longitude };
 }
 
-async function verifyFace(): Promise<{ verified: boolean; method?: string }> {
+async function captureFace(): Promise<{ verified: boolean; method?: string; faceImageBase64: string }> {
   if (Platform.OS === 'web') {
     throw new Error('Face verification is available on a physical device. Open the app in Expo Go to check in.');
   }
-  const hasHardware = await LocalAuthentication.hasHardwareAsync();
-  const isEnrolled = hasHardware && await LocalAuthentication.isEnrolledAsync();
-  const types = hasHardware ? await LocalAuthentication.supportedAuthenticationTypesAsync() : [];
-  if (isEnrolled && types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-    const result = await LocalAuthentication.authenticateAsync({
-      promptMessage: 'Verify your face to check in',
-      cancelLabel: 'Cancel',
-      disableDeviceFallback: true,
-    });
-    if (!result.success) throw new Error('Face verification was cancelled or unsuccessful');
-    return { verified: true, method: 'device_face_biometric' };
-  }
-
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
-    throw new Error('Face verification needs camera permission, or a device with Face ID / facial biometrics.');
+    throw new Error('Face verification needs camera permission.');
   }
   const photo = await ImagePicker.launchCameraAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -70,7 +57,10 @@ async function verifyFace(): Promise<{ verified: boolean; method?: string }> {
     exif: false,
   });
   if (photo.canceled || !photo.assets[0]) throw new Error('A face photo is required to check in');
-  return { verified: true, method: 'camera_selfie_capture' };
+  const faceImageBase64 = await FileSystem.readAsStringAsync(photo.assets[0].uri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+  return { verified: true, method: 'camera_face_capture', faceImageBase64 };
 }
 
 function formatTime(value?: string) {
@@ -132,7 +122,7 @@ export default function MyTeacherAttendance() {
     const [coordinates, face] = await Promise.all([
       readCurrentLocation(),
       teacherAttendanceSettings.requireFaceVerification
-        ? verifyFace()
+         ? captureFace()
         : Promise.resolve({ verified: false, method: 'disabled_by_admin' }),
     ]);
     await checkInTeacher({
@@ -141,13 +131,23 @@ export default function MyTeacherAttendance() {
       ...coordinates,
       faceVerified: face.verified,
       faceVerificationMethod: face.method,
+      faceImageBase64: face.verified && 'faceImageBase64' in face ? face.faceImageBase64 : undefined,
     });
   });
 
   const handleCheckOut = () => runAction(async () => {
     if (!todayRecord) throw new Error('No check-in found for today');
-    const coordinates = await readCurrentLocation();
-    await checkOutTeacher(todayRecord.id, { teacherId: user?.id ?? '', ...coordinates });
+    const [coordinates, face] = await Promise.all([
+      readCurrentLocation(),
+      teacherAttendanceSettings.requireFaceVerification
+        ? captureFace()
+        : Promise.resolve({ verified: false, method: 'disabled_by_admin' }),
+    ]);
+    await checkOutTeacher(todayRecord.id, {
+      teacherId: user?.id ?? '',
+      ...coordinates,
+      faceImageBase64: face.verified && 'faceImageBase64' in face ? face.faceImageBase64 : undefined,
+    });
   });
 
   const handleLeave = () => runAction(async () => {
@@ -280,7 +280,7 @@ export default function MyTeacherAttendance() {
           ) : !todayRecord.checkOutAt ? (
             <TouchableOpacity style={[s.secondaryButton, { borderColor: colors.primary }]} disabled={busy} onPress={handleCheckOut}>
               <Feather name="log-out" size={18} color={colors.primary} />
-              <Text style={[s.secondaryButtonText, { color: colors.primary }]}>{busy ? 'Reading location…' : 'Check out'}</Text>
+               <Text style={[s.secondaryButtonText, { color: colors.primary }]}>{busy ? 'Verifying…' : 'Verify face & check out'}</Text>
             </TouchableOpacity>
           ) : (
             <View style={[s.complete, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
@@ -292,7 +292,7 @@ export default function MyTeacherAttendance() {
           <View style={[s.info, { backgroundColor: colors.muted }]}>
             <Feather name="info" size={15} color={colors.mutedForeground} />
             <Text style={[s.infoText, { color: colors.mutedForeground }]}>
-              Face verification uses your device&apos;s facial biometrics when available. Otherwise, the camera captures a check-in selfie for the school record.
+               Your first selfie enrolls a private face template. Later check-in and check-out selfies are matched against it; the original photos are not stored.
             </Text>
           </View>
         </ScrollView>

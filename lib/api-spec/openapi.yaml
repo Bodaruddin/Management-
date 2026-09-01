@@ -330,6 +330,7 @@ components:
         checkOutStart: { type: string }
         checkOutEnd: { type: string }
         requireFaceVerification: { type: boolean }
+        allowLateCheckIn: { type: boolean }
         workingDaysPerMonth: { type: integer }
         lateGraceMinutes: { type: integer }
         lateDeductionAmount: { type: number }
@@ -368,6 +369,7 @@ components:
         longitude: { type: number }
         faceVerified: { type: boolean }
         faceVerificationMethod: { type: string }
+        faceImageBase64: { type: string, description: "Camera selfie used to enroll or match the teacher face template" }
     TeacherCheckOut:
       type: object
       required: [teacherId, latitude, longitude]
@@ -375,6 +377,7 @@ components:
         teacherId: { type: string }
         latitude: { type: number }
         longitude: { type: number }
+        faceImageBase64: { type: string, description: "Camera selfie used to match the enrolled teacher face template" }
     TeacherLeave:
       type: object
       properties:

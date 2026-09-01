@@ -28,6 +28,7 @@ export interface TeacherAttendanceSettings {
   checkOutStart?: string;
   checkOutEnd?: string;
   requireFaceVerification?: boolean;
+  allowLateCheckIn?: boolean;
   workingDaysPerMonth?: number;
   lateGraceMinutes?: number;
   lateDeductionAmount?: number;
@@ -81,12 +82,16 @@ export interface TeacherCheckIn {
   longitude: number;
   faceVerified: boolean;
   faceVerificationMethod?: string;
+  /** Camera selfie used to enroll or match the teacher face template */
+  faceImageBase64?: string;
 }
 
 export interface TeacherCheckOut {
   teacherId: string;
   latitude: number;
   longitude: number;
+  /** Camera selfie used to match the enrolled teacher face template */
+  faceImageBase64?: string;
 }
 
 export type TeacherLeaveStatus = typeof TeacherLeaveStatus[keyof typeof TeacherLeaveStatus];

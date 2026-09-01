@@ -18,6 +18,7 @@ export interface TeacherAttendanceSettings {
   checkOutStart?: string;
   checkOutEnd?: string;
   requireFaceVerification?: boolean;
+  allowLateCheckIn?: boolean;
   workingDaysPerMonth?: number;
   lateGraceMinutes?: number;
   lateDeductionAmount?: number;

@@ -14,4 +14,6 @@ export interface TeacherCheckIn {
   longitude: number;
   faceVerified: boolean;
   faceVerificationMethod?: string;
+  /** Camera selfie used to enroll or match the teacher face template */
+  faceImageBase64?: string;
 }

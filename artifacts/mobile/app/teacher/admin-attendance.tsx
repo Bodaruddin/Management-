@@ -255,9 +255,16 @@ export default function AdminTeacherAttendance() {
           <View style={[s.switchRow, { borderTopColor: colors.border }]}>
             <View style={{ flex: 1 }}>
               <Text style={[s.label, { color: colors.text }]}>Require face verification</Text>
-              <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Use device facial biometrics or a camera selfie.</Text>
+              <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Teachers enroll a selfie on first use, then match it at check-in and check-out.</Text>
             </View>
             <Switch value={settings.requireFaceVerification} onValueChange={value => setSettings(previous => ({ ...previous, requireFaceVerification: value }))} trackColor={{ true: colors.primary, false: colors.border }} thumbColor="#fff" />
+          </View>
+          <View style={[s.switchRow, { borderTopColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.label, { color: colors.text }]}>Allow late check-in</Text>
+              <Text style={[s.mutedText, { color: colors.mutedForeground }]}>When enabled, teachers may check in after the closing time and the record is marked late.</Text>
+            </View>
+            <Switch value={settings.allowLateCheckIn} onValueChange={value => setSettings(previous => ({ ...previous, allowLateCheckIn: value }))} trackColor={{ true: colors.primary, false: colors.border }} thumbColor="#fff" />
           </View>
           <TouchableOpacity style={[s.primaryButton, { backgroundColor: saving ? colors.muted : colors.primary }]} onPress={saveSettings} disabled={saving}>
             <Feather name="save" size={16} color="#fff" />
