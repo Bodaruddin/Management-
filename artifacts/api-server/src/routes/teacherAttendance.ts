@@ -5,6 +5,7 @@ import { createFaceTemplate, faceMatches } from "../lib/faceTemplate.js";
 const router = Router();
 const SETTINGS_KEY = "teacher_attendance_settings";
 const FACE_PROFILES_KEY = "teacher_face_profiles";
+const FACE_PROFILE_KEY_PREFIX = "teacher_face_profile:";
 const SCHOOL_TIME_ZONE = process.env.SCHOOL_TIME_ZONE ?? "Asia/Kolkata";
 
 const DEFAULT_SETTINGS = {
@@ -76,15 +77,66 @@ async function getSettings() {
 
 async function getFaceProfiles(): Promise<Record<string, string>> {
   const saved = await getAdapter().appSettings.get(FACE_PROFILES_KEY);
-  return saved?.value && typeof saved.value === "object" ? saved.value as Record<string, string> : {};
+  if (!saved?.value) return {};
+
+  // Older database adapters may return JSONB settings as a serialized
+  // string. Normalize both forms so an existing profile is not lost or
+  // overwritten when a teacher enrolls from a different client.
+  let value: unknown = saved.value;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, string] =>
+      typeof entry[0] === "string" && typeof entry[1] === "string" && entry[1].startsWith("v1:"),
+    ),
+  );
+}
+
+function faceProfileKey(teacherId: string): string {
+  return `${FACE_PROFILE_KEY_PREFIX}${encodeURIComponent(teacherId)}`;
+}
+
+function readStoredFaceTemplate(value: unknown): string | null {
+  if (typeof value === "string") {
+    if (value.startsWith("v1:")) return value;
+    try {
+      return readStoredFaceTemplate(JSON.parse(value));
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const template = (value as { template?: unknown }).template;
+  return typeof template === "string" && template.startsWith("v1:") ? template : null;
+}
+
+async function getFaceProfile(teacherId: string): Promise<string | null> {
+  // New records are isolated per teacher, so two enrollments cannot
+  // overwrite each other. Fall back to the original shared record for
+  // profiles created before this storage format was introduced.
+  const individual = await getAdapter().appSettings.get(faceProfileKey(teacherId));
+  return readStoredFaceTemplate(individual?.value) ?? (await getFaceProfiles())[teacherId] ?? null;
+}
+
+async function saveFaceProfile(teacherId: string, template: string): Promise<void> {
+  await getAdapter().appSettings.set(faceProfileKey(teacherId), {
+    teacherId,
+    template,
+    enrolledAt: new Date().toISOString(),
+    method: "camera_face_enrollment",
+  });
 }
 
 async function verifyOrEnrollFace(teacherId: string, imageBase64: string) {
-  const profiles = await getFaceProfiles();
-  const existing = profiles[teacherId];
+  const existing = await getFaceProfile(teacherId);
   if (!existing) {
-    profiles[teacherId] = createFaceTemplate(imageBase64);
-    await getAdapter().appSettings.set(FACE_PROFILES_KEY, profiles);
+    await saveFaceProfile(teacherId, createFaceTemplate(imageBase64));
     return { method: "camera_face_enrollment" };
   }
   if (!faceMatches(existing, imageBase64)) {
@@ -146,8 +198,7 @@ router.get("/teacher-attendance/face-status", async (req, res) => {
     res.status(400).json({ error: "teacherId is required" });
     return;
   }
-  const profiles = await getFaceProfiles();
-  res.json({ enrolled: Boolean(profiles[teacherId]) });
+  res.json({ enrolled: Boolean(await getFaceProfile(teacherId)) });
 });
 
 router.post("/teacher-attendance/face-enroll", async (req, res) => {
@@ -157,17 +208,18 @@ router.post("/teacher-attendance/face-enroll", async (req, res) => {
     res.status(400).json({ error: "teacherId and a camera selfie are required" });
     return;
   }
-  const profiles = await getFaceProfiles();
-  if (profiles[teacherId]) {
-    res.status(409).json({ enrolled: true, error: "Face verification is already set up for this teacher" });
-    return;
-  }
   try {
-    profiles[teacherId] = createFaceTemplate(imageBase64);
-    await getAdapter().appSettings.set(FACE_PROFILES_KEY, profiles);
+    if (await getFaceProfile(teacherId)) {
+      res.status(409).json({ enrolled: true, error: "Face verification is already set up for this teacher" });
+      return;
+    }
+    await saveFaceProfile(teacherId, createFaceTemplate(imageBase64));
     res.status(201).json({ enrolled: true, method: "camera_face_enrollment" });
   } catch (error: any) {
-    res.status(400).json({ error: error?.message ?? "Face enrollment failed. Please capture your face again." });
+    const message = error?.message ?? "Face enrollment failed. Please capture your face again.";
+    const databaseFailure = error?.code === "NO_DB_CONNECTION"
+      || /database|connection|postgres|firestore|app.?settings/i.test(message);
+    res.status(databaseFailure ? 503 : 400).json({ error: message });
   }
 });
 

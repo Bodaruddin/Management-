@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
@@ -44,6 +45,46 @@ async function readCurrentLocation(): Promise<Coordinates> {
 }
 
 type FaceCapturePurpose = 'enroll' | 'check-in' | 'check-out';
+
+async function getFaceImageBase64(photo: { uri?: string; base64?: string }): Promise<string> {
+  let rawBase64 = '';
+
+  if (photo.uri && Platform.OS !== 'web') {
+    // Some Android devices return a base64 field that is truncated or cannot
+    // be decoded by the server. Re-encode the actual captured file as a
+    // standard JPEG before uploading it.
+    try {
+      const normalized = await ImageManipulator.manipulateAsync(
+        photo.uri,
+        [],
+        {
+          compress: 0.7,
+          format: ImageManipulator.SaveFormat.JPEG,
+          base64: true,
+        },
+      );
+      rawBase64 = normalized.base64 ?? await FileSystem.readAsStringAsync(
+        normalized.uri,
+        { encoding: FileSystem.EncodingType.Base64 },
+      );
+    } catch {
+      // Keep the direct camera payload as a fallback if image manipulation
+      // is unavailable on a particular Expo Go/native build.
+      rawBase64 = photo.base64 ?? await FileSystem.readAsStringAsync(
+        photo.uri,
+        { encoding: FileSystem.EncodingType.Base64 },
+      );
+    }
+  } else {
+    rawBase64 = photo.base64 ?? '';
+  }
+
+  const trimmed = rawBase64.trim();
+  if (!trimmed) throw new Error('The camera did not return an image. Please try again.');
+  return trimmed.startsWith('data:')
+    ? trimmed
+    : `data:image/jpeg;base64,${trimmed}`;
+}
 
 function FaceCaptureModal({
   visible,
@@ -87,17 +128,13 @@ function FaceCaptureModal({
     setCapturing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({
+        // The file URI is normalized to a known-good JPEG below. Keeping the
+        // camera's own base64 as a fallback also preserves web compatibility.
         base64: true,
         quality: 0.3,
         skipProcessing: false,
       });
-      const rawBase64 = photo?.base64 ?? (photo?.uri
-        ? await FileSystem.readAsStringAsync(photo.uri, { encoding: FileSystem.EncodingType.Base64 })
-        : '');
-      if (!rawBase64) throw new Error('The camera did not return an image. Please try again.');
-      const imageBase64 = rawBase64.trimStart().startsWith('data:')
-        ? rawBase64.trim()
-        : `data:image/jpeg;base64,${rawBase64.trim()}`;
+      const imageBase64 = await getFaceImageBase64(photo);
       await onCaptured(imageBase64);
     } catch (error: any) {
       setCameraError(error?.message ?? 'Could not capture your face. Please try again.');
@@ -264,10 +301,18 @@ export default function MyTeacherAttendance() {
       return;
     }
     let active = true;
+    setError('');
     setFaceEnrolled(null);
     getTeacherFaceStatus(user.id)
       .then(enrolled => { if (active) setFaceEnrolled(enrolled); })
-      .catch((e: any) => { if (active) setError(e?.message ?? 'Could not check face verification status'); })
+      .catch((e: any) => {
+        if (!active) return;
+        // A status-read failure must not leave the teacher on an infinite
+        // loading screen. Showing setup is safe because the enrollment API
+        // refuses duplicate profiles and persists before returning success.
+        setFaceEnrolled(false);
+        setError(e?.message ?? 'Could not check face verification status. You can try setting up your face now.');
+      })
       .finally(() => undefined);
     return () => { active = false; };
   }, [getTeacherFaceStatus, teacherAttendanceSettings.requireFaceVerification, user?.id]);

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState as NativeAppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PENDING_CONFIG_KEY, PendingDbConfig, useDbSetup } from '@/context/DbSetupContext';
 import { getApiBase } from '@/constants/api';
@@ -604,7 +604,16 @@ const genReceiptNumber = (prefix = 'RCP') => `${prefix}${String(receiptCounter++
 
 async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${getApiBase()}/api${path}`, init);
-  if (!res.ok) throw new Error(`GET /api${path} failed: ${res.status}`);
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const errorBody = await res.json() as { error?: string };
+      detail = errorBody.error ? ` — ${errorBody.error}` : '';
+    } catch {
+      // Keep the status-only error when the server response is not JSON.
+    }
+    throw new Error(`GET /api${path} failed: ${res.status}${detail}`);
+  }
   return res.json();
 }
 
@@ -934,7 +943,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refreshIfNeeded();
     }
 
-    const subscription = AppState.addEventListener('change', nextState => {
+    const subscription = NativeAppState.addEventListener('change', nextState => {
       if (nextState === 'active') refreshIfNeeded();
     });
 
@@ -1328,7 +1337,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const enrollTeacherFace = useCallback(async (teacherId: string, faceImageBase64: string) => {
-    await apiPost('/teacher-attendance/face-enroll', { teacherId, faceImageBase64 });
+    const result = await apiPost<{ enrolled?: boolean }>('/teacher-attendance/face-enroll', {
+      teacherId,
+      faceImageBase64,
+    });
+    if (result.enrolled !== true) {
+      throw new Error('Face enrollment was not saved. Please capture your face again.');
+    }
   }, []);
 
   const checkInTeacher = useCallback(async (data: {
