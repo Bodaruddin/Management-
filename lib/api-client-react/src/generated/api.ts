@@ -23,6 +23,7 @@ import type {
   AdminAction,
   DeleteTeacherHolidayParams,
   DeleteTeacherLeaveParams,
+  GetTeacherFaceStatusParams,
   HealthStatus,
   ListTeacherAttendanceParams,
   ListTeacherLeavesParams,
@@ -33,6 +34,8 @@ import type {
   TeacherAttendanceSettingsUpdate,
   TeacherCheckIn,
   TeacherCheckOut,
+  TeacherFaceEnroll,
+  TeacherFaceStatus,
   TeacherHoliday,
   TeacherHolidayCreate,
   TeacherLeave,
@@ -358,6 +361,149 @@ export function useListTeacherAttendance<TData = Awaited<ReturnType<typeof listT
 
 
 
+
+export const getGetTeacherFaceStatusUrl = (params?: GetTeacherFaceStatusParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/teacher-attendance/face-status?${stringifiedParams}` : `/api/teacher-attendance/face-status`
+}
+
+export const getTeacherFaceStatus = async (params?: GetTeacherFaceStatusParams, options?: Parameters<typeof customFetch>[1]): Promise<TeacherFaceStatus> => {
+
+  return customFetch<TeacherFaceStatus>(getGetTeacherFaceStatusUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTeacherFaceStatusQueryKey = (params?: GetTeacherFaceStatusParams,) => {
+    return [
+    `/api/teacher-attendance/face-status`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTeacherFaceStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError = ErrorType<unknown>>(params?: GetTeacherFaceStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTeacherFaceStatusQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherFaceStatus>>> = ({ signal }) => getTeacherFaceStatus(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTeacherFaceStatusQueryResult = NonNullable<Awaited<ReturnType<typeof getTeacherFaceStatus>>>
+export type GetTeacherFaceStatusQueryError = ErrorType<unknown>
+
+
+
+export function useGetTeacherFaceStatus<TData = Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError = ErrorType<unknown>>(
+ params?: GetTeacherFaceStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTeacherFaceStatusQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getEnrollTeacherFaceUrl = () => {
+
+
+
+
+  return `/api/teacher-attendance/face-enroll`
+}
+
+export const enrollTeacherFace = async (teacherFaceEnroll: TeacherFaceEnroll, options?: Parameters<typeof customFetch>[1]): Promise<TeacherFaceStatus> => {
+
+  return customFetch<TeacherFaceStatus>(getEnrollTeacherFaceUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(teacherFaceEnroll)
+  }
+);}
+
+
+
+
+
+export const getEnrollTeacherFaceMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enrollTeacherFace>>, TError,{data: BodyType<TeacherFaceEnroll>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof enrollTeacherFace>>, TError,{data: BodyType<TeacherFaceEnroll>}, TContext> => {
+
+const mutationKey = ['enrollTeacherFace'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof enrollTeacherFace>>, {data: BodyType<TeacherFaceEnroll>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  enrollTeacherFace(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EnrollTeacherFaceMutationResult = NonNullable<Awaited<ReturnType<typeof enrollTeacherFace>>>
+    export type EnrollTeacherFaceMutationBody = BodyType<TeacherFaceEnroll>
+    export type EnrollTeacherFaceMutationError = ErrorType<unknown>
+
+    export const useEnrollTeacherFace = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enrollTeacherFace>>, TError,{data: BodyType<TeacherFaceEnroll>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof enrollTeacherFace>>,
+        TError,
+        {data: BodyType<TeacherFaceEnroll>},
+        TContext
+      > => {
+      return useMutation(getEnrollTeacherFaceMutationOptions(options));
+    }
 
 export const getTeacherCheckInUrl = () => {
 

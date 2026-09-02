@@ -140,6 +140,37 @@ router.get("/teacher-attendance", async (req, res) => {
   res.json(await getAdapter().teacherAttendance.list({ teacherId, month }));
 });
 
+router.get("/teacher-attendance/face-status", async (req, res) => {
+  const teacherId = typeof req.query.teacherId === "string" ? req.query.teacherId : "";
+  if (!teacherId) {
+    res.status(400).json({ error: "teacherId is required" });
+    return;
+  }
+  const profiles = await getFaceProfiles();
+  res.json({ enrolled: Boolean(profiles[teacherId]) });
+});
+
+router.post("/teacher-attendance/face-enroll", async (req, res) => {
+  const teacherId = String(req.body?.teacherId ?? "");
+  const imageBase64 = req.body?.faceImageBase64;
+  if (!teacherId || typeof imageBase64 !== "string" || !imageBase64) {
+    res.status(400).json({ error: "teacherId and a camera selfie are required" });
+    return;
+  }
+  const profiles = await getFaceProfiles();
+  if (profiles[teacherId]) {
+    res.status(409).json({ enrolled: true, error: "Face verification is already set up for this teacher" });
+    return;
+  }
+  try {
+    profiles[teacherId] = createFaceTemplate(imageBase64);
+    await getAdapter().appSettings.set(FACE_PROFILES_KEY, profiles);
+    res.status(201).json({ enrolled: true, method: "camera_face_enrollment" });
+  } catch (error: any) {
+    res.status(400).json({ error: error?.message ?? "Face enrollment failed. Please capture your face again." });
+  }
+});
+
 router.post("/teacher-attendance/check-in", async (req, res) => {
   const body = req.body ?? {};
   const teacherId = String(body.teacherId ?? "");

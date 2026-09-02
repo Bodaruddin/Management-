@@ -28,6 +28,12 @@
       "expo-font",
       "expo-web-browser",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow School Management to use your camera for private teacher face verification."
+        }
+      ],
+      [
         "expo-local-authentication",
         {
           "faceIDPermission": "Allow School Management to use Face ID to verify teacher attendance."

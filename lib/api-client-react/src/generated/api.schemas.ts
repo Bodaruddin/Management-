@@ -74,6 +74,17 @@ export interface TeacherAttendanceRecord {
   faceVerificationMethod?: string | null;
 }
 
+export interface TeacherFaceStatus {
+  enrolled: boolean;
+  method?: string;
+}
+
+export interface TeacherFaceEnroll {
+  teacherId: string;
+  /** Camera selfie used to create the private teacher face template */
+  faceImageBase64: string;
+}
+
 export interface TeacherCheckIn {
   teacherId: string;
   teacherName: string;
@@ -173,6 +184,10 @@ export type AdminIdParameter = string;
 export type ListTeacherAttendanceParams = {
 teacherId?: TeacherIdParameter;
 month?: MonthParameter;
+};
+
+export type GetTeacherFaceStatusParams = {
+teacherId?: TeacherIdParameter;
 };
 
 export type ListTeacherLeavesParams = {

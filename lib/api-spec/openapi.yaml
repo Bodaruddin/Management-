@@ -73,6 +73,36 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeacherAttendanceRecord"
+  /teacher-attendance/face-status:
+    get:
+      operationId: getTeacherFaceStatus
+      tags: [teacher-attendance]
+      parameters:
+        - $ref: "#/components/parameters/TeacherId"
+      responses:
+        "200":
+          description: Whether the teacher has completed face enrollment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherFaceStatus"
+  /teacher-attendance/face-enroll:
+    post:
+      operationId: enrollTeacherFace
+      tags: [teacher-attendance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherFaceEnroll"
+      responses:
+        "201":
+          description: Face enrollment completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherFaceStatus"
   /teacher-attendance/check-in:
     post:
       operationId: teacherCheckIn
@@ -358,6 +388,18 @@ components:
         distanceFromSchool: { type: [number, "null"] }
         faceVerified: { type: string }
         faceVerificationMethod: { type: [string, "null"] }
+    TeacherFaceStatus:
+      type: object
+      properties:
+        enrolled: { type: boolean }
+        method: { type: string }
+      required: [enrolled]
+    TeacherFaceEnroll:
+      type: object
+      required: [teacherId, faceImageBase64]
+      properties:
+        teacherId: { type: string }
+        faceImageBase64: { type: string, description: "Camera selfie used to create the private teacher face template" }
     TeacherCheckIn:
       type: object
       required: [teacherId, teacherName, latitude, longitude, faceVerified]

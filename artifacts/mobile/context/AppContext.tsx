@@ -511,6 +511,8 @@ interface AppContextType extends AppState {
   deleteAlumni: (id: string) => void;
   bulkAddAlumni: (records: Omit<Alumni, 'id' | 'batch'>[], batch: string) => Promise<void>;
   refreshTeacherAttendance: (teacherId?: string) => Promise<void>;
+  getTeacherFaceStatus: (teacherId: string) => Promise<boolean>;
+  enrollTeacherFace: (teacherId: string, faceImageBase64: string) => Promise<void>;
   checkInTeacher: (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
     faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string; date?: string;
@@ -1360,6 +1362,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const getTeacherFaceStatus = useCallback(async (teacherId: string) => {
+    const status = await apiGet<{ enrolled: boolean }>(
+      `/teacher-attendance/face-status?teacherId=${encodeURIComponent(teacherId)}`,
+    );
+    return status.enrolled;
+  }, []);
+
+  const enrollTeacherFace = useCallback(async (teacherId: string, faceImageBase64: string) => {
+    await apiPost('/teacher-attendance/face-enroll', { teacherId, faceImageBase64 });
+  }, []);
+
   const checkInTeacher = useCallback(async (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
     faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string; date?: string;
@@ -1646,7 +1659,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteInactivationRequestDocument, deleteInactivationRequest,
       refreshInactivationRequests, setStudentStatus, setClassAbsentLimit, updateDocumentBranding,
       addAlumni, updateAlumni, deleteAlumni, bulkAddAlumni,
-      refreshTeacherAttendance, checkInTeacher, checkOutTeacher, applyTeacherLeave,
+       refreshTeacherAttendance, getTeacherFaceStatus, enrollTeacherFace,
+       checkInTeacher, checkOutTeacher, applyTeacherLeave,
       updateTeacherLeave, deleteTeacherLeave,
       reviewTeacherLeave, addTeacherHoliday, updateTeacherHoliday, deleteTeacherHoliday,
       updateTeacherAttendanceSettings, calculateTeacherPayroll,

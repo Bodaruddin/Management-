@@ -93,6 +93,27 @@ export const ListTeacherAttendanceResponseItem = zod.object({
 export const ListTeacherAttendanceResponse = zod.array(ListTeacherAttendanceResponseItem)
 
 
+export const GetTeacherFaceStatusQueryParams = zod.object({
+  "teacherId": zod.coerce.string().optional()
+})
+
+export const GetTeacherFaceStatusResponse = zod.object({
+  "enrolled": zod.boolean(),
+  "method": zod.string().optional()
+})
+
+
+export const EnrollTeacherFaceBody = zod.object({
+  "teacherId": zod.string(),
+  "faceImageBase64": zod.string().describe('Camera selfie used to create the private teacher face template')
+})
+
+export const EnrollTeacherFaceResponse = zod.object({
+  "enrolled": zod.boolean(),
+  "method": zod.string().optional()
+})
+
+
 export const TeacherCheckInBody = zod.object({
   "teacherId": zod.string(),
   "teacherName": zod.string(),

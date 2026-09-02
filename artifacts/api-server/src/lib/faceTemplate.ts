@@ -10,12 +10,25 @@ type DecodedImage = {
 };
 
 function decodeImage(imageBase64: string): DecodedImage {
-  const raw = imageBase64.replace(/^data:image\/[^;]+;base64,/, "");
+  let raw = imageBase64.trim();
+  if (/^data:image\/[^;]+;base64,/i.test(raw)) {
+    raw = raw.slice(raw.indexOf(",") + 1);
+  }
+  raw = raw.replace(/\s/g, "").replace(/-/g, "+").replace(/_/g, "/");
   if (!raw || raw.length > 7_000_000) {
     throw new Error("The selfie is missing or too large");
   }
   try {
-    return jpeg.decode(Buffer.from(raw, "base64"), { useTArray: true }) as DecodedImage;
+    const bytes = Buffer.from(raw, "base64");
+    if (bytes.length < 4 || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+      throw new Error("The camera returned an unsupported image format");
+    }
+    return jpeg.decode(bytes, {
+      useTArray: true,
+      formatAsRGBA: true,
+      tolerantDecoding: true,
+      maxMemoryUsageInMB: 768,
+    }) as DecodedImage;
   } catch {
     throw new Error("The selfie could not be read. Please capture it again.");
   }
