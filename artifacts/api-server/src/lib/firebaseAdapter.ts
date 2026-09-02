@@ -2,14 +2,14 @@
  * Firebase Firestore DataAdapter — wraps Firebase Admin SDK.
  * Each PostgreSQL table maps to a Firestore collection of the same name.
  */
-import type { Firestore, QueryDocumentSnapshot } from "firebase-admin/firestore";
+import type { DocumentSnapshot, Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import crypto from "node:crypto";
 import type { DataAdapter } from "./adapter.js";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-function mapDoc(doc: QueryDocumentSnapshot): any {
-  return { id: doc.id, ...doc.data() };
+function mapDoc(doc: DocumentSnapshot): any {
+  return { id: doc.id, ...(doc.data() ?? {}) };
 }
 
 function newId(): string {
