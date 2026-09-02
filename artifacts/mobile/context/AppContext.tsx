@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PENDING_CONFIG_KEY, PendingDbConfig, useDbSetup } from '@/context/DbSetupContext';
 import { getApiBase } from '@/constants/api';
@@ -835,6 +835,7 @@ const AppContext = createContext<AppContextType | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(DEFAULT_STATE);
   const loadedRef = React.useRef(false);
+  const loadInFlightRef = React.useRef<Promise<boolean> | null>(null);
   const { user } = useAuth();
   const { isSetupComplete } = useDbSetup();
 
@@ -894,6 +895,54 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
   }, []);
+
+  const refreshAllData = React.useCallback(async (): Promise<boolean> => {
+    // AppState can emit "active" more than once while the app is starting.
+    // Share the same request instead of overwriting state with competing
+    // bootstrap responses.
+    if (loadInFlightRef.current) return loadInFlightRef.current;
+
+    const request = loadAllData().finally(() => {
+      loadInFlightRef.current = null;
+    });
+    loadInFlightRef.current = request;
+    return request;
+  }, [loadAllData]);
+
+  React.useEffect(() => {
+    // Do not load school data until a valid session and a configured database
+    // are available. Clear the old user's data on logout so a later login
+    // always starts from a fresh server snapshot.
+    if (!user || isSetupComplete !== true) {
+      loadedRef.current = false;
+      if (!user) setState(DEFAULT_STATE);
+      return;
+    }
+
+    let disposed = false;
+
+    const refreshIfNeeded = () => {
+      void refreshAllData().then(success => {
+        // If the server was temporarily unavailable, retry on the next
+        // foreground event instead of considering the empty state loaded.
+        if (!success && !disposed) loadedRef.current = false;
+      });
+    };
+
+    if (!loadedRef.current) {
+      loadedRef.current = true;
+      refreshIfNeeded();
+    }
+
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') refreshIfNeeded();
+    });
+
+    return () => {
+      disposed = true;
+      subscription.remove();
+    };
+  }, [isSetupComplete, refreshAllData, user]);
 
   // ── Students ──
   const addStudent = useCallback((s: Omit<Student, 'id'>) => {
