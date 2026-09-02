@@ -254,6 +254,7 @@ export default function TeacherDashboard() {
   // ── Stable values needed by hooks below (must be before early-return) ───────
   const now      = new Date();
   const todayStr = now.toISOString().split('T')[0];
+  const { width: screenW } = useWindowDimensions();
 
   const upcomingExams = useMemo(() =>
     exams.filter(e => e.date >= todayStr)
@@ -414,7 +415,6 @@ export default function TeacherDashboard() {
 
 
   // ── Responsive dimensions ────────────────────────────────────────────────────
-  const { width: screenW } = useWindowDimensions();
   const ITEM_W = Math.floor((screenW - H_PAD * 2 - GRID_GAP * (COLS - 1)) / COLS);
   const STAT_W = (screenW - H_PAD * 2 - GRID_GAP) / 2;
 
