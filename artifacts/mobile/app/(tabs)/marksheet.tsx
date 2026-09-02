@@ -96,6 +96,15 @@ function fmtDate(d: string): string {
   return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function getInitials(name: string): string {
   return name.split(' ').map(w => w[0] ?? '').slice(0, 2).join('').toUpperCase();
 }
@@ -839,15 +848,20 @@ function buildCombinedMarksheetHtml(
   .comb-title .t2 { font-family:'Archivo Black',sans-serif; font-size:26px; color:#c8a040; font-style:italic; letter-spacing:1px; line-height:1; }
   .comb-title .stars { font-size:11px; color:#c8a040; letter-spacing:5px; margin-top:2px; }
   /* info box */
-  .info-box { border:1.5px solid #c8a040; border-radius:8px; display:flex; margin-top:7px; overflow:hidden; background:#fdfcf5; }
-  .info-col { flex:1; padding:8px 12px; }
+   /*
+    * Keep these as table cells instead of flex items. Android's print WebView
+    * can collapse the later flex children while rendering HTML to PDF,
+    * leaving only the first student-detail row visible.
+    */
+   .info-box { border:1.5px solid #c8a040; border-radius:8px; display:table; width:100%; table-layout:fixed; margin-top:7px; overflow:hidden; background:#fdfcf5; }
+   .info-col { display:table-cell; width:50%; vertical-align:top; padding:8px 12px; }
   .info-col + .info-col { border-left:1px solid #e8d9a8; }
-  .irow { display:flex; align-items:center; gap:6px; height:17px; margin-bottom:1px; font-size:11px; line-height:1; }
+   .irow { display:table; width:100%; table-layout:fixed; height:17px; margin-bottom:1px; font-size:11px; line-height:1; }
   .irow:last-child { margin-bottom:0; }
-  .irow .ic { width:18px; height:17px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:11px; }
-  .irow .lbl { font-weight:600; color:#0c1f4a; min-width:78px; flex-shrink:0; }
-  .irow .colon { font-weight:700; color:#c8a040; margin:0 4px; flex-shrink:0; }
-  .irow .val { font-weight:700; color:#1a1a2e; white-space:nowrap; flex-shrink:1; overflow:hidden; text-overflow:ellipsis; }
+   .irow .ic { display:table-cell; width:18px; height:17px; vertical-align:middle; text-align:center; font-size:11px; }
+   .irow .lbl { display:table-cell; width:78px; vertical-align:middle; font-weight:600; color:#0c1f4a; white-space:nowrap; }
+   .irow .colon { display:table-cell; width:12px; vertical-align:middle; text-align:center; font-weight:700; color:#c8a040; }
+   .irow .val { display:table-cell; vertical-align:middle; font-weight:700; color:#1a1a2e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* ---------- QR card ---------- */
   .qr-card { margin-top:5px; border:2px solid #c8a040; border-radius:10px; padding:7px 10px; display:inline-flex; flex-direction:column; align-items:center; gap:4px; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
   .qr-card span { font-size:9px; font-weight:700; color:#0c1f4a; letter-spacing:1.5px; text-transform:uppercase; }
@@ -878,9 +892,9 @@ function buildCombinedMarksheetHtml(
   .gs-mini td:last-child { text-align:right; font-weight:800; color:#0c1f4a; font-size:10px; padding-right:4px; }
   @media print { .summary { display:grid !important; grid-template-columns:repeat(6,1fr) !important; } }
   /* remarks */
-  .rem { display:flex; align-items:stretch; margin-top:7px; border-radius:6px; overflow:hidden; border:1.5px solid #d0d8ea; }
-  .rem-tag { background:#0c1f4a; color:#fff; padding:8px 18px 8px 12px; font-size:12px; font-weight:700; letter-spacing:0.5px; display:flex; align-items:center; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:32px; }
-  .rem-txt { padding:8px 14px; font-size:12.5px; color:#222; display:flex; align-items:center; font-weight:500; flex:1; }
+   .rem { display:table; width:100%; table-layout:fixed; margin-top:7px; border-radius:6px; overflow:hidden; border:1.5px solid #d0d8ea; }
+   .rem-tag { display:table-cell; width:132px; vertical-align:middle; background:#0c1f4a; color:#fff; padding:8px 18px 8px 12px; font-size:12px; font-weight:700; letter-spacing:0.5px; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:32px; }
+   .rem-txt { display:table-cell; vertical-align:middle; padding:8px 14px; font-size:12.5px; line-height:1.35; color:#222; font-weight:500; word-break:normal; }
   /* signatures — flex-shrink:0 keeps them out of the scrolling inner area */
   .sigs { display:flex; justify-content:space-around; margin-top:6px; text-align:center; flex-shrink:0; }
   .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:28px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:4px; margin-bottom:6px; min-width:160px; line-height:1.4; }
@@ -947,16 +961,16 @@ function buildCombinedMarksheetHtml(
     <!-- ══ STUDENT INFO ══ -->
     <div class="info-box">
       <div class="info-col">
-        <div class="irow"><span class="ic">👤</span><span class="lbl">Student Name</span><span class="colon">:</span><span class="val">${student.name.toUpperCase()}</span></div>
-        <div class="irow"><span class="ic">👨</span><span class="lbl">Father's Name</span><span class="colon">:</span><span class="val">${(student.fatherName||'—').toUpperCase()}</span></div>
-        <div class="irow"><span class="ic">👩</span><span class="lbl">Mother's Name</span><span class="colon">:</span><span class="val">${(student.motherName||'—').toUpperCase()}</span></div>
-        <div class="irow"><span class="ic">🎓</span><span class="lbl">Class</span><span class="colon">:</span><span class="val">${data.className}</span></div>
-        <div class="irow"><span class="ic">📘</span><span class="lbl">Section</span><span class="colon">:</span><span class="val">${student.section?.trim() || '—'}</span></div>
+        <div class="irow"><span class="ic">👤</span><span class="lbl">Student Name</span><span class="colon">:</span><span class="val">${escapeHtml(student.name).toUpperCase()}</span></div>
+        <div class="irow"><span class="ic">👨</span><span class="lbl">Father's Name</span><span class="colon">:</span><span class="val">${escapeHtml(student.fatherName || '—').toUpperCase()}</span></div>
+        <div class="irow"><span class="ic">👩</span><span class="lbl">Mother's Name</span><span class="colon">:</span><span class="val">${escapeHtml(student.motherName || '—').toUpperCase()}</span></div>
+        <div class="irow"><span class="ic">🎓</span><span class="lbl">Class</span><span class="colon">:</span><span class="val">${escapeHtml(data.className)}</span></div>
+        <div class="irow"><span class="ic">📘</span><span class="lbl">Section</span><span class="colon">:</span><span class="val">${escapeHtml(student.section?.trim() || '—')}</span></div>
       </div>
       <div class="info-col">
-        <div class="irow"><span class="ic">🪪</span><span class="lbl">Adm. No.</span><span class="colon">:</span><span class="val">${student.admissionNo||'—'}</span></div>
-        <div class="irow"><span class="ic">📋</span><span class="lbl">Roll No.</span><span class="colon">:</span><span class="val">${student.rollNumber}</span></div>
-        <div class="irow"><span class="ic">📅</span><span class="lbl">D.O.B.</span><span class="colon">:</span><span class="val">${fmtDate(student.dateOfBirth)}</span></div>
+        <div class="irow"><span class="ic">🪪</span><span class="lbl">Adm. No.</span><span class="colon">:</span><span class="val">${escapeHtml(student.admissionNo || '—')}</span></div>
+        <div class="irow"><span class="ic">📋</span><span class="lbl">Roll No.</span><span class="colon">:</span><span class="val">${escapeHtml(student.rollNumber)}</span></div>
+        <div class="irow"><span class="ic">📅</span><span class="lbl">D.O.B.</span><span class="colon">:</span><span class="val">${escapeHtml(fmtDate(student.dateOfBirth))}</span></div>
         <div class="irow"><span class="ic">📝</span><span class="lbl">Exam Type</span><span class="colon">:</span><span class="val">Regular</span></div>
         <div class="irow"><span class="ic">📅</span><span class="lbl">Issue Date</span><span class="colon">:</span><span class="val">${issueDate}</span></div>
       </div>
@@ -1092,7 +1106,7 @@ function buildCombinedMarksheetHtml(
     <!-- ══ REMARKS ══ -->
     <div class="rem">
       <div class="rem-tag">REMARKS</div>
-      <div class="rem-txt">${remark}</div>
+      <div class="rem-txt">${escapeHtml(remark)}</div>
     </div>
 
 
