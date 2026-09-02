@@ -21,16 +21,34 @@ const ReviewSchema = z.object({
 });
 
 // List all inactivation requests
-router.get("/inactivation-requests", async (_req, res) => {
+router.get("/inactivation-requests", async (req, res) => {
   res.set("Cache-Control", "no-store");
   const rows = await getAdapter().inactivationRequests.list();
-  res.json(rows);
+  const includeDocument = req.query.includeDocument === "true";
+  if (includeDocument) {
+    res.json(rows);
+    return;
+  }
+  res.json(rows.map((row: any) => {
+    const { documentBase64: _documentBase64, ...summary } = row;
+    return { ...summary, hasDocument: Boolean(row.documentBase64) };
+  }));
 });
 
 // List requests for a specific student
 router.get("/inactivation-requests/student/:studentId", async (req, res) => {
   const rows = await getAdapter().inactivationRequests.listByStudent(req.params.studentId);
   res.json(rows);
+});
+
+// Load one request with its document only when the review screen needs it.
+router.get("/inactivation-requests/:id", async (req, res) => {
+  const row = await getAdapter().inactivationRequests.get(req.params.id);
+  if (!row) {
+    res.status(404).json({ error: "Request not found" });
+    return;
+  }
+  res.json(row);
 });
 
 // Teacher submits a reactivation request for an inactive student

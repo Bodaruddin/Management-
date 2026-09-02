@@ -346,6 +346,14 @@ export function createPgAdapter(db: DB): DataAdapter {
           .from(inactivationRequestsTable)
           .orderBy(desc(inactivationRequestsTable.createdAt));
       },
+      async get(id) {
+        const [row] = await db
+          .select()
+          .from(inactivationRequestsTable)
+          .where(eq(inactivationRequestsTable.id, id))
+          .limit(1);
+        return row ?? null;
+      },
       async listByStudent(studentId) {
         return db
           .select()

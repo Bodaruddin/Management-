@@ -205,6 +205,7 @@ export interface InactivationRequest {
   teacherName: string;
   reason: string;
   documentBase64?: string;
+  hasDocument?: boolean;
   documentName?: string;
   documentMimeType?: string;
   status: 'pending' | 'approved' | 'rejected';
@@ -503,6 +504,7 @@ interface AppContextType extends AppState {
   deleteInactivationRequestDocument: (id: string) => Promise<void>;
   deleteInactivationRequest: (id: string) => Promise<void>;
   refreshInactivationRequests: () => Promise<void>;
+  loadInactivationRequestDocument: (id: string) => Promise<InactivationRequest>;
   setStudentStatus: (id: string, status: 'active' | 'inactive' | 'graduated') => Promise<void>;
   setClassAbsentLimit: (className: string, maxDays: number) => Promise<void>;
   updateDocumentBranding: (branding: DocumentBranding) => Promise<void>;
@@ -760,6 +762,7 @@ function mapInactivationRequest(r: any): InactivationRequest {
     teacherName: r.teacherName ?? r.teacher_name ?? '',
     reason: r.reason ?? '',
     documentBase64: r.documentBase64 ?? r.document_base64 ?? undefined,
+    hasDocument: r.hasDocument ?? Boolean(r.documentBase64 ?? r.document_base64),
     documentName: r.documentName ?? r.document_name ?? undefined,
     documentMimeType: r.documentMimeType ?? r.document_mime_type ?? undefined,
     status: r.status ?? 'pending',
@@ -837,84 +840,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const loadAllData = React.useCallback(async (): Promise<boolean> => {
     try {
-      const [classes, sections, students, teachers, subjects, feeTypes, attendance, exams, results, fees, expenses, salaries, promotions, markSubs, auditLog, inactivationReqs, classAbsentLimitsRaw, documentBranding, alumniRows, teacherAttendance, teacherLeaves, teacherHolidays, teacherAttendanceSettings] = await Promise.all([
-        apiGet<string[]>('/classes'),
-        apiGet<string[]>('/sections').catch(() => [] as string[]),
-        apiGet<any[]>('/students?includeGraduated=true'),
-        apiGet<any[]>('/teachers'),
-        apiGet<string[]>('/subjects'),
-        apiGet<any[]>('/fee-types'),
-        apiGet<any[]>('/attendance'),
-        apiGet<any[]>('/exams'),
-        apiGet<any[]>('/exam-results'),
-        apiGet<any[]>('/fee-records'),
-        apiGet<any[]>('/expenses'),
-        apiGet<any[]>('/salary-records'),
-        apiGet<any[]>('/promotion-records'),
-        apiGet<any[]>('/mark-submissions').catch(() => [] as any[]),
-        apiGet<any[]>('/mark-audit-log').catch(() => [] as any[]),
-        apiGet<any[]>('/inactivation-requests', { cache: 'no-store' }).catch(() => [] as any[]),
-        apiGet<Record<string, number>>('/settings/class-absent-limits').catch(() => ({} as Record<string, number>)),
-        apiGet<DocumentBranding>('/settings/document-branding').catch(() => DEFAULT_STATE.documentBranding),
-        apiGet<any[]>('/alumni').catch(() => [] as any[]),
-        apiGet<any[]>('/teacher-attendance').catch(() => [] as any[]),
-        apiGet<any[]>('/teacher-leaves').catch(() => [] as any[]),
-        apiGet<any[]>('/teacher-holidays').catch(() => [] as any[]),
-        apiGet<TeacherAttendanceSettings>('/settings/teacher-attendance').catch(() => DEFAULT_STATE.teacherAttendanceSettings),
-      ]);
-
-      const isEmpty = classes.length === 0 && students.length === 0 && teachers.length === 0;
-
-      if (isEmpty) {
-        await seedAllData();
-        const [c2, sec2, s2, t2, sub2, ft2, att2, ex2, res2, fee2, exp2, sal2, pro2, ms2, auditLog2, ir2, cal2, branding2, alumni2, ta2, tl2, th2, tas2] = await Promise.all([
-          apiGet<string[]>('/classes'), apiGet<string[]>('/sections').catch(() => [] as string[]),
-          apiGet<any[]>('/students?includeGraduated=true'), apiGet<any[]>('/teachers'),
-          apiGet<string[]>('/subjects'), apiGet<any[]>('/fee-types'), apiGet<any[]>('/attendance'),
-          apiGet<any[]>('/exams'), apiGet<any[]>('/exam-results'), apiGet<any[]>('/fee-records'),
-          apiGet<any[]>('/expenses'), apiGet<any[]>('/salary-records'), apiGet<any[]>('/promotion-records'),
-          apiGet<any[]>('/mark-submissions').catch(() => [] as any[]),
-          apiGet<any[]>('/mark-audit-log').catch(() => [] as any[]),
-          apiGet<any[]>('/inactivation-requests', { cache: 'no-store' }).catch(() => [] as any[]),
-          apiGet<Record<string, number>>('/settings/class-absent-limits').catch(() => ({} as Record<string, number>)),
-          apiGet<DocumentBranding>('/settings/document-branding').catch(() => DEFAULT_STATE.documentBranding),
-          apiGet<any[]>('/alumni').catch(() => [] as any[]),
-          apiGet<any[]>('/teacher-attendance').catch(() => [] as any[]),
-          apiGet<any[]>('/teacher-leaves').catch(() => [] as any[]),
-          apiGet<any[]>('/teacher-holidays').catch(() => [] as any[]),
-          apiGet<TeacherAttendanceSettings>('/settings/teacher-attendance').catch(() => DEFAULT_STATE.teacherAttendanceSettings),
-        ]);
+      const loadBootstrap = () => apiGet<any>('/bootstrap');
+      const applyBootstrap = (data: any) => {
+        const {
+          classes = [], sections = [], students = [], teachers = [], subjects = [],
+          feeTypes = [], attendance = [], exams = [], results = [], fees = [],
+          expenses = [], salaries = [], promotions = [], markSubmissions = [],
+          markAuditLog = [], inactivationRequests = [], classAbsentLimits = {},
+          documentBranding = DEFAULT_STATE.documentBranding, alumni = [],
+          teacherAttendance = [], teacherLeaves = [], teacherHolidays = [],
+          teacherAttendanceSettings = DEFAULT_STATE.teacherAttendanceSettings,
+        } = data;
         setState({
-          classes: c2.sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })), sections: sec2, students: s2.map(mapStudent), teachers: t2.map(mapTeacher),
-          subjects: sub2, feeTypes: ft2.map(mapFeeType), attendanceRecords: att2.map(mapAttendance),
-          exams: ex2.map(mapExam), examResults: res2.map(mapExamResult), feeRecords: fee2.map(mapFeeRecord),
-          expenses: exp2.map(mapExpense), salaryRecords: sal2.map(mapSalary), promotionRecords: pro2.map(mapPromotion),
-          markSubmissions: ms2, markAuditLog: auditLog2,
-          inactivationRequests: ir2.map(mapInactivationRequest),
-          classAbsentLimits: cal2,
-          documentBranding: branding2,
-          alumni: alumni2,
-          teacherAttendanceRecords: ta2.map(mapTeacherAttendance),
-          teacherLeaves: tl2.map(mapTeacherLeave),
-          teacherHolidays: th2.map(mapTeacherHoliday),
-          teacherAttendanceSettings: tas2,
-        });
-      } else {
-        setState({
-          classes: classes.sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })), sections, students: students.map(mapStudent), teachers: teachers.map(mapTeacher),
-          subjects, feeTypes: feeTypes.map(mapFeeType), attendanceRecords: attendance.map(mapAttendance),
-          exams: exams.map(mapExam), examResults: results.map(mapExamResult), feeRecords: fees.map(mapFeeRecord),
-          expenses: expenses.map(mapExpense), salaryRecords: salaries.map(mapSalary), promotionRecords: promotions.map(mapPromotion),
-          markSubmissions: markSubs, markAuditLog: auditLog,
-          inactivationRequests: inactivationReqs.map(mapInactivationRequest),
-          classAbsentLimits: classAbsentLimitsRaw,
+          classes: classes.sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })),
+          sections,
+          students: students.map(mapStudent),
+          teachers: teachers.map(mapTeacher),
+          subjects,
+          feeTypes: feeTypes.map(mapFeeType),
+          attendanceRecords: attendance.map(mapAttendance),
+          exams: exams.map(mapExam),
+          examResults: results.map(mapExamResult),
+          feeRecords: fees.map(mapFeeRecord),
+          expenses: expenses.map(mapExpense),
+          salaryRecords: salaries.map(mapSalary),
+          promotionRecords: promotions.map(mapPromotion),
+          markSubmissions,
+          markAuditLog,
+          inactivationRequests: inactivationRequests.map(mapInactivationRequest),
+          classAbsentLimits,
           documentBranding,
-          alumni: alumniRows,
+          alumni,
           teacherAttendanceRecords: teacherAttendance.map(mapTeacherAttendance),
           teacherLeaves: teacherLeaves.map(mapTeacherLeave),
           teacherHolidays: teacherHolidays.map(mapTeacherHoliday),
           teacherAttendanceSettings,
         });
+      };
+
+      const initialData = await loadBootstrap();
+      const isEmpty = initialData.classes.length === 0
+        && initialData.students.length === 0
+        && initialData.teachers.length === 0;
+      if (isEmpty) {
+        await seedAllData();
+        applyBootstrap(await loadBootstrap());
+      } else {
+        applyBootstrap(initialData);
       }
       return true;
     } catch (err) {
@@ -922,69 +894,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
   }, []);
-
-  // ── Sync locally-saved DB config to API (set during offline setup) ──────────
-  const syncPendingDbConfig = useCallback(async () => {
-    try {
-      const raw = await AsyncStorage.getItem(PENDING_CONFIG_KEY);
-      if (!raw) return;
-      const cfg: PendingDbConfig = JSON.parse(raw);
-      const dbType = cfg.provider === 'firebase' ? 'firebase' : 'postgresql';
-      const body: Record<string, any> = { name: cfg.name, dbType };
-      if (cfg.provider !== 'firebase') {
-        body.url = cfg.url;
-      } else {
-        Object.assign(body, {
-          projectId: cfg.projectId, apiKey: cfg.apiKey, authDomain: cfg.authDomain,
-          storageBucket: cfg.storageBucket, messagingSenderId: cfg.messagingSenderId,
-          appId: cfg.appId, serviceAccountJson: cfg.serviceAccountJson,
-        });
-      }
-      const created = await apiPost<{ id: string }>('/db-connections', body);
-      const result = await apiPost<{ success: boolean }>(`/db-connections/${created.id}/test`, {});
-      if (result.success) {
-        const activation = await apiPost<{ success: boolean; message?: string }>(`/db-connections/${created.id}/activate`, {});
-        if (!activation.success) throw new Error(activation.message ?? 'The database could not be activated.');
-        await AsyncStorage.removeItem(PENDING_CONFIG_KEY);
-        console.log('[AppContext] Pending DB config synced and activated.');
-      } else {
-        // Delete bad entry — user will need to reconfigure
-        await fetch(`${getApiBase()}/api/db-connections/${created.id}`, { method: 'DELETE' }).catch(() => {});
-      }
-    } catch (_e) {
-      // Ignore — will retry next time API loads successfully
-    }
-  }, []);
-
-  useEffect(() => {
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-    let cancelled = false;
-
-    // Do not hydrate every data collection while the user is still on the
-    // login or database setup screen. This avoids a burst of API requests on
-    // every cold start and loads the same data once the app is ready.
-    if (!user || isSetupComplete !== true) return;
-
-    const attempt = async (delay = 0) => {
-      if (cancelled) return;
-      if (delay > 0) await new Promise(r => setTimeout(r, delay));
-      if (cancelled) return;
-      const ok = await loadAllData();
-      if (ok) {
-        loadedRef.current = true;
-        syncPendingDbConfig(); // best-effort, non-blocking
-      } else if (!cancelled) {
-        // Retry every 3 s until data loads
-        retryTimer = setTimeout(() => attempt(0), 3000);
-      }
-    };
-
-    attempt();
-    return () => {
-      cancelled = true;
-      if (retryTimer) clearTimeout(retryTimer);
-    };
-  }, [loadAllData, user, isSetupComplete]);
 
   // ── Students ──
   const addStudent = useCallback((s: Omit<Student, 'id'>) => {
@@ -1549,7 +1458,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({
       ...prev,
       inactivationRequests: prev.inactivationRequests.map(r => r.id === id
-        ? { ...r, documentBase64: undefined, documentName: undefined, documentMimeType: undefined }
+        ? { ...r, documentBase64: undefined, hasDocument: false, documentName: undefined, documentMimeType: undefined }
         : r),
     }));
   }, []);
@@ -1572,6 +1481,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshInactivationRequests = useCallback(async (): Promise<void> => {
     const rows = await apiGet<any[]>(`/inactivation-requests?refresh=${Date.now()}`, { cache: 'no-store' });
     setState(prev => ({ ...prev, inactivationRequests: rows.map(mapInactivationRequest) }));
+  }, []);
+
+  const loadInactivationRequestDocument = useCallback(async (id: string): Promise<InactivationRequest> => {
+    const row = await apiGet<any>(`/inactivation-requests/${encodeURIComponent(id)}?includeDocument=true`);
+    const request = mapInactivationRequest(row);
+    setState(prev => ({
+      ...prev,
+      inactivationRequests: prev.inactivationRequests.map(item => item.id === id ? request : item),
+    }));
+    return request;
   }, []);
 
   const setClassAbsentLimit = useCallback(async (className: string, maxDays: number): Promise<void> => {
@@ -1657,7 +1576,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       promoteStudent, bulkPromoteClass,
       submitInactivationRequest, approveInactivationRequest, rejectInactivationRequest,
       deleteInactivationRequestDocument, deleteInactivationRequest,
-      refreshInactivationRequests, setStudentStatus, setClassAbsentLimit, updateDocumentBranding,
+      refreshInactivationRequests, loadInactivationRequestDocument, setStudentStatus, setClassAbsentLimit, updateDocumentBranding,
       addAlumni, updateAlumni, deleteAlumni, bulkAddAlumni,
        refreshTeacherAttendance, getTeacherFaceStatus, enrollTeacherFace,
        checkInTeacher, checkOutTeacher, applyTeacherLeave,

@@ -46,6 +46,7 @@ export interface DataAdapter {
   };
   inactivationRequests: {
     list(): Promise<any[]>;
+    get(id: string): Promise<any | null>;
     listByStudent(studentId: string): Promise<any[]>;
     create(data: any): Promise<any>;
     updateStatus(id: string, status: "approved" | "rejected", adminNote?: string): Promise<any | null>;

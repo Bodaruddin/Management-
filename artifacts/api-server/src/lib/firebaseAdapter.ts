@@ -447,6 +447,10 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
         const snap = await col("inactivation_requests").orderBy("createdAt", "desc").get();
         return snap.docs.map(mapDoc);
       },
+      async get(id) {
+        const snap = await col("inactivation_requests").doc(id).get();
+        return snap.exists ? mapDoc(snap) : null;
+      },
       async listByStudent(studentId) {
         const snap = await col("inactivation_requests")
           .where("studentId", "==", studentId)

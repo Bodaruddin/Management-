@@ -3,12 +3,24 @@ import { getAdapter } from "../lib/dbManager.js";
 
 const router = Router();
 
+let alumniSyncAt = 0;
+let alumniSyncPromise: Promise<void> | null = null;
+
+async function syncGraduatedStudentsOnce(): Promise<void> {
+  if (Date.now() - alumniSyncAt < 60_000) return;
+  if (alumniSyncPromise) return alumniSyncPromise;
+  alumniSyncPromise = getAdapter().alumni.syncGraduatedStudents()
+    .then(() => { alumniSyncAt = Date.now(); })
+    .finally(() => { alumniSyncPromise = null; });
+  return alumniSyncPromise;
+}
+
 router.get("/students", async (req, res) => {
   // Repair legacy Alumni imports before returning the active student list.
   // This keeps parallel dashboard loads from briefly exposing graduated
   // students with their old class assignment.
-  await getAdapter().alumni.syncGraduatedStudents();
   const includeGraduated = req.query.includeGraduated === "true";
+  if (includeGraduated) await syncGraduatedStudentsOnce();
   const rows = await getAdapter().students.list(includeGraduated);
   res.json(rows);
 });

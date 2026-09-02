@@ -925,7 +925,7 @@ const reqModalStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
 });
 
 function RequestsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
-  const { inactivationRequests, approveInactivationRequest, rejectInactivationRequest, deleteInactivationRequestDocument, deleteInactivationRequest, refreshInactivationRequests } = useApp();
+  const { inactivationRequests, approveInactivationRequest, rejectInactivationRequest, deleteInactivationRequestDocument, deleteInactivationRequest, refreshInactivationRequests, loadInactivationRequestDocument } = useApp();
   const [filter, setFilter] = useState<ReqFilter>('pending');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<InactivationRequest | null>(null);
@@ -970,7 +970,7 @@ function RequestsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
           onDeleteDocument={async id => {
             await deleteInactivationRequestDocument(id);
             setSelected(prev => prev && prev.id === id
-              ? { ...prev, documentBase64: undefined, documentName: undefined, documentMimeType: undefined }
+              ? { ...prev, documentBase64: undefined, hasDocument: false, documentName: undefined, documentMimeType: undefined }
               : prev);
           }}
           colors={colors}
@@ -1020,9 +1020,16 @@ function RequestsTab({ colors }: { colors: ReturnType<typeof useColors> }) {
         }
         renderItem={({ item }) => {
           const col = reqStatusColor(item.status, colors);
-          const hasDoc = !!item.documentBase64;
+          const hasDoc = item.hasDocument ?? !!item.documentBase64;
           return (
-            <TouchableOpacity style={[s.card, { backgroundColor: colors.card }]} onPress={() => setSelected(item)} activeOpacity={0.85}>
+            <TouchableOpacity style={[s.card, { backgroundColor: colors.card }]} onPress={() => {
+              setSelected(item);
+              if (item.hasDocument && !item.documentBase64) {
+                loadInactivationRequestDocument(item.id)
+                  .then(setSelected)
+                  .catch(() => {});
+              }
+            }} activeOpacity={0.85}>
               <View style={[s.stripe, { backgroundColor: col }]} />
               <View style={{ flex: 1, paddingLeft: 12 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
