@@ -283,6 +283,20 @@ function applyNativePrintMargins(html: string, marginMm: number): string {
     height: ${pageHeight} !important;
     margin: 0 auto !important;
   }
+  /*
+   * Combined marksheets have a dense table and their page content is
+   * deliberately compacted in the template. Let that page use its natural
+   * height so native print does not clip the signatures and footer when the
+   * printable width is reduced by the PDF margin.
+   */
+  .page.combined-page {
+    height: auto !important;
+    min-height: ${pageHeight} !important;
+    overflow: visible !important;
+  }
+  .page.combined-page .inner {
+    overflow: visible !important;
+  }
 </style>`;
 
   return html.includes('</head>')

@@ -767,13 +767,13 @@ function buildCombinedMarksheetHtml(
       const v = row.marks[key];
       const ex = examMap[key];
       if (v === null || !ex)
-        return `<td style="padding:6px 4px;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`
-             + `<td style="padding:6px 4px;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`;
-      return `<td style="padding:6px 4px;font-size:13px;font-weight:800;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${v}</td>`
-           + `<td style="padding:6px 4px;font-size:11px;color:#0c1f4a;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0">${getSubjectMaxMarks(ex, row.subject, student.class)}</td>`;
+        return `<td style="padding:4px 4px;line-height:1.1;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`
+             + `<td style="padding:4px 4px;line-height:1.1;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`;
+      return `<td style="padding:4px 4px;line-height:1.1;font-size:13px;font-weight:800;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${v}</td>`
+           + `<td style="padding:4px 4px;line-height:1.1;font-size:11px;color:#0c1f4a;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0">${getSubjectMaxMarks(ex, row.subject, student.class)}</td>`;
     }).join('');
     return `<tr style="background:${bg}">
-      <td style="padding:6px 12px;font-size:12px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:nowrap">${icon}&nbsp;${row.subject}</td>
+      <td style="padding:4px 12px;line-height:1.1;font-size:12px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:nowrap">${icon}&nbsp;${row.subject}</td>
       ${examCells}
       <td style="padding:6px 6px;font-size:13px;font-weight:800;color:#0c1f4a;text-align:center;border-left:2px solid #b0bcd4;border-bottom:1px solid #dde4f0">${row.total}</td>
        <td style="padding:6px 4px;font-size:11px;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.max}</td>
@@ -830,7 +830,7 @@ function buildCombinedMarksheetHtml(
   .corner.tr { top:5px; right:5px; transform:rotate(90deg); transform-origin:50% 50%; }
   .corner.bl { bottom:5px; left:5px; transform:rotate(-90deg); transform-origin:50% 50%; }
   .corner.br { bottom:5px; right:5px; transform:rotate(180deg); transform-origin:50% 50%; }
-  .inner { border:1.5px solid #c8a040; border-radius:6px; padding:12px; overflow:hidden; display:flex; flex-direction:column; ${_innerZoomCss} }
+  .inner { border:1.5px solid #c8a040; border-radius:6px; padding:12px; overflow:visible; display:flex; flex-direction:column; ${_innerZoomCss} }
   /* header */
   .hdr { display:flex; align-items:flex-start; gap:18px; padding-bottom:8px; border-bottom:3px solid #0c1f4a; }
   .hdr-center { flex:1; text-align:center; }
@@ -905,7 +905,7 @@ function buildCombinedMarksheetHtml(
 </style>
 </head>
 <body>
-<div class="page">
+<div class="page combined-page">
 
   <!-- Gold corners (rotated via CSS, no inline transforms) -->
   <div class="corner tl">${cornerSvg()}</div>
