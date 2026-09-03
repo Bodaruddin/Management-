@@ -402,6 +402,12 @@ export default function TeacherAttendance() {
   };
 
   const reportRecords = useMemo(() => {
+    // The take-attendance screen is the default view. Do not copy and sort
+    // the complete attendance history until the user actually opens reports.
+    // On larger schools this work can block the JS thread during navigation
+    // and make Android appear to freeze or close the app.
+    if (view !== 'report') return [];
+
     let records = attendanceRecords;
     if (filterReportClass !== 'All') records = records.filter(a => a.class === filterReportClass);
     if (reportRange === 'monthly') {
@@ -414,9 +420,13 @@ export default function TeacherAttendance() {
       records = records.filter(a => a.date >= customStartDate && a.date <= customEndDate);
     }
     return [...records].sort((a, b) => b.date.localeCompare(a.date));
-  }, [attendanceRecords, filterReportClass, reportRange, reportMonth, reportYear, customStartDate, customEndDate]);
+  }, [attendanceRecords, filterReportClass, reportRange, reportMonth, reportYear, customStartDate, customEndDate, view]);
 
   const reportStudents = useMemo<ReportStudent[]>(() => {
+    // Report rows are not needed while taking attendance. Keeping this
+    // calculation lazy makes the initial route transition lightweight.
+    if (view !== 'report') return [];
+
     const stats = new Map<string, ReportStudent>();
     const registeredStudents = new Map(students.map(student => [student.id, student]));
 
@@ -477,7 +487,7 @@ export default function TeacherAttendance() {
       );
       return rollOrder || a.name.localeCompare(b.name);
     });
-  }, [students, reportRecords, filterReportClass]);
+  }, [students, reportRecords, filterReportClass, view]);
 
   const customRangeValid = /^\d{4}-\d{2}-\d{2}$/.test(customStartDate)
     && /^\d{4}-\d{2}-\d{2}$/.test(customEndDate)
