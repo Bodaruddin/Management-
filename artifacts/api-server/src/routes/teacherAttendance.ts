@@ -128,7 +128,9 @@ async function getFaceProfiles(): Promise<Record<string, string>> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return Object.fromEntries(
     Object.entries(value).filter((entry): entry is [string, string] =>
-      typeof entry[0] === "string" && typeof entry[1] === "string" && entry[1].startsWith("v1:"),
+      typeof entry[0] === "string"
+      && typeof entry[1] === "string"
+      && (entry[1].startsWith("v1:") || entry[1].startsWith("v2:")),
     ),
   );
 }
@@ -139,7 +141,7 @@ function faceProfileKey(teacherId: string): string {
 
 function readStoredFaceTemplate(value: unknown): string | null {
   if (typeof value === "string") {
-    if (value.startsWith("v1:")) return value;
+    if (value.startsWith("v1:") || value.startsWith("v2:")) return value;
     try {
       return readStoredFaceTemplate(JSON.parse(value));
     } catch {
@@ -148,7 +150,10 @@ function readStoredFaceTemplate(value: unknown): string | null {
   }
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const template = (value as { template?: unknown }).template;
-  return typeof template === "string" && template.startsWith("v1:") ? template : null;
+  return typeof template === "string"
+    && (template.startsWith("v1:") || template.startsWith("v2:"))
+    ? template
+    : null;
 }
 
 async function getFaceProfile(teacherId: string): Promise<string | null> {
