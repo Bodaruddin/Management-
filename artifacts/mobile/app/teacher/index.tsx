@@ -565,13 +565,16 @@ export default function TeacherDashboard() {
             <AnimatedCard
               key={a.label}
               style={{ width: ITEM_W }}
-              onPress={async () => {
+              onPress={() => {
                 if (a.disabled) {
-                  await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                  void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
                   setBlockedAction({ label: a.label, icon: a.icon, grad: a.grad });
                   return;
                 }
-                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                // Do not await native haptics here. Some Android devices take
+                // long enough to resolve this promise that the tap feels
+                // ignored before the route navigation starts.
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
                 if (a.route) router.push(a.route as any);
               }}
             >
