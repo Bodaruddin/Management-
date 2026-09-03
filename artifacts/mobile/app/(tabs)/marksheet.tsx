@@ -767,18 +767,18 @@ function buildCombinedMarksheetHtml(
       const v = row.marks[key];
       const ex = examMap[key];
       if (v === null || !ex)
-        return `<td style="padding:4px 4px;line-height:1.1;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`
-             + `<td style="padding:4px 4px;line-height:1.1;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`;
-      return `<td style="padding:4px 4px;line-height:1.1;font-size:13px;font-weight:800;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${v}</td>`
-           + `<td style="padding:4px 4px;line-height:1.1;font-size:11px;color:#0c1f4a;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0">${getSubjectMaxMarks(ex, row.subject, student.class)}</td>`;
+         return `<td style="padding:2px 3px;line-height:1;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`
+             + `<td style="padding:2px 3px;line-height:1;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`;
+      return `<td style="padding:2px 3px;line-height:1;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${v}</td>`
+           + `<td style="padding:2px 3px;line-height:1;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0">${getSubjectMaxMarks(ex, row.subject, student.class)}</td>`;
     }).join('');
     return `<tr style="background:${bg}">
-      <td style="padding:4px 12px;line-height:1.1;font-size:12px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:nowrap">${icon}&nbsp;${row.subject}</td>
+       <td style="padding:2px 8px;line-height:1;font-size:10.5px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:nowrap">${icon}&nbsp;${row.subject}</td>
       ${examCells}
-      <td style="padding:6px 6px;font-size:13px;font-weight:800;color:#0c1f4a;text-align:center;border-left:2px solid #b0bcd4;border-bottom:1px solid #dde4f0">${row.total}</td>
-       <td style="padding:6px 4px;font-size:11px;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.max}</td>
-      <td style="padding:6px 6px;font-size:12px;font-weight:600;color:#1a1a2e;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.pct.toFixed(2)}</td>
-      <td style="padding:6px 6px;font-size:14px;font-weight:900;color:${sg.color};text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.grade}</td>
+       <td style="padding:3px 4px;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:2px solid #b0bcd4;border-bottom:1px solid #dde4f0">${row.total}</td>
+        <td style="padding:3px 3px;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.max}</td>
+       <td style="padding:3px 4px;font-size:11px;font-weight:600;color:#1a1a2e;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.pct.toFixed(2)}</td>
+       <td style="padding:3px 4px;font-size:13px;font-weight:900;color:${sg.color};text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.grade}</td>
     </tr>`;
   }).join('');
 
@@ -786,10 +786,10 @@ function buildCombinedMarksheetHtml(
   const examTotalCells = EXAM_TYPE_ORDER.map(key => {
     const t = examTotals[key];
     if (!t)
-      return `<td style="padding:6px 4px;text-align:center;border-left:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.3)">—</td>`
-           + `<td style="padding:6px 4px;text-align:center;border-left:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.2)">—</td>`;
-    return `<td style="padding:6px 4px;font-size:14px;font-weight:900;color:#e8c96a;text-align:center;border-left:1px solid rgba(255,255,255,0.18)">${t.obtained}</td>`
-         + `<td style="padding:6px 4px;font-size:11px;color:rgba(255,255,255,0.65);text-align:center;border-left:1px solid rgba(255,255,255,0.08)">/${t.max}</td>`;
+       return `<td style="padding:3px 3px;text-align:center;border-left:1px solid rgba(255,255,255,0.12);color:rgba(255,255,255,0.3)">—</td>`
+            + `<td style="padding:3px 3px;text-align:center;border-left:1px solid rgba(255,255,255,0.06);color:rgba(255,255,255,0.2)">—</td>`;
+    return `<td style="padding:3px 3px;font-size:13px;font-weight:900;color:#e8c96a;text-align:center;border-left:1px solid rgba(255,255,255,0.18)">${t.obtained}</td>`
+         + `<td style="padding:3px 3px;font-size:10px;color:rgba(255,255,255,0.65);text-align:center;border-left:1px solid rgba(255,255,255,0.08)">/${t.max}</td>`;
   }).join('');
 
   const remark = percentage >= 90 ? 'Excellent performance! Keep up the hard work and continue to shine.' :
@@ -803,12 +803,11 @@ function buildCombinedMarksheetHtml(
   const gradeRows = [['90% and above','A+'],['80% to 89%','A'],['70% to 79%','B+'],['60% to 69%','B'],['50% to 59%','C'],['30% to 49%','D'],['Below 30%','F']]
     .map(([r,g], i) => `<tr style="background:${i%2===0?'#fff':'#f5f7fd'}"><td style="padding:5px 10px;font-size:12px;color:#475569;border-bottom:1px solid #eef1f8">${r}</td><td style="padding:5px 10px;font-size:14px;font-weight:900;color:#0c1f4a;text-align:center;border-bottom:1px solid #eef1f8">${g}</td></tr>`).join('');
 
-  // Always zoom .inner so footer + signatures are guaranteed to fit within
-  // .page { height:297mm; overflow:hidden }. A hard max of 0.93 ensures at least
-  // 7 % reduction even with very few subjects (estimation errors can't cause clipping).
-  // Base 840 = header~275 + info~135 + table-header~60 + summary~140 + remarks~45 + sigs~80 + footer~45 + gaps~60
-  const _innerContentH = 840 + subjectRows.length * 30;
-  const _innerZoomVal = Math.min(0.98, 1020 / _innerContentH);
+  // Keep enough headroom for Android's native print WebView, which can measure
+  // font line boxes a little taller than the browser preview. The table rows
+  // are intentionally compact so the signatures and footer stay on page 1.
+  const _innerContentH = 900 + subjectRows.length * 30;
+  const _innerZoomVal = Math.min(0.86, 990 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
   return `<!DOCTYPE html>
@@ -823,29 +822,30 @@ function buildCombinedMarksheetHtml(
   body { font-family:'Poppins',Arial,sans-serif; background:#fff; padding:0; margin:0; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   @page { size:A4 portrait; margin:0; }
   @media print { html, body { background:#fff; padding:0; margin:0; height:297mm; overflow:hidden; } .page { page-break-after:avoid; break-after:avoid; } }
-  /* 794 px = A4 width at 96 dpi; height:auto so PDF captures only actual content, no blank gap */
-  .page { width:794px; height:auto; margin:0 auto; background:#fdfefb; border:5px solid #0c1f4a; border-radius:10px; padding:9px; position:relative; box-sizing:border-box; display:flex; flex-direction:column; }
+  /* Keep the combined sheet inside one A4 page in native print as well as web capture. */
+  .page { width:794px; height:1123px; margin:0 auto; background:#fdfefb; border:5px solid #0c1f4a; border-radius:10px; padding:9px; position:relative; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; page-break-inside:avoid; break-inside:avoid; }
   .corner { position:absolute; width:48px; height:48px; pointer-events:none; z-index:10; }
   .corner.tl { top:5px; left:5px; transform:rotate(0deg); transform-origin:50% 50%; }
   .corner.tr { top:5px; right:5px; transform:rotate(90deg); transform-origin:50% 50%; }
   .corner.bl { bottom:5px; left:5px; transform:rotate(-90deg); transform-origin:50% 50%; }
   .corner.br { bottom:5px; right:5px; transform:rotate(180deg); transform-origin:50% 50%; }
-  .inner { border:1.5px solid #c8a040; border-radius:6px; padding:12px; overflow:visible; display:flex; flex-direction:column; ${_innerZoomCss} }
+  .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:visible; }
+  .inner-content { display:flex; flex-direction:column; ${_innerZoomCss} }
   /* header */
-  .hdr { display:flex; align-items:flex-start; gap:18px; padding-bottom:8px; border-bottom:3px solid #0c1f4a; }
+  .hdr { display:flex; align-items:flex-start; gap:12px; padding-bottom:5px; border-bottom:3px solid #0c1f4a; }
   .hdr-center { flex:1; text-align:center; }
-  .school-h1 { font-family:'Archivo Black',sans-serif; font-size:26px; color:#0c1f4a; line-height:1.2; letter-spacing:0.3px; }
-  .tagline-row { display:flex; align-items:center; gap:8px; margin:4px 0 3px; }
+  .school-h1 { font-family:'Archivo Black',sans-serif; font-size:22px; color:#0c1f4a; line-height:1.15; letter-spacing:0.3px; }
+  .tagline-row { display:flex; align-items:center; gap:6px; margin:3px 0 2px; }
   .tline { flex:1; height:1.5px; background:#c8a040; }
   .tagline-txt { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:3px; white-space:nowrap; }
-  .addr { font-size:11.5px; font-weight:600; color:#0c1f4a; display:flex; align-items:center; justify-content:center; gap:5px; }
+  .addr { font-size:10px; font-weight:600; color:#0c1f4a; display:flex; align-items:center; justify-content:center; gap:4px; }
   .hdr-right { flex-shrink:0; text-align:center; }
-  .session-box { background:#0c1f4a; color:#fff; border-radius:6px; padding:6px 18px; display:inline-block; }
+  .session-box { background:#0c1f4a; color:#fff; border-radius:6px; padding:4px 12px; display:inline-block; }
   .session-lbl { font-size:9px; letter-spacing:1.5px; font-weight:600; }
-  .session-val { font-size:21px; font-weight:800; line-height:1.2; }
+  .session-val { font-size:18px; font-weight:800; line-height:1.1; }
   .comb-title { margin-top:5px; }
   .comb-title .t1 { font-family:'Archivo Black',sans-serif; font-size:13px; color:#c8a040; font-style:italic; letter-spacing:1px; }
-  .comb-title .t2 { font-family:'Archivo Black',sans-serif; font-size:26px; color:#c8a040; font-style:italic; letter-spacing:1px; line-height:1; }
+  .comb-title .t2 { font-family:'Archivo Black',sans-serif; font-size:22px; color:#c8a040; font-style:italic; letter-spacing:1px; line-height:1; }
   .comb-title .stars { font-size:11px; color:#c8a040; letter-spacing:5px; margin-top:2px; }
   /* info box */
    /*
@@ -853,59 +853,59 @@ function buildCombinedMarksheetHtml(
     * can collapse the later flex children while rendering HTML to PDF,
     * leaving only the first student-detail row visible.
     */
-   .info-box { border:1.5px solid #c8a040; border-radius:8px; display:table; width:100%; table-layout:fixed; margin-top:7px; overflow:hidden; background:#fdfcf5; }
-   .info-col { display:table-cell; width:50%; vertical-align:top; padding:8px 12px; }
+    .info-box { border:1.5px solid #c8a040; border-radius:8px; display:table; width:100%; table-layout:fixed; margin-top:5px; overflow:hidden; background:#fdfcf5; }
+    .info-col { display:table-cell; width:50%; vertical-align:top; padding:5px 8px; }
   .info-col + .info-col { border-left:1px solid #e8d9a8; }
-   .irow { display:table; width:100%; table-layout:fixed; height:17px; margin-bottom:1px; font-size:11px; line-height:1; }
+    .irow { display:table; width:100%; table-layout:fixed; height:15px; margin-bottom:0; font-size:10px; line-height:1; }
   .irow:last-child { margin-bottom:0; }
-   .irow .ic { display:table-cell; width:18px; height:17px; vertical-align:middle; text-align:center; font-size:11px; }
-   .irow .lbl { display:table-cell; width:78px; vertical-align:middle; font-weight:600; color:#0c1f4a; white-space:nowrap; }
+    .irow .ic { display:table-cell; width:16px; height:15px; vertical-align:middle; text-align:center; font-size:10px; }
+    .irow .lbl { display:table-cell; width:70px; vertical-align:middle; font-weight:600; color:#0c1f4a; white-space:nowrap; }
    .irow .colon { display:table-cell; width:12px; vertical-align:middle; text-align:center; font-weight:700; color:#c8a040; }
    .irow .val { display:table-cell; vertical-align:middle; font-weight:700; color:#1a1a2e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* ---------- QR card ---------- */
-  .qr-card { margin-top:5px; border:2px solid #c8a040; border-radius:10px; padding:7px 10px; display:inline-flex; flex-direction:column; align-items:center; gap:4px; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
+  .qr-card { margin-top:4px; border:2px solid #c8a040; border-radius:8px; padding:4px 7px; display:inline-flex; flex-direction:column; align-items:center; gap:2px; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
   .qr-card span { font-size:9px; font-weight:700; color:#0c1f4a; letter-spacing:1.5px; text-transform:uppercase; }
   /* perf table */
-  .perf-title { background:#0c1f4a; display:flex; align-items:center; gap:10px; padding:6px 14px; border-radius:6px 6px 0 0; margin-top:9px; }
+  .perf-title { background:#0c1f4a; display:flex; align-items:center; gap:8px; padding:4px 10px; border-radius:6px 6px 0 0; margin-top:6px; }
   .pt-line { flex:1; height:1px; background:rgba(200,160,64,0.45); }
-  .pt-txt { font-size:12px; font-weight:700; color:#fff; letter-spacing:2.5px; }
+  .pt-txt { font-size:10px; font-weight:700; color:#fff; letter-spacing:2px; }
   table.mt { width:100%; border-collapse:collapse; font-size:12px; border:1.5px solid #0c1f4a; border-top:none; }
-  table.mt th { background:#0c1f4a; color:#fff; padding:5px 4px; font-size:10px; font-weight:700; letter-spacing:0.4px; text-align:center; border-right:1px solid rgba(255,255,255,0.12); }
-  table.mt th.sh { text-align:left; padding-left:12px; }
-  table.mt th.sub { background:#122d60; font-size:9.5px; color:rgba(255,255,255,0.85); font-weight:600; }
+  table.mt th { background:#0c1f4a; color:#fff; padding:3px 3px; font-size:9px; font-weight:700; letter-spacing:0.3px; text-align:center; border-right:1px solid rgba(255,255,255,0.12); }
+  table.mt th.sh { text-align:left; padding-left:8px; }
+  table.mt th.sub { background:#122d60; font-size:8.5px; color:rgba(255,255,255,0.85); font-weight:600; }
   table.mt th.total-h { color:#e8c96a; border-left:2px solid rgba(255,255,255,0.28); }
   table.mt tr.tr td { background:#0c1f4a; font-weight:800; font-size:13px; border-top:2px solid #0c1f4a; border-bottom:none; }
   table.mt tr.tr td:first-child { font-size:12px; }
   /* summary cards */
-  .summary { display:grid; grid-template-columns:repeat(6,1fr); gap:6px; margin-top:8px; margin-bottom:0; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .sc { border:1.5px solid #e2e8f0; border-radius:14px; padding:6px 5px 5px; text-align:center; background:#fff; box-shadow:0 6px 20px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; flex-direction:column; align-items:center; justify-content:center; }
-  .sc .si { display:flex; justify-content:center; align-items:center; margin:0 auto 6px; width:42px; height:42px; border-radius:50%; flex-shrink:0; }
-  .sc .si svg { width:29px; height:29px; }
-  .sc .sl { font-size:8.5px; font-weight:700; color:#0c1f4a; letter-spacing:0.4px; line-height:1.5; text-transform:uppercase; }
-  .sc .sv { font-family:'Archivo Black',sans-serif; font-size:17px; color:#0c1f4a; margin-top:2px; line-height:1.1; }
+  .summary { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:6px; margin-bottom:0; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sc { border:1.5px solid #e2e8f0; border-radius:11px; padding:4px 4px 3px; text-align:center; background:#fff; box-shadow:0 6px 20px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .sc .si { display:flex; justify-content:center; align-items:center; margin:0 auto 3px; width:32px; height:32px; border-radius:50%; flex-shrink:0; }
+  .sc .si svg { width:23px; height:23px; }
+  .sc .sl { font-size:7.5px; font-weight:700; color:#0c1f4a; letter-spacing:0.3px; line-height:1.35; text-transform:uppercase; }
+  .sc .sv { font-family:'Archivo Black',sans-serif; font-size:15px; color:#0c1f4a; margin-top:1px; line-height:1.05; }
   .sc .ss { font-size:8px; color:#64748b; margin-top:1px; line-height:1.3; }
   .sc .result { display:inline-block; margin-top:3px; padding:2px 8px; border-radius:20px; font-size:9.5px; font-weight:700; }
   .sc .pass { background:#d4edda; color:#1a7a40; }
   .sc .fail { background:#f8d7da; color:#b02020; }
   .gs-mini { width:100%; margin-top:3px; border-collapse:collapse; }
-  .gs-mini td { font-size:8.5px; padding:2px 3px; border-bottom:1px solid #f0f4f8; text-align:left; color:#475569; }
+  .gs-mini td { font-size:7.5px; padding:1px 2px; border-bottom:1px solid #f0f4f8; text-align:left; color:#475569; }
   .gs-mini td:last-child { text-align:right; font-weight:800; color:#0c1f4a; font-size:10px; padding-right:4px; }
   @media print { .summary { display:grid !important; grid-template-columns:repeat(6,1fr) !important; } }
   /* remarks */
-   .rem { display:table; width:100%; table-layout:fixed; margin-top:7px; border-radius:6px; overflow:hidden; border:1.5px solid #d0d8ea; }
-   .rem-tag { display:table-cell; width:132px; vertical-align:middle; background:#0c1f4a; color:#fff; padding:8px 18px 8px 12px; font-size:12px; font-weight:700; letter-spacing:0.5px; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:32px; }
-   .rem-txt { display:table-cell; vertical-align:middle; padding:8px 14px; font-size:12.5px; line-height:1.35; color:#222; font-weight:500; word-break:normal; }
+   .rem { display:table; width:100%; table-layout:fixed; margin-top:5px; border-radius:6px; overflow:hidden; border:1.5px solid #d0d8ea; }
+   .rem-tag { display:table-cell; width:110px; vertical-align:middle; background:#0c1f4a; color:#fff; padding:5px 12px 5px 9px; font-size:10px; font-weight:700; letter-spacing:0.4px; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:24px; }
+   .rem-txt { display:table-cell; vertical-align:middle; padding:5px 10px; font-size:10.5px; line-height:1.25; color:#222; font-weight:500; word-break:normal; }
   /* signatures — flex-shrink:0 keeps them out of the scrolling inner area */
-  .sigs { display:flex; justify-content:space-around; margin-top:6px; text-align:center; flex-shrink:0; }
-  .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:28px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:4px; margin-bottom:6px; min-width:160px; line-height:1.4; }
-  .sig-block .role { font-size:11.5px; font-weight:700; color:#0c1f4a; letter-spacing:0.3px; }
+  .sigs { display:flex; justify-content:space-around; margin-top:4px; text-align:center; flex-shrink:0; }
+  .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
+  .sig-block .role { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:0.2px; }
   /* footer — flex-shrink:0 always pins it at page bottom */
-  .footer { position:relative; z-index:11; background:#0c1f4a; border-radius:0 0 6px 6px; margin-top:6px; padding:8px 22px; text-align:center; flex-shrink:0; }
-  .footer-quote { font-size:10px; color:#c8a040; letter-spacing:2.5px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; }
+  .footer { position:relative; z-index:11; background:#0c1f4a; border-radius:0 0 6px 6px; margin-top:4px; padding:5px 14px; text-align:center; flex-shrink:0; }
+  .footer-quote { font-size:8px; color:#c8a040; letter-spacing:2px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; }
 </style>
 </head>
 <body>
-<div class="page combined-page">
+<div class="page combined-page" style="--native-scale:${_innerZoomVal};">
 
   <!-- Gold corners (rotated via CSS, no inline transforms) -->
   <div class="corner tl">${cornerSvg()}</div>
@@ -914,12 +914,13 @@ function buildCombinedMarksheetHtml(
   <div class="corner br">${cornerSvg()}</div>
 
   <div class="inner">
+  <div class="inner-content">
 
     <!-- ══ HEADER ══ -->
     <div class="hdr">
       <!-- Badge -->
       <div style="flex-shrink:0">
-           ${branding.logoDataUrl ? documentLogoHtml(branding, 130, 130) : `<svg xmlns="http://www.w3.org/2000/svg" width="130" height="130" viewBox="0 0 110 110">
+           ${branding.logoDataUrl ? documentLogoHtml(branding, 112, 112) : `<svg xmlns="http://www.w3.org/2000/svg" width="112" height="112" viewBox="0 0 110 110">
           <defs>
             <path id="cta" d="M 11,55 A 44,44 0 1,0 99,55"/>
             <path id="cba" d="M 18,55 A 37,37 0 0,1 92,55"/>
@@ -952,7 +953,7 @@ function buildCombinedMarksheetHtml(
           <div class="stars">★ ★ ★</div>
         </div>
         <div class="qr-card">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=84x84&color=0c1f4a&bgcolor=FFFFFF&data=${verifyData}" width="84" height="84" style="border-radius:4px;display:block" onerror="this.style.display='none'" alt="QR Code"/>
+           <img src="https://api.qrserver.com/v1/create-qr-code/?size=72x72&color=0c1f4a&bgcolor=FFFFFF&data=${verifyData}" width="72" height="72" style="border-radius:4px;display:block" onerror="this.style.display='none'" alt="QR Code"/>
           <span>Scan to Verify</span>
         </div>
       </div>
@@ -1121,11 +1122,11 @@ function buildCombinedMarksheetHtml(
       <div class="role">Principal</div>
     </div>
   </div>
-
   <div class="footer">
     <div class="footer-quote">Education is the most powerful weapon which you can use to change the world.</div>
   </div>
 
+   </div><!-- /inner-content -->
   </div><!-- /inner -->
 
 </div><!-- /page -->

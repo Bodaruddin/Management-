@@ -278,24 +278,39 @@ function applyNativePrintMargins(html: string, marginMm: number): string {
     padding: 0 !important;
     margin: 0 !important;
   }
-  .page {
-    width: ${pageWidth} !important;
-    height: ${pageHeight} !important;
-    margin: 0 auto !important;
-  }
+   .page {
+     width: ${pageWidth} !important;
+     height: ${pageHeight} !important;
+     margin: 0 auto !important;
+   }
   /*
    * Combined marksheets have a dense table and their page content is
-   * deliberately compacted in the template. Let that page use its natural
-   * height so native print does not clip the signatures and footer when the
-   * printable width is reduced by the PDF margin.
+   * deliberately compacted in the template. Keep the page fixed and
+   * non-breaking so native print cannot move signatures and the footer to page 2.
    */
-  .page.combined-page {
-    height: auto !important;
-    min-height: ${pageHeight} !important;
-    overflow: visible !important;
-  }
+   .page.combined-page {
+     height: ${pageHeight} !important;
+     min-height: 0 !important;
+     overflow: hidden !important;
+     page-break-inside: avoid !important;
+     break-inside: avoid !important;
+   }
   .page.combined-page .inner {
-    overflow: visible !important;
+     height: 100% !important;
+     min-height: 0 !important;
+     overflow: hidden !important;
+   }
+   /*
+    * Android print can ignore CSS zoom while still using the unscaled
+    * content height for pagination. Scale the complete inner content as one
+    * transformed unit and give its layout box the inverse dimensions.
+    */
+   .page.combined-page .inner-content {
+     zoom: 1 !important;
+     width: calc(100% / var(--native-scale, 0.82)) !important;
+     min-height: calc(100% / var(--native-scale, 0.82)) !important;
+     transform: scale(var(--native-scale, 0.82)) !important;
+     transform-origin: top left !important;
   }
 </style>`;
 
