@@ -7,6 +7,7 @@ const SETTINGS_KEY = "teacher_attendance_settings";
 const FACE_PROFILES_KEY = "teacher_face_profiles";
 const FACE_PROFILE_KEY_PREFIX = "teacher_face_profile:";
 const SCHOOL_TIME_ZONE = process.env.SCHOOL_TIME_ZONE ?? "Asia/Kolkata";
+const TIME_SETTING_KEYS = ["checkInStart", "checkInEnd", "checkOutStart", "checkOutEnd"] as const;
 
 const DEFAULT_SETTINGS = {
   schoolLatitude: null as number | null,
@@ -34,6 +35,21 @@ function asDate(value: unknown): string {
 function timeToMinutes(value: string): number {
   const [hours, minutes] = value.split(":").map(Number);
   return hours * 60 + minutes;
+}
+
+function normalizeTime(value: unknown): string | null {
+  const normalized = String(value ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+  const twelveHour = normalized.match(/^(\d{1,2})(?::([0-5]\d))?\s*(AM|PM)$/);
+  if (twelveHour) {
+    const hour = Number(twelveHour[1]);
+    if (hour < 1 || hour > 12) return null;
+    const minute = twelveHour[2] ?? "00";
+    const hour24 = (hour % 12) + (twelveHour[3] === "PM" ? 12 : 0);
+    return `${String(hour24).padStart(2, "0")}:${minute}`;
+  }
+
+  const twentyFourHour = normalized.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  return twentyFourHour ? `${twentyFourHour[1]}:${twentyFourHour[2]}` : null;
 }
 
 function currentTimeMinutes(): number {
@@ -72,7 +88,26 @@ function dateRange(startDate: string, endDate: string): string[] {
 
 async function getSettings() {
   const saved = await getAdapter().appSettings.get(SETTINGS_KEY);
-  return { ...DEFAULT_SETTINGS, ...(saved?.value ?? {}) };
+  let savedValue: unknown = saved?.value;
+  if (typeof savedValue === "string") {
+    try {
+      savedValue = JSON.parse(savedValue);
+    } catch {
+      savedValue = {};
+    }
+  }
+  const settings = {
+    ...DEFAULT_SETTINGS,
+    ...(savedValue && typeof savedValue === "object" ? savedValue : {}),
+  } as typeof DEFAULT_SETTINGS & Record<string, unknown>;
+
+  // Normalize settings written by older clients that accepted 12-hour values.
+  // Invalid legacy values fall back to the safe defaults instead of making the
+  // whole attendance window unusable.
+  for (const key of TIME_SETTING_KEYS) {
+    settings[key] = normalizeTime(settings[key]) ?? DEFAULT_SETTINGS[key];
+  }
+  return settings;
 }
 
 async function getFaceProfiles(): Promise<Record<string, string>> {
@@ -155,15 +190,19 @@ router.put("/settings/teacher-attendance", async (req, res) => {
     return;
   }
   const body = req.body ?? {};
+  const checkInStart = normalizeTime(body.checkInStart);
+  const checkInEnd = normalizeTime(body.checkInEnd);
+  const checkOutStart = normalizeTime(body.checkOutStart);
+  const checkOutEnd = normalizeTime(body.checkOutEnd);
   const settings = {
     ...await getSettings(),
     schoolLatitude: body.schoolLatitude === null || body.schoolLatitude === undefined ? null : Number(body.schoolLatitude),
     schoolLongitude: body.schoolLongitude === null || body.schoolLongitude === undefined ? null : Number(body.schoolLongitude),
     radiusMeters: Number(body.radiusMeters),
-    checkInStart: String(body.checkInStart),
-    checkInEnd: String(body.checkInEnd),
-    checkOutStart: String(body.checkOutStart),
-    checkOutEnd: String(body.checkOutEnd),
+    checkInStart: checkInStart ?? "",
+    checkInEnd: checkInEnd ?? "",
+    checkOutStart: checkOutStart ?? "",
+    checkOutEnd: checkOutEnd ?? "",
     requireFaceVerification: Boolean(body.requireFaceVerification),
     allowLateCheckIn: Boolean(body.allowLateCheckIn),
     workingDaysPerMonth: Number(body.workingDaysPerMonth),
@@ -174,12 +213,19 @@ router.put("/settings/teacher-attendance", async (req, res) => {
   if ((settings.schoolLatitude !== null && !isValidCoordinate(settings.schoolLatitude, -90, 90))
     || (settings.schoolLongitude !== null && !isValidCoordinate(settings.schoolLongitude, -180, 180))
     || !Number.isFinite(settings.radiusMeters) || settings.radiusMeters <= 0
-    || !/^\d{2}:\d{2}$/.test(settings.checkInStart) || !/^\d{2}:\d{2}$/.test(settings.checkInEnd)
-    || !/^\d{2}:\d{2}$/.test(settings.checkOutStart) || !/^\d{2}:\d{2}$/.test(settings.checkOutEnd)
+    || !checkInStart || !checkInEnd || !checkOutStart || !checkOutEnd
     || !Number.isInteger(settings.workingDaysPerMonth) || settings.workingDaysPerMonth < 1
     || !Number.isInteger(settings.lateGraceMinutes) || settings.lateGraceMinutes < 0
     || !Number.isFinite(settings.lateDeductionAmount) || settings.lateDeductionAmount < 0) {
-    res.status(400).json({ error: "Invalid teacher attendance settings" });
+    res.status(400).json({ error: "Invalid teacher attendance settings. Use times such as 4:30 PM or 16:30." });
+    return;
+  }
+  if (timeToMinutes(checkInEnd) <= timeToMinutes(checkInStart)) {
+    res.status(400).json({ error: "Check-in closing time must be later than the check-in start time." });
+    return;
+  }
+  if (timeToMinutes(checkOutEnd) <= timeToMinutes(checkOutStart)) {
+    res.status(400).json({ error: "Check-out closing time must be later than the check-out start time." });
     return;
   }
   await getAdapter().appSettings.set(SETTINGS_KEY, settings);
