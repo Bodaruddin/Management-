@@ -1,7 +1,10 @@
 import jpeg from "jpeg-js";
 
 const TEMPLATE_SIZE = 24;
-const MATCH_THRESHOLD = 0.82;
+// A phone can return the same face with a mirrored image, a slightly different
+// crop, or a few pixels of movement inside the camera guide. Keep the threshold
+// conservative and handle those camera variations explicitly below.
+const MATCH_THRESHOLD = 0.78;
 
 type DecodedImage = {
   data: Uint8Array;
@@ -35,15 +38,46 @@ function decodeImage(imageBase64: string): DecodedImage {
 }
 
 function normalizedPixels(image: DecodedImage): number[] {
+  return normalizedPixelsWithOptions(image);
+}
+
+type NormalizationOptions = {
+  flipX?: boolean;
+  shiftX?: number;
+  shiftY?: number;
+  zoom?: number;
+};
+
+function normalizedPixelsWithOptions(
+  image: DecodedImage,
+  options: NormalizationOptions = {},
+): number[] {
   const side = Math.min(image.width, image.height);
-  const left = Math.floor((image.width - side) / 2);
-  const top = Math.floor((image.height - side) / 2);
+  const zoom = Math.max(1, options.zoom ?? 1);
+  const cropSide = Math.max(1, Math.floor(side / zoom));
+  const maxLeft = Math.max(0, image.width - cropSide);
+  const maxTop = Math.max(0, image.height - cropSide);
+  const centeredLeft = (image.width - cropSide) / 2;
+  const centeredTop = (image.height - cropSide) / 2;
+  const left = Math.max(
+    0,
+    Math.min(maxLeft, Math.round(centeredLeft + (options.shiftX ?? 0) * side)),
+  );
+  const top = Math.max(
+    0,
+    Math.min(maxTop, Math.round(centeredTop + (options.shiftY ?? 0) * side)),
+  );
   const pixels: number[] = [];
 
   for (let y = 0; y < TEMPLATE_SIZE; y += 1) {
     for (let x = 0; x < TEMPLATE_SIZE; x += 1) {
-      const sourceX = Math.min(image.width - 1, left + Math.floor(((x + 0.5) * side) / TEMPLATE_SIZE));
-      const sourceY = Math.min(image.height - 1, top + Math.floor(((y + 0.5) * side) / TEMPLATE_SIZE));
+      const localX = Math.min(cropSide - 1, Math.floor(((x + 0.5) * cropSide) / TEMPLATE_SIZE));
+      const localY = Math.min(cropSide - 1, Math.floor(((y + 0.5) * cropSide) / TEMPLATE_SIZE));
+      const sourceX = Math.min(
+        image.width - 1,
+        left + (options.flipX ? cropSide - 1 - localX : localX),
+      );
+      const sourceY = Math.min(image.height - 1, top + localY);
       const offset = (sourceY * image.width + sourceX) * 4;
       const red = image.data[offset] ?? 0;
       const green = image.data[offset + 1] ?? 0;
@@ -85,7 +119,24 @@ function similarity(left: number[], right: number[]): number {
 export function faceMatches(storedTemplate: unknown, imageBase64: string): boolean {
   const stored = parseTemplate(storedTemplate);
   if (!stored) return false;
-  return similarity(stored, normalizedPixels(decodeImage(imageBase64))) >= MATCH_THRESHOLD;
+  const image = decodeImage(imageBase64);
+
+  // Keep v1 templates usable, but make matching tolerant of the normal
+  // differences between the enrollment photo and a later phone capture.
+  const candidates = [
+    {},
+    { flipX: true },
+    { shiftX: -0.07 },
+    { shiftX: 0.07 },
+    { shiftY: -0.07 },
+    { shiftY: 0.07 },
+    { zoom: 1.1 },
+    { flipX: true, zoom: 1.1 },
+  ];
+
+  return candidates.some((options) =>
+    similarity(stored, normalizedPixelsWithOptions(image, options)) >= MATCH_THRESHOLD,
+  );
 }
 
 export const faceMatchThreshold = MATCH_THRESHOLD;
