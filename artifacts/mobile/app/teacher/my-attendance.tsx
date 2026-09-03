@@ -279,6 +279,90 @@ function FaceCaptureModal({
   );
 }
 
+type FaceResultKind = 'success' | 'error';
+
+function FaceResultModal({
+  visible,
+  kind,
+  purpose,
+  message,
+  onRetry,
+  onDismiss,
+}: {
+  visible: boolean;
+  kind: FaceResultKind;
+  purpose: 'check-in' | 'check-out';
+  message: string;
+  onRetry: () => void;
+  onDismiss: () => void;
+}) {
+  const colors = useColors();
+  const success = kind === 'success';
+  const resultColor = success ? colors.success : colors.destructive;
+  const resultBackground = success ? colors.success + '18' : colors.destructive + '18';
+  const title = success
+    ? purpose === 'check-in' ? 'Attendance marked' : 'Check-out complete'
+    : 'Face not recognized';
+  const description = success
+    ? purpose === 'check-in'
+      ? 'Your face matched securely and your attendance has been recorded.'
+      : 'Your face matched securely and your check-out has been recorded.'
+    : 'We could not verify this face. Make sure you are centered, well lit, and try again.';
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={success ? undefined : onDismiss}>
+      <View style={[resultStyles.backdrop, { backgroundColor: colors.primary + 'E6' }]}>
+        <View style={[resultStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[resultStyles.iconHalo, { backgroundColor: resultBackground }]}>
+            <View style={[resultStyles.iconCircle, { backgroundColor: resultColor }]}>
+              <Feather name={success ? 'check' : 'alert-circle'} size={30} color={colors.primaryForeground} />
+            </View>
+          </View>
+          <View style={[resultStyles.statusPill, { backgroundColor: resultBackground }]}>
+            <View style={[resultStyles.statusDot, { backgroundColor: resultColor }]} />
+            <Text style={[resultStyles.statusText, { color: resultColor }]}>
+              {success ? 'VERIFIED SECURELY' : 'VERIFICATION NEEDED'}
+            </Text>
+          </View>
+          <Text style={[resultStyles.title, { color: colors.text }]}>{title}</Text>
+          <Text style={[resultStyles.description, { color: colors.mutedForeground }]}>
+            {success ? description : message || description}
+          </Text>
+
+          {success ? (
+            <View style={[resultStyles.redirectNote, { backgroundColor: colors.muted }]}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[resultStyles.redirectText, { color: colors.mutedForeground }]}>
+                Returning to your dashboard…
+              </Text>
+            </View>
+          ) : (
+            <View style={resultStyles.actions}>
+              <TouchableOpacity
+                style={[resultStyles.retryButton, { backgroundColor: colors.primary }]}
+                onPress={onRetry}
+                accessibilityRole="button"
+                accessibilityLabel="Try face verification again"
+              >
+                <Feather name="camera" size={17} color={colors.primaryForeground} />
+                <Text style={[resultStyles.retryButtonText, { color: colors.primaryForeground }]}>Try again</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={resultStyles.dismissButton}
+                onPress={onDismiss}
+                accessibilityRole="button"
+                accessibilityLabel="Close face verification message"
+              >
+                <Text style={[resultStyles.dismissButtonText, { color: colors.mutedForeground }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function formatTime(value?: string) {
   if (!value) return '—';
   const date = new Date(value);
@@ -300,6 +384,10 @@ export default function MyTeacherAttendance() {
   const [error, setError] = useState('');
   const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null);
   const [faceCaptureMode, setFaceCaptureMode] = useState<FaceCapturePurpose | null>(null);
+  const [faceResult, setFaceResult] = useState<FaceResultKind | null>(null);
+  const [faceResultPurpose, setFaceResultPurpose] = useState<'check-in' | 'check-out'>('check-in');
+  const [faceResultMessage, setFaceResultMessage] = useState('');
+  const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [leaveStart, setLeaveStart] = useState(new Date().toISOString().slice(0, 10));
   const [leaveEnd, setLeaveEnd] = useState(new Date().toISOString().slice(0, 10));
   const [leaveReason, setLeaveReason] = useState('');
@@ -321,6 +409,10 @@ export default function MyTeacherAttendance() {
   useEffect(() => {
     if (user?.id) refreshTeacherAttendance(user.id).catch(error => console.error('[TeacherAttendance]', error));
   }, [refreshTeacherAttendance, user?.id]);
+
+  useEffect(() => () => {
+    if (redirectTimer.current) clearTimeout(redirectTimer.current);
+  }, []);
 
   useEffect(() => {
     if (!user?.id || !teacherAttendanceSettings.requireFaceVerification) {
@@ -344,17 +436,36 @@ export default function MyTeacherAttendance() {
     return () => { active = false; };
   }, [getTeacherFaceStatus, teacherAttendanceSettings.requireFaceVerification, user?.id]);
 
-  const runAction = async (action: () => Promise<void>) => {
+  const runAction = async (
+    action: () => Promise<void>,
+    feedback?: { onSuccess?: () => void; onError?: (message: string) => void },
+  ) => {
     setBusy(true);
     setError('');
     try {
       await action();
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      feedback?.onSuccess?.();
     } catch (e: any) {
-      setError(e?.message ?? 'Something went wrong');
+      const message = e?.message ?? 'Something went wrong';
+      setError(message);
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      feedback?.onError?.(message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const showFaceResult = (kind: FaceResultKind, purpose: 'check-in' | 'check-out', message = '') => {
+    setFaceResultPurpose(purpose);
+    setFaceResultMessage(message);
+    setFaceResult(kind);
+    if (kind === 'success') {
+      if (redirectTimer.current) clearTimeout(redirectTimer.current);
+      redirectTimer.current = setTimeout(() => {
+        setFaceResult(null);
+        router.replace('/teacher');
+      }, 1900);
     }
   };
 
@@ -386,6 +497,20 @@ export default function MyTeacherAttendance() {
           faceImageBase64,
         });
       }
+    }, {
+      onSuccess: () => {
+        if (purpose !== 'enroll') showFaceResult('success', purpose);
+      },
+      onError: message => {
+        if (purpose !== 'enroll' && /face did not match|face verification failed/i.test(message)) {
+          setError('');
+          showFaceResult(
+            'error',
+            purpose,
+            'Your face did not match the enrolled profile. Please try again with your face centered in the frame.',
+          );
+        }
+      },
     });
   };
 
@@ -700,6 +825,22 @@ export default function MyTeacherAttendance() {
         onCancel={() => setFaceCaptureMode(null)}
         onCaptured={handleFaceCaptured}
       />
+      <FaceResultModal
+        visible={faceResult !== null}
+        kind={faceResult ?? 'error'}
+        purpose={faceResultPurpose}
+        message={faceResultMessage}
+        onRetry={() => {
+          setFaceResult(null);
+          setFaceResultMessage('');
+          setError('');
+          setFaceCaptureMode(faceResultPurpose);
+        }}
+        onDismiss={() => {
+          setFaceResult(null);
+          setFaceResultMessage('');
+        }}
+      />
     </View>
   );
 }
@@ -774,6 +915,114 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   leaveAction: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 6 },
   leaveActionText: { fontSize: 10, fontWeight: '800' },
   pendingHint: { fontSize: 10, marginTop: 5 },
+});
+
+const resultStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 380,
+    alignItems: 'center',
+    borderRadius: 28,
+    borderWidth: 1,
+    paddingHorizontal: 24,
+    paddingTop: 26,
+    paddingBottom: 20,
+    shadowOpacity: 0.18,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 14 },
+    elevation: 10,
+  },
+  iconHalo: {
+    width: 94,
+    height: 94,
+    borderRadius: 47,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  iconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 20,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    marginBottom: 13,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+    marginTop: 9,
+  },
+  redirectNote: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    borderRadius: 13,
+    paddingVertical: 12,
+    marginTop: 21,
+  },
+  redirectText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  actions: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 21,
+  },
+  retryButton: {
+    width: '100%',
+    minHeight: 52,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+  },
+  retryButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  dismissButton: {
+    paddingHorizontal: 18,
+    paddingVertical: 13,
+  },
+  dismissButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });
 
 const cameraStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
