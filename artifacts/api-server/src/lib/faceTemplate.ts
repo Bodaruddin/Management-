@@ -1,10 +1,11 @@
 import jpeg from "jpeg-js";
 
 const TEMPLATE_SIZE = 24;
-// A phone can return the same face with a mirrored image, a slightly different
-// crop, or a few pixels of movement inside the camera guide. Keep the threshold
-// conservative and handle those camera variations explicitly below.
-const MATCH_THRESHOLD = 0.78;
+// The original matcher compared one exact 24x24 crop. That was too sensitive
+// to JPEG noise, lighting, and small changes in how a teacher held the phone.
+// Keep the threshold high enough to avoid accepting unrelated images, but allow
+// the normal variation produced by a front-facing phone camera.
+const MATCH_THRESHOLD = 0.72;
 
 type DecodedImage = {
   data: Uint8Array;
@@ -37,10 +38,6 @@ function decodeImage(imageBase64: string): DecodedImage {
   }
 }
 
-function normalizedPixels(image: DecodedImage): number[] {
-  return normalizedPixelsWithOptions(image);
-}
-
 type NormalizationOptions = {
   flipX?: boolean;
   shiftX?: number;
@@ -48,9 +45,29 @@ type NormalizationOptions = {
   zoom?: number;
 };
 
+// These variants cover the changes we can see without storing the original
+// photo: mirrored front-camera output, a little movement in the guide, and
+// different distances from the camera. New enrollments store all variants;
+// old v1 profiles are matched against all of them as well.
+const TEMPLATE_VARIANTS: NormalizationOptions[] = [
+  {},
+  { flipX: true },
+  { zoom: 1.12 },
+  { zoom: 1.25 },
+  { shiftX: -0.08 },
+  { shiftX: 0.08 },
+  { shiftY: -0.08 },
+  { shiftY: 0.08 },
+  { zoom: 1.12, shiftX: -0.06 },
+  { zoom: 1.12, shiftX: 0.06 },
+  { zoom: 1.12, shiftY: -0.06 },
+  { zoom: 1.12, shiftY: 0.06 },
+];
+
 function normalizedPixelsWithOptions(
   image: DecodedImage,
   options: NormalizationOptions = {},
+  legacySampling = false,
 ): number[] {
   const side = Math.min(image.width, image.height);
   const zoom = Math.max(1, options.zoom ?? 1);
@@ -71,18 +88,35 @@ function normalizedPixelsWithOptions(
 
   for (let y = 0; y < TEMPLATE_SIZE; y += 1) {
     for (let x = 0; x < TEMPLATE_SIZE; x += 1) {
-      const localX = Math.min(cropSide - 1, Math.floor(((x + 0.5) * cropSide) / TEMPLATE_SIZE));
-      const localY = Math.min(cropSide - 1, Math.floor(((y + 0.5) * cropSide) / TEMPLATE_SIZE));
-      const sourceX = Math.min(
-        image.width - 1,
-        left + (options.flipX ? cropSide - 1 - localX : localX),
-      );
-      const sourceY = Math.min(image.height - 1, top + localY);
-      const offset = (sourceY * image.width + sourceX) * 4;
-      const red = image.data[offset] ?? 0;
-      const green = image.data[offset + 1] ?? 0;
-      const blue = image.data[offset + 2] ?? 0;
-      pixels.push(0.299 * red + 0.587 * green + 0.114 * blue);
+      // Average four samples from each output cell instead of taking one
+      // pixel. This makes the descriptor much less affected by JPEG blocks
+      // and camera sensor noise. Keep the original single-sample path for
+      // v1 profiles so an existing enrollment remains compatible.
+      let luminance = 0;
+      let sampleCount = 0;
+      const sampleOffsets = legacySampling ? [0.5] : [0.25, 0.75];
+      for (const sampleX of sampleOffsets) {
+        for (const sampleY of sampleOffsets) {
+          const localX = Math.min(
+            cropSide - 1,
+            Math.floor(((x + sampleX) * cropSide) / TEMPLATE_SIZE),
+          );
+          const localY = Math.min(
+            cropSide - 1,
+            Math.floor(((y + sampleY) * cropSide) / TEMPLATE_SIZE),
+          );
+          const orientedX = options.flipX ? cropSide - 1 - localX : localX;
+          const sourceX = Math.min(image.width - 1, left + orientedX);
+          const sourceY = Math.min(image.height - 1, top + localY);
+          const offset = (sourceY * image.width + sourceX) * 4;
+          const red = image.data[offset] ?? 0;
+          const green = image.data[offset + 1] ?? 0;
+          const blue = image.data[offset + 2] ?? 0;
+          luminance += 0.299 * red + 0.587 * green + 0.114 * blue;
+          sampleCount += 1;
+        }
+      }
+      pixels.push(luminance / sampleCount);
     }
   }
 
@@ -93,14 +127,33 @@ function normalizedPixelsWithOptions(
 }
 
 export function createFaceTemplate(imageBase64: string): string {
-  const template = normalizedPixels(decodeImage(imageBase64));
-  return `v1:${template.join(",")}`;
+  const image = decodeImage(imageBase64);
+  const templates = TEMPLATE_VARIANTS.map((options) =>
+    normalizedPixelsWithOptions(image, options),
+  );
+  return `v2:${JSON.stringify(templates)}`;
 }
 
-function parseTemplate(value: unknown): number[] | null {
-  if (typeof value !== "string" || !value.startsWith("v1:")) return null;
-  const values = value.slice(3).split(",").map(Number);
-  return values.length === TEMPLATE_SIZE * TEMPLATE_SIZE && values.every(Number.isFinite) ? values : null;
+function isValidTemplate(values: unknown): values is number[] {
+  return Array.isArray(values)
+    && values.length === TEMPLATE_SIZE * TEMPLATE_SIZE
+    && values.every((value) => typeof value === "number" && Number.isFinite(value));
+}
+
+function parseTemplates(value: unknown): number[][] | null {
+  if (typeof value !== "string") return null;
+  if (value.startsWith("v1:")) {
+    const values = value.slice(3).split(",").map(Number);
+    return isValidTemplate(values) ? [values] : null;
+  }
+  if (!value.startsWith("v2:")) return null;
+  try {
+    const templates: unknown = JSON.parse(value.slice(3));
+    if (!Array.isArray(templates) || templates.length === 0 || templates.length > 32) return null;
+    return templates.every(isValidTemplate) ? templates : null;
+  } catch {
+    return null;
+  }
 }
 
 function similarity(left: number[], right: number[]): number {
@@ -117,25 +170,23 @@ function similarity(left: number[], right: number[]): number {
 }
 
 export function faceMatches(storedTemplate: unknown, imageBase64: string): boolean {
-  const stored = parseTemplate(storedTemplate);
-  if (!stored) return false;
+  const storedTemplates = parseTemplates(storedTemplate);
+  if (!storedTemplates) return false;
   const image = decodeImage(imageBase64);
 
-  // Keep v1 templates usable, but make matching tolerant of the normal
-  // differences between the enrollment photo and a later phone capture.
-  const candidates = [
-    {},
-    { flipX: true },
-    { shiftX: -0.07 },
-    { shiftX: 0.07 },
-    { shiftY: -0.07 },
-    { shiftY: 0.07 },
-    { zoom: 1.1 },
-    { flipX: true, zoom: 1.1 },
-  ];
+  const candidates = TEMPLATE_VARIANTS.map((options) =>
+    normalizedPixelsWithOptions(image, options),
+  );
+  const legacyCandidates = typeof storedTemplate === "string" && storedTemplate.startsWith("v1:")
+    ? TEMPLATE_VARIANTS.map((options) =>
+      normalizedPixelsWithOptions(image, options, true),
+    )
+    : [];
 
-  return candidates.some((options) =>
-    similarity(stored, normalizedPixelsWithOptions(image, options)) >= MATCH_THRESHOLD,
+  return storedTemplates.some((stored) =>
+    [...candidates, ...legacyCandidates].some((candidate) =>
+      similarity(stored, candidate) >= MATCH_THRESHOLD,
+    ),
   );
 }
 
