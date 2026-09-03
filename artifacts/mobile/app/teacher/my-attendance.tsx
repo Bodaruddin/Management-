@@ -158,7 +158,9 @@ function FaceCaptureModal({
         // The file URI is normalized to a known-good JPEG below. Keeping the
         // camera's own base64 as a fallback also preserves web compatibility.
         base64: true,
-        quality: 0.3,
+        // Keep enough detail for matching. The previous 0.3 setting introduced
+        // visible JPEG artifacts before the server created the face template.
+        quality: 0.85,
         skipProcessing: false,
       });
       const imageBase64 = await getFaceImageBase64(photo);
