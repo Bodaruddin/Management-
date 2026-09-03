@@ -5,6 +5,7 @@ export default function TeacherLayout() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
+      <Stack.Screen name="attendance-menu" />
       <Stack.Screen name="attendance" />
       <Stack.Screen name="my-attendance" />
       <Stack.Screen name="admin-attendance" />

@@ -198,7 +198,7 @@ const ACTIONS: {
   permKey?: string;
 }[] = [
   // ── Always-accessible ──
-  { label: 'Attendance',   sub: 'Mark & View',     grad: ['#8B5CF6','#A855F7'], icon: 'check-square',    route: '/teacher/attendance' },
+  { label: 'Attendance',   sub: 'Mark & View',     grad: ['#8B5CF6','#A855F7'], icon: 'check-square',    route: '/teacher/attendance-menu' },
   { label: 'Enter Marks',  sub: 'Add & Manage',    grad: ['#F59E0B','#FBBF24'], icon: 'edit-2',          route: '/teacher/marks',   permKey: 'manageResults' },
   { label: 'View Salary',  sub: 'Details',         grad: ['#10B981','#34D399'], icon: 'credit-card',     route: '/teacher/salary' },
   // ── Permission-gated (all 6 always rendered; locked when no access) ──
