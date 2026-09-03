@@ -46,13 +46,28 @@ async function readCurrentLocation(): Promise<Coordinates> {
 
 type FaceCapturePurpose = 'enroll' | 'check-in' | 'check-out';
 
+function jpegDataUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  const commaIndex = trimmed.indexOf(',');
+  const payload = (commaIndex >= 0 ? trimmed.slice(commaIndex + 1) : trimmed)
+    .replace(/\s/g, '');
+
+  // JPEG files start with FF D8 FF, which is /9j/ in base64. Rejecting other
+  // formats here prevents Android camera payloads from being mislabeled as
+  // JPEGs and then rejected by the API decoder.
+  if (!payload.startsWith('/9j/')) return null;
+  return `data:image/jpeg;base64,${payload}`;
+}
+
 async function getFaceImageBase64(photo: { uri?: string; base64?: string }): Promise<string> {
-  let rawBase64 = '';
+  const candidates: string[] = [];
 
   if (photo.uri && Platform.OS !== 'web') {
     // Some Android devices return a base64 field that is truncated or cannot
     // be decoded by the server. Re-encode the actual captured file as a
-    // standard JPEG before uploading it.
+    // standard JPEG before uploading it. Read the resulting file first:
+    // ImageManipulator's inline base64 field is not reliable on every device.
     try {
       const normalized = await ImageManipulator.manipulateAsync(
         photo.uri,
@@ -63,27 +78,39 @@ async function getFaceImageBase64(photo: { uri?: string; base64?: string }): Pro
           base64: true,
         },
       );
-      rawBase64 = normalized.base64 ?? await FileSystem.readAsStringAsync(
-        normalized.uri,
-        { encoding: FileSystem.EncodingType.Base64 },
-      );
+      try {
+        candidates.push(await FileSystem.readAsStringAsync(
+          normalized.uri,
+          { encoding: FileSystem.EncodingType.Base64 },
+        ));
+      } catch {
+        if (normalized.base64) candidates.push(normalized.base64);
+      }
     } catch {
       // Keep the direct camera payload as a fallback if image manipulation
       // is unavailable on a particular Expo Go/native build.
-      rawBase64 = photo.base64 ?? await FileSystem.readAsStringAsync(
-        photo.uri,
-        { encoding: FileSystem.EncodingType.Base64 },
-      );
+      try {
+        candidates.push(await FileSystem.readAsStringAsync(
+          photo.uri,
+          { encoding: FileSystem.EncodingType.Base64 },
+        ));
+      } catch {
+        if (photo.base64) candidates.push(photo.base64);
+      }
     }
-  } else {
-    rawBase64 = photo.base64 ?? '';
   }
 
-  const trimmed = rawBase64.trim();
-  if (!trimmed) throw new Error('The camera did not return an image. Please try again.');
-  return trimmed.startsWith('data:')
-    ? trimmed
-    : `data:image/jpeg;base64,${trimmed}`;
+  if (photo.base64) candidates.push(photo.base64);
+  if (photo.uri && Platform.OS === 'web' && !photo.base64) {
+    throw new Error('The camera did not return an image. Please try again.');
+  }
+
+  for (const candidate of candidates) {
+    const jpeg = jpegDataUrl(candidate);
+    if (jpeg) return jpeg;
+  }
+
+  throw new Error('The camera returned an unreadable photo. Please keep your face centered and try again.');
 }
 
 function FaceCaptureModal({
