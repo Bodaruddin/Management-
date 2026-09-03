@@ -8,7 +8,6 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
-import { router } from 'expo-router';
 
 type ReportMode = 'daily' | 'monthly' | 'class' | 'student';
 
@@ -355,16 +354,6 @@ export default function AttendanceScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      <View style={[s.teacherLinkBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[s.teacherLinkTitle, { color: colors.text }]}>Teacher attendance</Text>
-          <Text style={[s.teacherLinkCopy, { color: colors.mutedForeground }]}>Manage GPS rules, leave, holidays & payroll</Text>
-        </View>
-        <TouchableOpacity style={[s.teacherLinkButton, { backgroundColor: colors.primary }]} onPress={() => router.push('/teacher/admin-attendance' as any)}>
-          <Feather name="arrow-up-right" size={15} color="#fff" />
-          <Text style={s.teacherLinkButtonText}>Open</Text>
-        </TouchableOpacity>
-      </View>
       {/* Modes Segmented Control */}
       <View style={[s.segmentContainer, { backgroundColor: colors.card }]}>
         {(['daily', 'monthly', 'class', 'student'] as ReportMode[]).map(m => (
@@ -495,11 +484,6 @@ const m = StyleSheet.create({
 
 const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1 },
-  teacherLinkBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 11, borderBottomWidth: 1, gap: 10 },
-  teacherLinkTitle: { fontSize: 13, fontWeight: '800' },
-  teacherLinkCopy: { fontSize: 11, marginTop: 2 },
-  teacherLinkButton: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 9 },
-  teacherLinkButtonText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   segmentContainer: { flexDirection: 'row', margin: 16, borderRadius: 12, padding: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
   segmentBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
   segmentText: { fontSize: 13, fontWeight: '600' },

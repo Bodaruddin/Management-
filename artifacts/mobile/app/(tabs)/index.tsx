@@ -858,6 +858,7 @@ export default function AdminDashboard() {
   >(null);
   const [brandingModal, setBrandingModal] = useState(false);
   const [showMonthBirthdays, setShowMonthBirthdays] = useState(false);
+  const [attendanceChoiceModal, setAttendanceChoiceModal] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -1225,7 +1226,7 @@ export default function AdminDashboard() {
               />
               <QuickActionItem
                 icon="calendar" label="Attendance" gradient={['#0E7490', '#22D3EE']}
-                onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(tabs)/attendance' as any); }}
+                onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setAttendanceChoiceModal(true); }}
               />
               <QuickActionItem
                 icon="arrow-up-circle" label="Promote" gradient={['#1E3A8A', '#6366F1']}
@@ -1392,6 +1393,76 @@ export default function AdminDashboard() {
           </FadeSlide>
         )}
       </ScrollView>
+
+      {/* ── Attendance Choice Modal ── */}
+      <Modal
+        visible={attendanceChoiceModal}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setAttendanceChoiceModal(false)}
+      >
+        <View style={ac.overlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            onPress={() => setAttendanceChoiceModal(false)}
+            activeOpacity={1}
+          />
+          <View style={ac.sheet}>
+            <View style={ac.header}>
+              <View style={ac.headerIcon}>
+                <Feather name="calendar" size={20} color="#0E7490" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={ac.title}>Attendance</Text>
+                <Text style={ac.subtitle}>Choose the attendance section to open</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setAttendanceChoiceModal(false)}
+                style={ac.closeBtn}
+                activeOpacity={0.7}
+              >
+                <Feather name="x" size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={ac.option}
+              onPress={() => {
+                setAttendanceChoiceModal(false);
+                router.push('/(tabs)/attendance' as any);
+              }}
+              activeOpacity={0.85}
+            >
+              <View style={[ac.optionIcon, { backgroundColor: '#E0F2FE' }]}>
+                <Feather name="users" size={21} color="#0369A1" />
+              </View>
+              <View style={ac.optionCopy}>
+                <Text style={ac.optionTitle}>Students Attendance</Text>
+                <Text style={ac.optionSubtitle}>Take attendance and view student reports</Text>
+              </View>
+              <Feather name="chevron-right" size={19} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={ac.option}
+              onPress={() => {
+                setAttendanceChoiceModal(false);
+                router.push('/teacher/admin-attendance' as any);
+              }}
+              activeOpacity={0.85}
+            >
+              <View style={[ac.optionIcon, { backgroundColor: '#DCFCE7' }]}>
+                <Feather name="user-check" size={21} color="#15803D" />
+              </View>
+              <View style={ac.optionCopy}>
+                <Text style={ac.optionTitle}>Teacher Attendance</Text>
+                <Text style={ac.optionSubtitle}>Manage teacher attendance, leave and holidays</Text>
+              </View>
+              <Feather name="chevron-right" size={19} color="#94A3B8" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Profile / Settings Modal ── */}
       <Modal visible={logoutModal} animationType="fade" transparent>
@@ -1873,6 +1944,89 @@ const qa_row = StyleSheet.create({
     rowGap: 16,
     shadowColor: '#0C1F4A', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06, shadowRadius: 10, elevation: 3,
+  },
+});
+
+// ─── Attendance choice modal styles ───────────────────────────────────────────
+const ac = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(3, 15, 38, 0.48)',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  sheet: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#0C1F4A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 18,
+  },
+  headerIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: '#CFFAFE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    color: '#0F2456',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  subtitle: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 3,
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    backgroundColor: '#F8FAFC',
+    marginTop: 10,
+    gap: 12,
+  },
+  optionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionCopy: {
+    flex: 1,
+  },
+  optionTitle: {
+    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  optionSubtitle: {
+    color: '#64748B',
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 3,
   },
 });
 
