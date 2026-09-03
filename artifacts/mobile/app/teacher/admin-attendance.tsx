@@ -205,6 +205,11 @@ export default function AdminTeacherAttendance() {
           placeholderTextColor={colors.mutedForeground}
           style={[s.input, { color: colors.text, backgroundColor: colors.card, borderColor: colors.border }]}
         />
+        {isTimeField && parseTime12Hour(timeDrafts[timeKey]) ? (
+          <Text style={[s.mutedText, { color: colors.mutedForeground }]}>
+            Saved as {parseTime12Hour(timeDrafts[timeKey])} (24-hour time)
+          </Text>
+        ) : null}
       </View>
     );
   };
@@ -227,7 +232,7 @@ export default function AdminTeacherAttendance() {
           <View style={s.sectionHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[s.sectionTitle, { color: colors.text }]}>Attendance rules</Text>
-              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>These rules apply to every teacher check-in. Times use 12-hour format, such as 1:00 AM or 1:00 PM.</Text>
+              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>These rules apply to every teacher check-in. Enter times like 1:00 AM or 4:30 PM; the 24-hour value is shown below each field.</Text>
             </View>
             <Feather name="shield" size={20} color={colors.primary} />
           </View>
