@@ -804,8 +804,9 @@ function buildCombinedMarksheetHtml(
     .map(([r,g], i) => `<tr style="background:${i%2===0?'#fff':'#f5f7fd'}"><td style="padding:5px 10px;font-size:12px;color:#475569;border-bottom:1px solid #eef1f8">${r}</td><td style="padding:5px 10px;font-size:14px;font-weight:900;color:#0c1f4a;text-align:center;border-bottom:1px solid #eef1f8">${g}</td></tr>`).join('');
 
   // Keep enough headroom for Android's native print WebView, which can measure
-  // font line boxes a little taller than the browser preview. The table rows
-  // are intentionally compact so the signatures and footer stay on page 1.
+  // font line boxes a little taller than the browser preview. The page remains
+  // a single A4 sheet; the flex layout below uses the remaining height instead
+  // of leaving it as unused white space after the footer.
   const _innerContentH = 900 + subjectRows.length * 30;
   const _innerZoomVal = Math.min(0.86, 990 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
@@ -829,8 +830,8 @@ function buildCombinedMarksheetHtml(
   .corner.tr { top:5px; right:5px; transform:rotate(90deg); transform-origin:50% 50%; }
   .corner.bl { bottom:5px; left:5px; transform:rotate(-90deg); transform-origin:50% 50%; }
   .corner.br { bottom:5px; right:5px; transform:rotate(180deg); transform-origin:50% 50%; }
-  .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:visible; }
-  .inner-content { display:flex; flex-direction:column; ${_innerZoomCss} }
+  .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:visible; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; }
+  .inner-content { display:flex; flex:1 1 auto; min-height:0; flex-direction:column; ${_innerZoomCss} }
   /* header */
   .hdr { display:flex; align-items:flex-start; gap:12px; padding-bottom:5px; border-bottom:3px solid #0c1f4a; }
   .hdr-center { flex:1; text-align:center; }
@@ -877,8 +878,8 @@ function buildCombinedMarksheetHtml(
   table.mt tr.tr td { background:#0c1f4a; font-weight:800; font-size:13px; border-top:2px solid #0c1f4a; border-bottom:none; }
   table.mt tr.tr td:first-child { font-size:12px; }
   /* summary cards */
-  .summary { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:6px; margin-bottom:0; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .sc { border:1.5px solid #e2e8f0; border-radius:11px; padding:4px 4px 3px; text-align:center; background:#fff; box-shadow:0 6px 20px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .summary { display:grid; flex:1 1 auto; min-height:0; align-items:stretch; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:6px; margin-bottom:0; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sc { border:1.5px solid #e2e8f0; border-radius:11px; padding:4px 4px 3px; text-align:center; background:#fff; box-shadow:0 6px 20px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; height:100%; min-height:0; flex-direction:column; align-items:center; justify-content:center; }
   .sc .si { display:flex; justify-content:center; align-items:center; margin:0 auto 3px; width:32px; height:32px; border-radius:50%; flex-shrink:0; }
   .sc .si svg { width:23px; height:23px; }
   .sc .sl { font-size:7.5px; font-weight:700; color:#0c1f4a; letter-spacing:0.3px; line-height:1.35; text-transform:uppercase; }
@@ -896,7 +897,7 @@ function buildCombinedMarksheetHtml(
    .rem-tag { display:table-cell; width:110px; vertical-align:middle; background:#0c1f4a; color:#fff; padding:5px 12px 5px 9px; font-size:10px; font-weight:700; letter-spacing:0.4px; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:24px; }
    .rem-txt { display:table-cell; vertical-align:middle; padding:5px 10px; font-size:10.5px; line-height:1.25; color:#222; font-weight:500; word-break:normal; }
   /* signatures — flex-shrink:0 keeps them out of the scrolling inner area */
-  .sigs { display:flex; justify-content:space-around; margin-top:4px; text-align:center; flex-shrink:0; }
+  .sigs { display:flex; justify-content:space-around; margin-top:8px; min-height:82px; align-items:flex-end; text-align:center; flex-shrink:0; }
   .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
   .sig-block .role { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:0.2px; }
   /* footer — flex-shrink:0 always pins it at page bottom */
