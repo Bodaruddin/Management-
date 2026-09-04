@@ -364,7 +364,10 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
       return;
     }
   }
-  if (currentTimeMinutes() < timeToMinutes(settings.checkOutStart)) {
+  const nowMinutes = currentTimeMinutes();
+  const checkOutStart = timeToMinutes(settings.checkOutStart);
+  const checkOutEnd = timeToMinutes(settings.checkOutEnd);
+  if (nowMinutes < checkOutStart || nowMinutes > checkOutEnd) {
     res.status(403).json({ error: `Check-out is available from ${settings.checkOutStart} to ${settings.checkOutEnd}` });
     return;
   }
