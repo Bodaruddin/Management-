@@ -514,12 +514,12 @@ interface AppContextType extends AppState {
   bulkAddAlumni: (records: Omit<Alumni, 'id' | 'batch'>[], batch: string) => Promise<void>;
   refreshTeacherAttendance: (teacherId?: string) => Promise<void>;
   getTeacherFaceStatus: (teacherId: string) => Promise<boolean>;
-  enrollTeacherFace: (teacherId: string, faceImageBase64: string) => Promise<void>;
+  enrollTeacherFace: (teacherId: string, faceImageBase64List: string[]) => Promise<void>;
   checkInTeacher: (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
-    faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string; date?: string;
+    faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string; faceImageBase64Candidates?: string[]; date?: string;
   }) => Promise<TeacherAttendanceRecord>;
-  checkOutTeacher: (id: string, data: { teacherId: string; latitude: number; longitude: number; faceImageBase64?: string }) => Promise<TeacherAttendanceRecord>;
+  checkOutTeacher: (id: string, data: { teacherId: string; latitude: number; longitude: number; faceImageBase64?: string; faceImageBase64Candidates?: string[] }) => Promise<TeacherAttendanceRecord>;
   applyTeacherLeave: (data: Omit<TeacherLeaveApplication, 'id' | 'status' | 'createdAt'>) => Promise<TeacherLeaveApplication>;
   updateTeacherLeave: (id: string, data: Pick<TeacherLeaveApplication, 'teacherId' | 'startDate' | 'endDate' | 'reason'>) => Promise<TeacherLeaveApplication>;
   deleteTeacherLeave: (id: string, teacherId: string) => Promise<void>;
@@ -1345,10 +1345,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return status.enrolled;
   }, []);
 
-  const enrollTeacherFace = useCallback(async (teacherId: string, faceImageBase64: string) => {
+  const enrollTeacherFace = useCallback(async (teacherId: string, faceImageBase64List: string[]) => {
     const result = await apiPost<{ enrolled?: boolean }>('/teacher-attendance/face-enroll', {
       teacherId,
-      faceImageBase64,
+      faceImageBase64List,
     });
     if (result.enrolled !== true) {
       throw new Error('Face enrollment was not saved. Please capture your face again.');
@@ -1357,7 +1357,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const checkInTeacher = useCallback(async (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
-    faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string; date?: string;
+    faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string; faceImageBase64Candidates?: string[]; date?: string;
   }) => {
     const row = await apiPost<any>('/teacher-attendance/check-in', data);
     const record = mapTeacherAttendance(row);
@@ -1365,7 +1365,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return record;
   }, []);
 
-  const checkOutTeacher = useCallback(async (id: string, data: { teacherId: string; latitude: number; longitude: number; faceImageBase64?: string }) => {
+  const checkOutTeacher = useCallback(async (id: string, data: { teacherId: string; latitude: number; longitude: number; faceImageBase64?: string; faceImageBase64Candidates?: string[] }) => {
     const row = await apiPost<any>(`/teacher-attendance/${id}/check-out`, data);
     const record = mapTeacherAttendance(row);
     setState(prev => ({ ...prev, teacherAttendanceRecords: prev.teacherAttendanceRecords.map(item => item.id === id ? record : item) }));
