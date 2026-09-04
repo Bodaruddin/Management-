@@ -642,7 +642,16 @@ async function apiPut<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`PUT /api${path} failed: ${res.status}`);
+  if (!res.ok) {
+    let detail = "";
+    try {
+      const errorBody = await res.json() as { error?: string };
+      detail = errorBody.error ? ` — ${errorBody.error}` : "";
+    } catch {
+      // Keep the status-only error when the server response is not JSON.
+    }
+    throw new Error(`PUT /api${path} failed: ${res.status}${detail}`);
+  }
   return res.json();
 }
 
