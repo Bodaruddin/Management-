@@ -1,7 +1,8 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
   Modal, ScrollView, Alert, Platform, KeyboardAvoidingView,
+  Keyboard, Dimensions, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -20,6 +21,12 @@ interface ClassAssignment {
 export default function TeacherExams() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const screenHeight = Dimensions.get('screen').height;
+  const androidKeyboardPadding = Platform.OS === 'android'
+    ? Math.max(0, keyboardHeight - Math.max(0, screenHeight - windowHeight))
+    : 0;
   const { user } = useAuth();
   const { exams, classes, subjects, addExam, updateExam, deleteExam } = useApp();
 
@@ -36,6 +43,21 @@ export default function TeacherExams() {
   const [confirmDelete, setConfirmDelete] = useState<Exam | null>(null);
   const createExamScrollRef = useRef<ScrollView>(null);
 
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const showSubscription = Keyboard.addListener('keyboardDidShow', event => {
+      setKeyboardHeight(event.endCoordinates.height);
+      setTimeout(() => createExamScrollRef.current?.scrollToEnd({ animated: true }), 120);
+    });
+    const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+
   const hasPermission = user?.permissions?.manageExams === true;
 
   const topPad = Platform.OS === 'web' ? 12 : insets.top;
@@ -43,8 +65,12 @@ export default function TeacherExams() {
 
   const revealExamInput = () => {
     if (Platform.OS === 'web') return;
-    // Wait for Android to resize the modal, then keep the focused subject field above the keyboard.
-    setTimeout(() => createExamScrollRef.current?.scrollToEnd({ animated: true }), 250);
+    // Android native Modal windows can report the keyboard after the first layout pass.
+    // Retry after the resize so the focused time field is above the IME.
+    const scrollToFocusedField = () => createExamScrollRef.current?.scrollToEnd({ animated: true });
+    scrollToFocusedField();
+    setTimeout(scrollToFocusedField, 220);
+    setTimeout(scrollToFocusedField, 600);
   };
 
   const resetForm = () =>
@@ -304,13 +330,13 @@ export default function TeacherExams() {
 
       {/* Create / Edit Exam Modal */}
       <Modal visible={showCreate} animationType="slide" transparent>
-        <View style={mo.overlay}>
+        <View style={[mo.overlay, androidKeyboardPadding > 0 ? { paddingBottom: androidKeyboardPadding } : null]}>
           <KeyboardAvoidingView
             style={mo.keyboardAvoiding}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
           >
-            <View style={[mo.sheet, { backgroundColor: colors.card }]}>
+            <View style={[mo.sheet, { backgroundColor: colors.card, maxHeight: Platform.OS === 'android' && keyboardHeight > 0 ? '100%' : '92%' }]}>
             <View style={[mo.header, { borderBottomColor: colors.border }]}>
               <Text style={[mo.title, { color: colors.text }]}>{editingExam ? 'Edit Exam' : 'Create Exam'}</Text>
               <TouchableOpacity onPress={closeExamForm}>
