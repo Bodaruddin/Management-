@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
-import { createFaceTemplate, faceMatches } from "../lib/faceTemplate.js";
+import { createFaceTemplateFromSamples, matchFaceTemplate } from "../lib/faceTemplate.js";
 
 const router = Router();
 const SETTINGS_KEY = "teacher_attendance_settings";
@@ -130,7 +130,7 @@ async function getFaceProfiles(): Promise<Record<string, string>> {
     Object.entries(value).filter((entry): entry is [string, string] =>
       typeof entry[0] === "string"
       && typeof entry[1] === "string"
-      && (entry[1].startsWith("v1:") || entry[1].startsWith("v2:")),
+      && (entry[1].startsWith("v1:") || entry[1].startsWith("v2:") || entry[1].startsWith("v3:")),
     ),
   );
 }
@@ -141,7 +141,7 @@ function faceProfileKey(teacherId: string): string {
 
 function readStoredFaceTemplate(value: unknown): string | null {
   if (typeof value === "string") {
-    if (value.startsWith("v1:") || value.startsWith("v2:")) return value;
+    if (value.startsWith("v1:") || value.startsWith("v2:") || value.startsWith("v3:")) return value;
     try {
       return readStoredFaceTemplate(JSON.parse(value));
     } catch {
@@ -151,7 +151,7 @@ function readStoredFaceTemplate(value: unknown): string | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const template = (value as { template?: unknown }).template;
   return typeof template === "string"
-    && (template.startsWith("v1:") || template.startsWith("v2:"))
+    && (template.startsWith("v1:") || template.startsWith("v2:") || template.startsWith("v3:"))
     ? template
     : null;
 }
@@ -173,16 +173,43 @@ async function saveFaceProfile(teacherId: string, template: string): Promise<voi
   });
 }
 
-async function verifyOrEnrollFace(teacherId: string, imageBase64: string) {
+function faceCandidatesFromBody(body: any): string[] {
+  const candidates = Array.isArray(body?.faceImageBase64Candidates)
+    ? body.faceImageBase64Candidates
+    : [body?.faceImageBase64];
+  return candidates
+    .filter((value: unknown): value is string => typeof value === "string" && value.length > 0)
+    .slice(0, 5);
+}
+
+async function verifyFaceCandidates(teacherId: string, imageBase64List: string[]) {
   const existing = await getFaceProfile(teacherId);
   if (!existing) {
-    await saveFaceProfile(teacherId, createFaceTemplate(imageBase64));
-    return { method: "camera_face_enrollment" };
+    throw new Error("Face verification is not set up yet. Complete face enrollment before marking attendance.");
   }
-  if (!faceMatches(existing, imageBase64)) {
+
+  // Evaluate every captured frame server-side. Quality is checked before
+  // matching, and the strongest valid match wins without lowering the stored
+  // calibrated threshold.
+  const matches = imageBase64List.flatMap((imageBase64) => {
+    try {
+      const match = matchFaceTemplate(existing, imageBase64);
+      return match.usable ? [match] : [];
+    } catch {
+      return [];
+    }
+  });
+  if (!matches.length) {
+    throw new Error("No usable face frame was detected. Improve the lighting, keep your face centered, and try again.");
+  }
+
+  const best = matches.reduce((current, candidate) =>
+    candidate.score > current.score ? candidate : current,
+  );
+  if (!best.matched) {
     throw new Error("Face did not match the enrolled teacher. Please look directly at the camera and try again.");
   }
-  return { method: "camera_face_match" };
+  return { method: "camera_face_match", score: best.score, threshold: best.threshold };
 }
 
 router.get("/settings/teacher-attendance", async (_req, res) => {
@@ -254,9 +281,13 @@ router.get("/teacher-attendance/face-status", async (req, res) => {
 
 router.post("/teacher-attendance/face-enroll", async (req, res) => {
   const teacherId = String(req.body?.teacherId ?? "");
-  const imageBase64 = req.body?.faceImageBase64;
-  if (!teacherId || typeof imageBase64 !== "string" || !imageBase64) {
-    res.status(400).json({ error: "teacherId and a camera selfie are required" });
+  const imageBase64List = Array.isArray(req.body?.faceImageBase64List)
+    ? req.body.faceImageBase64List
+      .filter((value: unknown): value is string => typeof value === "string" && value.length > 0)
+      .slice(0, 5)
+    : [];
+  if (!teacherId || imageBase64List.length < 3) {
+    res.status(400).json({ error: "teacherId and at least 3 clear camera samples are required" });
     return;
   }
   try {
@@ -264,8 +295,8 @@ router.post("/teacher-attendance/face-enroll", async (req, res) => {
       res.status(409).json({ enrolled: true, error: "Face verification is already set up for this teacher" });
       return;
     }
-    await saveFaceProfile(teacherId, createFaceTemplate(imageBase64));
-    res.status(201).json({ enrolled: true, method: "camera_face_enrollment" });
+    await saveFaceProfile(teacherId, createFaceTemplateFromSamples(imageBase64List));
+    res.status(201).json({ enrolled: true, sampleCount: imageBase64List.length, method: "camera_face_enrollment" });
   } catch (error: any) {
     const message = error?.message ?? "Face enrollment failed. Please capture your face again.";
     const databaseFailure = error?.code === "NO_DB_CONNECTION"
@@ -312,12 +343,13 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
   }
   let faceVerificationMethod = "disabled_by_admin";
   if (settings.requireFaceVerification) {
-    if (typeof body.faceImageBase64 !== "string" || !body.faceImageBase64) {
+    const imageBase64List = faceCandidatesFromBody(body);
+    if (!imageBase64List.length) {
       res.status(400).json({ error: "A camera selfie is required for face verification" });
       return;
     }
     try {
-      faceVerificationMethod = (await verifyOrEnrollFace(teacherId, body.faceImageBase64)).method;
+      faceVerificationMethod = (await verifyFaceCandidates(teacherId, imageBase64List)).method;
     } catch (error: any) {
       res.status(403).json({ error: error?.message ?? "Face verification failed" });
       return;
@@ -372,12 +404,13 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
     return;
   }
   if (settings.requireFaceVerification) {
-    if (typeof body.faceImageBase64 !== "string" || !body.faceImageBase64) {
+    const imageBase64List = faceCandidatesFromBody(body);
+    if (!imageBase64List.length) {
       res.status(400).json({ error: "A camera selfie is required for face verification" });
       return;
     }
     try {
-      await verifyOrEnrollFace(teacherId, body.faceImageBase64);
+      await verifyFaceCandidates(teacherId, imageBase64List);
     } catch (error: any) {
       res.status(403).json({ error: error?.message ?? "Face verification failed" });
       return;
