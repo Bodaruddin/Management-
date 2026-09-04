@@ -71,9 +71,11 @@ async function getFaceImageBase64(photo: { uri?: string; base64?: string }): Pro
     try {
       const normalized = await ImageManipulator.manipulateAsync(
         photo.uri,
-        [],
+        [{ resize: { width: 720 } }],
         {
-          compress: 0.7,
+          // 720px preserves facial detail while keeping three verification
+          // frames comfortably below the API request limit.
+          compress: 0.82,
           format: ImageManipulator.SaveFormat.JPEG,
           base64: true,
         },
@@ -122,13 +124,14 @@ function FaceCaptureModal({
   visible: boolean;
   purpose: FaceCapturePurpose;
   onCancel: () => void;
-  onCaptured: (imageBase64: string) => Promise<void>;
+  onCaptured: (imageBase64List: string[]) => Promise<void>;
 }) {
   const colors = useColors();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('front');
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
+  const [captureStatus, setCaptureStatus] = useState('');
   const [cameraError, setCameraError] = useState('');
   const cameraRef = useRef<CameraView>(null);
   const scanProgress = useRef(new Animated.Value(0)).current;
@@ -136,6 +139,7 @@ function FaceCaptureModal({
   useEffect(() => {
     if (!visible) {
       setCameraReady(false);
+      setCaptureStatus('');
       setCameraError('');
       return;
     }
@@ -153,29 +157,39 @@ function FaceCaptureModal({
     if (!cameraRef.current || !cameraReady || capturing) return;
     setCameraError('');
     setCapturing(true);
+    const requiredFrames = 3;
+    const imageBase64List: string[] = [];
     try {
-      const photo = await cameraRef.current.takePictureAsync({
-        // The file URI is normalized to a known-good JPEG below. Keeping the
-        // camera's own base64 as a fallback also preserves web compatibility.
-        base64: true,
-        // Keep enough detail for matching. The previous 0.3 setting introduced
-        // visible JPEG artifacts before the server created the face template.
-        quality: 0.85,
-        skipProcessing: false,
-      });
-      const imageBase64 = await getFaceImageBase64(photo);
-      await onCaptured(imageBase64);
+      for (let attempt = 0; attempt < requiredFrames; attempt += 1) {
+        setCaptureStatus(attempt === 0 ? 'Face detected' : 'Capturing frame ' + (attempt + 1) + ' of ' + requiredFrames + '…');
+        const photo = await cameraRef.current.takePictureAsync({
+          // Normalize every frame to a standard JPEG before upload. Three
+          // compact frames reduce blur/eye-blink failures without trusting the
+          // client to decide whether a face actually matched.
+          base64: true,
+          quality: 0.82,
+          skipProcessing: false,
+        });
+        imageBase64List.push(await getFaceImageBase64(photo));
+        if (attempt < requiredFrames - 1) {
+          await new Promise(resolve => setTimeout(resolve, 220));
+        }
+      }
+      setCaptureStatus('Face detected → Verifying');
+      await new Promise(resolve => setTimeout(resolve, 180));
+      await onCaptured(imageBase64List);
     } catch (error: any) {
       setCameraError(error?.message ?? 'Could not capture your face. Please try again.');
     } finally {
       setCapturing(false);
+      setCaptureStatus('');
     }
   };
 
   const title = purpose === 'enroll' ? 'Set up face verification' : 'Verify your face';
   const description = purpose === 'enroll'
-    ? 'This private scan will be used to recognize you at check-in and check-out.'
-    : purpose === 'check-in' ? 'Look at the camera to check in automatically.' : 'Look at the camera to check out automatically.';
+    ? 'We capture 3 clear samples to build a calibrated private template.'
+    : purpose === 'check-in' ? 'We check up to 3 clear frames before marking attendance.' : 'We check up to 3 clear frames before checking you out.';
   const needsSettings = permission?.status === 'denied' && permission.canAskAgain === false;
   const scanLineY = scanProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 230] });
   const scanLineOpacity = scanProgress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.35, 1, 0.35] });
@@ -243,7 +257,7 @@ function FaceCaptureModal({
               >
                 {capturing ? <ActivityIndicator color={colors.primary} /> : <View style={cs.shutterInner} />}
               </TouchableOpacity>
-              <Text style={cs.hint}>{capturing ? 'Checking securely…' : 'Tap to capture'}</Text>
+              <Text style={cs.hint}>{capturing ? captureStatus : purpose === 'enroll' ? '3 clear samples captured automatically' : 'Up to 3 clear frames checked automatically'}</Text>
             </View>
           </>
         ) : (
@@ -325,6 +339,13 @@ function FaceResultModal({
             <Text style={[resultStyles.statusText, { color: resultColor }]}>
               {success ? 'VERIFIED SECURELY' : 'VERIFICATION NEEDED'}
             </Text>
+          </View>
+          <View style={[resultStyles.steps, { borderColor: resultColor + '45', backgroundColor: resultBackground }]}>
+            <Text style={[resultStyles.stepText, { color: resultColor }]}>✓ Face detected</Text>
+            <Text style={[resultStyles.stepArrow, { color: resultColor }]}>→</Text>
+            <Text style={[resultStyles.stepText, { color: resultColor }]}>✓ Verifying</Text>
+            <Text style={[resultStyles.stepArrow, { color: resultColor }]}>→</Text>
+            <Text style={[resultStyles.stepText, { color: resultColor }]}>{success ? '✓ Attendance marked' : 'Verification required'}</Text>
           </View>
           <Text style={[resultStyles.title, { color: colors.text }]}>{title}</Text>
           <Text style={[resultStyles.description, { color: colors.mutedForeground }]}>
@@ -471,13 +492,12 @@ export default function MyTeacherAttendance() {
     }
   };
 
-  const handleFaceCaptured = async (faceImageBase64: string) => {
+  const handleFaceCaptured = async (faceImageBase64List: string[]) => {
     const purpose = faceCaptureMode;
-    setFaceCaptureMode(null);
     if (!purpose || !user) return;
     await runAction(async () => {
       if (purpose === 'enroll') {
-        await enrollTeacherFace(user.id, faceImageBase64);
+        await enrollTeacherFace(user.id, faceImageBase64List);
         setFaceEnrolled(true);
         return;
       }
@@ -489,14 +509,14 @@ export default function MyTeacherAttendance() {
           ...coordinates,
           faceVerified: true,
           faceVerificationMethod: 'camera_face_match',
-          faceImageBase64,
+          faceImageBase64Candidates: faceImageBase64List,
         });
       } else {
         if (!todayRecord) throw new Error('No check-in found for today');
         await checkOutTeacher(todayRecord.id, {
           teacherId: user.id,
           ...coordinates,
-          faceImageBase64,
+          faceImageBase64Candidates: faceImageBase64List,
         });
       }
     }, {
@@ -504,16 +524,18 @@ export default function MyTeacherAttendance() {
         if (purpose !== 'enroll') showFaceResult('success', purpose);
       },
       onError: message => {
-        if (purpose !== 'enroll' && /face did not match|face verification failed/i.test(message)) {
+        if (purpose !== 'enroll' && /face did not match|face verification failed|no usable face frame/i.test(message)) {
           setError('');
           showFaceResult(
             'error',
             purpose,
-            'Your face did not match the enrolled profile. Please try again with your face centered in the frame.',
+            'Your face could not be verified. Please try again with your face centered in good lighting.',
           );
         }
       },
     });
+    // Keep the camera visible while the server checks all captured frames.
+    setFaceCaptureMode(null);
   };
 
   const handleCheckIn = () => {
@@ -974,6 +996,9 @@ const resultStyles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.8,
   },
+  steps: { width: '100%', borderWidth: 1, borderRadius: 12, padding: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 16 },
+  stepText: { fontSize: 10, fontWeight: '800' },
+  stepArrow: { fontSize: 14, fontWeight: '800' },
   title: {
     fontSize: 24,
     fontWeight: '800',
