@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
   Modal, ScrollView, Alert, Platform, KeyboardAvoidingView,
@@ -34,11 +34,18 @@ export default function TeacherExams() {
     defaultMaxMarks: '100',
   });
   const [confirmDelete, setConfirmDelete] = useState<Exam | null>(null);
+  const createExamScrollRef = useRef<ScrollView>(null);
 
   const hasPermission = user?.permissions?.manageExams === true;
 
   const topPad = Platform.OS === 'web' ? 12 : insets.top;
   const botPad = Platform.OS === 'web' ? 84 : insets.bottom + 80;
+
+  const revealExamInput = () => {
+    if (Platform.OS === 'web') return;
+    // Wait for Android to resize the modal, then keep the focused subject field above the keyboard.
+    setTimeout(() => createExamScrollRef.current?.scrollToEnd({ animated: true }), 250);
+  };
 
   const resetForm = () =>
     setForm({ name: '', selectedClasses: [], classAssignments: [], defaultDate: todayISO, defaultMaxMarks: '100' });
@@ -311,7 +318,9 @@ export default function TeacherExams() {
               </TouchableOpacity>
             </View>
             <ScrollView
-              style={{ padding: 20 }}
+              ref={createExamScrollRef}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 20, paddingBottom: 280 }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               automaticallyAdjustKeyboardInsets
@@ -424,6 +433,7 @@ export default function TeacherExams() {
                                 style={[mo.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13 }]}
                                 value={sched.date}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'date', v)}
+                                onFocus={revealExamInput}
                                 placeholder="YYYY-MM-DD"
                                 placeholderTextColor={colors.mutedForeground}
                               />
@@ -434,6 +444,7 @@ export default function TeacherExams() {
                                 style={[mo.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
                                 value={String(sched.maxMarks)}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'maxMarks', v)}
+                                onFocus={revealExamInput}
                                 placeholder="100"
                                 placeholderTextColor={colors.mutedForeground}
                                 keyboardType="number-pad"
@@ -447,6 +458,7 @@ export default function TeacherExams() {
                                 style={[mo.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
                                 value={sched.startTime ?? ''}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'startTime', v)}
+                                onFocus={revealExamInput}
                                 placeholder="09:00 AM"
                                 placeholderTextColor={colors.mutedForeground}
                                 returnKeyType="next"
@@ -458,6 +470,7 @@ export default function TeacherExams() {
                                 style={[mo.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
                                 value={sched.endTime ?? ''}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'endTime', v)}
+                                onFocus={revealExamInput}
                                 placeholder="12:00 PM"
                                 placeholderTextColor={colors.mutedForeground}
                                 returnKeyType="done"
@@ -521,7 +534,7 @@ export default function TeacherExams() {
 
 const mo = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  keyboardAvoiding: { width: '100%', maxHeight: '100%' },
+  keyboardAvoiding: { flex: 1, width: '100%', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '92%', minHeight: 0, overflow: 'hidden' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
   title: { fontSize: 17, fontWeight: '700' },
