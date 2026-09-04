@@ -30,6 +30,37 @@ const DEFAULT_TEACHER_ATTENDANCE_SETTINGS = {
   deductionType: "daily_rate",
 };
 
+const TIME_SETTING_KEYS = ["checkInStart", "checkInEnd", "checkOutStart", "checkOutEnd"] as const;
+
+function normalizeTime(value: unknown): string | null {
+  const normalized = String(value ?? "").trim().toUpperCase().replace(/\s+/g, " " );
+  const twelveHour = normalized.match(/^(\d{1,2})(?::([0-5]\d))?\s*(AM|PM)$/);
+  if (twelveHour) {
+    const hour = Number(twelveHour[1]);
+    if (hour < 1 || hour > 12) return null;
+    const minute = twelveHour[2] ?? "00";
+    const hour24 = (hour % 12) + (twelveHour[3] === "PM" ? 12 : 0);
+    return `${String(hour24).padStart(2, "0")}:${minute}`;
+  }
+  const twentyFourHour = normalized.match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  return twentyFourHour ? `${twentyFourHour[1]}:${twentyFourHour[2]}` : null;
+}
+
+function readTeacherAttendanceSettings(value: unknown) {
+  let savedValue = value;
+  if (typeof savedValue === "string") {
+    try { savedValue = JSON.parse(savedValue); } catch { savedValue = {}; }
+  }
+  const settings = {
+    ...DEFAULT_TEACHER_ATTENDANCE_SETTINGS,
+    ...(savedValue && typeof savedValue === "object" && !Array.isArray(savedValue) ? savedValue : {}),
+  };
+  for (const key of TIME_SETTING_KEYS) {
+    settings[key] = normalizeTime(settings[key]) ?? DEFAULT_TEACHER_ATTENDANCE_SETTINGS[key];
+  }
+  return settings;
+}
+
 function withoutDocuments(rows: any[]) {
   return rows.map((row) => {
     const { documentBase64: _documentBase64, ...summary } = row;
@@ -117,10 +148,7 @@ router.get("/bootstrap", async (_req, res) => {
     teacherAttendance,
     teacherLeaves,
     teacherHolidays,
-    teacherAttendanceSettings: {
-      ...DEFAULT_TEACHER_ATTENDANCE_SETTINGS,
-      ...(teacherAttendanceSettingsSetting?.value ?? {}),
-    },
+    teacherAttendanceSettings: readTeacherAttendanceSettings(teacherAttendanceSettingsSetting?.value),
   });
 });
 
