@@ -318,10 +318,10 @@ export default function ExamsScreen() {
     setShowCreateModal(true);
   };
 
-  const revealCreateFormInput = () => {
+  const revealExamInput = () => {
     if (Platform.OS === 'web') return;
-    // Let Android resize the modal first, then reveal the focused schedule field.
-    setTimeout(() => createExamScrollRef.current?.scrollToEnd({ animated: true }), 150);
+    // Wait for Android to resize the modal, then keep the focused subject field above the keyboard.
+    setTimeout(() => createExamScrollRef.current?.scrollToEnd({ animated: true }), 250);
   };
 
   const openEditExam = (exam: Exam) => {
@@ -1421,7 +1421,8 @@ export default function ExamsScreen() {
             </View>
             <ScrollView
               ref={createExamScrollRef}
-              contentContainerStyle={{ padding: 20, paddingBottom: 180 }}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 20, paddingBottom: 280 }}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               nestedScrollEnabled
@@ -1566,7 +1567,7 @@ export default function ExamsScreen() {
                                 style={[cmo.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13 }]}
                                 value={sched.date}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'date', v)}
-                                onFocus={revealCreateFormInput}
+                                onFocus={revealExamInput}
                                 placeholder="YYYY-MM-DD"
                                 placeholderTextColor={colors.mutedForeground}
                               />
@@ -1577,6 +1578,7 @@ export default function ExamsScreen() {
                                 style={[cmo.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
                                 value={String(sched.maxMarks)}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'maxMarks', v)}
+                                onFocus={revealExamInput}
                                 placeholder="100"
                                 placeholderTextColor={colors.mutedForeground}
                                 keyboardType="number-pad"
@@ -1591,7 +1593,7 @@ export default function ExamsScreen() {
                                 style={[cmo.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
                                 value={sched.startTime ?? ''}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'startTime', v)}
-                                onFocus={revealCreateFormInput}
+                                onFocus={revealExamInput}
                                 placeholder="09:00 AM"
                                 placeholderTextColor={colors.mutedForeground}
                               />
@@ -1602,7 +1604,7 @@ export default function ExamsScreen() {
                                 style={[cmo.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border, paddingVertical: 8, fontSize: 13, textAlign: 'center' }]}
                                 value={sched.endTime ?? ''}
                                 onChangeText={v => updateSubjectScheduleForClass(ca.class, sched.subject, 'endTime', v)}
-                                onFocus={revealCreateFormInput}
+                                onFocus={revealExamInput}
                                 placeholder="12:00 PM"
                                 placeholderTextColor={colors.mutedForeground}
                               />
