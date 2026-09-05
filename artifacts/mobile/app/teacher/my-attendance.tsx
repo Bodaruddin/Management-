@@ -53,11 +53,25 @@ function jpegDataUrl(value: string | undefined): string | null {
   const payload = (commaIndex >= 0 ? trimmed.slice(commaIndex + 1) : trimmed)
     .replace(/\s/g, '');
 
-  // JPEG files start with FF D8 FF, which is /9j/ in base64. Rejecting other
-  // formats here prevents Android camera payloads from being mislabeled as
-  // JPEGs and then rejected by the API decoder.
-  if (!payload.startsWith('/9j/')) return null;
+  // CameraView can return either raw base64 or a browser data/blob URL.
+  // Do not reject a valid browser payload based on one particular base64
+  // prefix; the server decodes the bytes and remains authoritative about
+  // whether the image is a readable JPEG.
+  if (payload.length < 100) return null;
   return `data:image/jpeg;base64,${payload}`;
+}
+
+async function readWebImageAsBase64(uri: string): Promise<string> {
+  if (uri.startsWith('data:')) return uri;
+  const response = await fetch(uri);
+  if (!response.ok) throw new Error('The browser camera image could not be read');
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('The browser camera image could not be read'));
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.readAsDataURL(blob);
+  });
 }
 
 async function getFaceImageBase64(photo: { uri?: string; base64?: string }): Promise<string> {
@@ -100,10 +114,15 @@ async function getFaceImageBase64(photo: { uri?: string; base64?: string }): Pro
     }
   }
 
-  if (photo.base64) candidates.push(photo.base64);
-  if (photo.uri && Platform.OS === 'web' && !photo.base64) {
-    throw new Error('The camera did not return an image. Please try again.');
+  if (photo.uri && Platform.OS === 'web') {
+    try {
+      candidates.unshift(await readWebImageAsBase64(photo.uri));
+    } catch {
+      // Fall back to CameraView's base64 field below when the URI is a
+      // short-lived blob URL that the browser has already released.
+    }
   }
+  if (photo.base64) candidates.push(photo.base64);
 
   for (const candidate of candidates) {
     const jpeg = jpegDataUrl(candidate);
