@@ -743,6 +743,17 @@ export function createPgAdapter(db: DB): DataAdapter {
         const [row] = await db.insert(teacherAttendanceRecordsTable).values(values).returning();
         return row;
       },
+      async createIfAbsent(teacherId, date, data) {
+        try {
+          const row = await this.create({ ...data, teacherId, date });
+          return { row, created: true };
+        } catch (error: any) {
+          if (error?.code !== "23505") throw error;
+          const row = await this.getByTeacherDate(teacherId, date);
+          if (!row) throw error;
+          return { row, created: false };
+        }
+      },
       async updateCheckOut(id, data) {
         const [row] = await db.update(teacherAttendanceRecordsTable).set({
           checkOutAt: data.checkOutAt ? new Date(data.checkOutAt) : new Date(),

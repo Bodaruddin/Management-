@@ -12,4 +12,10 @@ export interface TeacherCheckOut {
   longitude: number;
   /** Camera selfie used to match the enrolled teacher face template */
   faceImageBase64?: string;
+  /**
+     * Short burst of camera samples; the server verifies the strongest usable frame
+     * @minItems 1
+     * @maxItems 5
+     */
+  faceSamplesBase64?: string[];
 }

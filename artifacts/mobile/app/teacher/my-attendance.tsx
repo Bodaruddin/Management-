@@ -8,7 +8,6 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import { router } from 'expo-router';
@@ -45,6 +44,7 @@ async function readCurrentLocation(): Promise<Coordinates> {
 }
 
 type FaceCapturePurpose = 'enroll' | 'check-in' | 'check-out';
+type FaceFlowStage = 'detected' | 'verifying';
 
 function jpegDataUrl(value: string | undefined): string | null {
   if (!value) return null;
@@ -73,9 +73,7 @@ async function getFaceImageBase64(photo: { uri?: string; base64?: string }): Pro
         photo.uri,
         [{ resize: { width: 720 } }],
         {
-          // 720px preserves facial detail while keeping three verification
-          // frames comfortably below the API request limit.
-          compress: 0.82,
+          compress: 0.88,
           format: ImageManipulator.SaveFormat.JPEG,
           base64: true,
         },
@@ -115,23 +113,29 @@ async function getFaceImageBase64(photo: { uri?: string; base64?: string }): Pro
   throw new Error('The camera returned an unreadable photo. Please keep your face centered and try again.');
 }
 
+function wait(milliseconds: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
 function FaceCaptureModal({
   visible,
   purpose,
   onCancel,
+  onStageChange,
   onCaptured,
 }: {
   visible: boolean;
   purpose: FaceCapturePurpose;
   onCancel: () => void;
-  onCaptured: (imageBase64List: string[]) => Promise<void>;
+  onStageChange: (stage: FaceFlowStage) => void;
+  onCaptured: (imagesBase64: string[]) => Promise<void>;
 }) {
   const colors = useColors();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('front');
   const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
-  const [captureStatus, setCaptureStatus] = useState('');
+  const [captureNumber, setCaptureNumber] = useState(0);
   const [cameraError, setCameraError] = useState('');
   const cameraRef = useRef<CameraView>(null);
   const scanProgress = useRef(new Animated.Value(0)).current;
@@ -139,8 +143,8 @@ function FaceCaptureModal({
   useEffect(() => {
     if (!visible) {
       setCameraReady(false);
-      setCaptureStatus('');
       setCameraError('');
+      setCaptureNumber(0);
       return;
     }
     const animation = Animated.loop(
@@ -157,39 +161,36 @@ function FaceCaptureModal({
     if (!cameraRef.current || !cameraReady || capturing) return;
     setCameraError('');
     setCapturing(true);
-    const requiredFrames = 3;
-    const imageBase64List: string[] = [];
     try {
-      for (let attempt = 0; attempt < requiredFrames; attempt += 1) {
-        setCaptureStatus(attempt === 0 ? 'Face detected' : 'Capturing frame ' + (attempt + 1) + ' of ' + requiredFrames + '…');
+      const sampleCount = purpose === 'enroll' ? 5 : 3;
+      const images: string[] = [];
+      for (let index = 0; index < sampleCount; index += 1) {
+        setCaptureNumber(index + 1);
         const photo = await cameraRef.current.takePictureAsync({
-          // Normalize every frame to a standard JPEG before upload. Three
-          // compact frames reduce blur/eye-blink failures without trusting the
-          // client to decide whether a face actually matched.
+          // A short burst lets the server choose the clearest frame while
+          // keeping the enrollment template independent from one photo.
           base64: true,
-          quality: 0.82,
+          quality: 0.92,
           skipProcessing: false,
         });
-        imageBase64List.push(await getFaceImageBase64(photo));
-        if (attempt < requiredFrames - 1) {
-          await new Promise(resolve => setTimeout(resolve, 220));
-        }
+        images.push(await getFaceImageBase64(photo));
+        if (index < sampleCount - 1) await wait(180);
       }
-      setCaptureStatus('Face detected → Verifying');
-      await new Promise(resolve => setTimeout(resolve, 180));
-      await onCaptured(imageBase64List);
+      onStageChange('detected');
+      await wait(160);
+      onStageChange('verifying');
+      await onCaptured(images);
     } catch (error: any) {
       setCameraError(error?.message ?? 'Could not capture your face. Please try again.');
     } finally {
       setCapturing(false);
-      setCaptureStatus('');
     }
   };
 
   const title = purpose === 'enroll' ? 'Set up face verification' : 'Verify your face';
   const description = purpose === 'enroll'
-    ? 'We capture 3 clear samples to build a calibrated private template.'
-    : purpose === 'check-in' ? 'We check up to 3 clear frames before marking attendance.' : 'We check up to 3 clear frames before checking you out.';
+    ? 'We will capture five quick samples so normal lighting and expression changes still verify safely.'
+    : 'We will capture three quick frames and verify the clearest one securely.';
   const needsSettings = permission?.status === 'denied' && permission.canAskAgain === false;
   const scanLineY = scanProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 230] });
   const scanLineOpacity = scanProgress.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.35, 1, 0.35] });
@@ -235,7 +236,7 @@ function FaceCaptureModal({
                 <Animated.View style={[cs.scanLine, { transform: [{ translateY: scanLineY }], opacity: scanLineOpacity }]} />
               </View>
               <Text style={cs.guideTitle}>Center your face in the frame</Text>
-              <Text style={cs.guideCopy}>Keep your eyes visible and use good lighting</Text>
+              <Text style={cs.guideCopy}>Keep your eyes visible · face a light source · hold still</Text>
             </View>
 
             <View style={cs.bottomPanel}>
@@ -257,7 +258,9 @@ function FaceCaptureModal({
               >
                 {capturing ? <ActivityIndicator color={colors.primary} /> : <View style={cs.shutterInner} />}
               </TouchableOpacity>
-              <Text style={cs.hint}>{capturing ? captureStatus : purpose === 'enroll' ? '3 clear samples captured automatically' : 'Up to 3 clear frames checked automatically'}</Text>
+              <Text style={cs.hint}>
+                {capturing ? `Capturing sample ${captureNumber} of ${purpose === 'enroll' ? 5 : 3}…` : 'Tap to capture a short burst'}
+              </Text>
             </View>
           </>
         ) : (
@@ -296,6 +299,54 @@ function FaceCaptureModal({
 }
 
 type FaceResultKind = 'success' | 'error';
+
+function FaceProgressModal({
+  visible,
+  purpose,
+}: {
+  visible: boolean;
+  purpose: 'check-in' | 'check-out';
+}) {
+  const colors = useColors();
+  const action = purpose === 'check-in' ? 'check-in' : 'check-out';
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <View style={[resultStyles.backdrop, { backgroundColor: colors.primary + 'E6' }]}>
+        <View style={[resultStyles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[resultStyles.progressIcon, { backgroundColor: colors.secondary }]}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+          <Text style={[resultStyles.title, { color: colors.text }]}>Verifying securely</Text>
+          <Text style={[resultStyles.description, { color: colors.mutedForeground }]}>
+            Checking the best frame before recording your {action}.
+          </Text>
+          <View style={resultStyles.steps}>
+            <View style={resultStyles.step}>
+              <View style={[resultStyles.stepIcon, { backgroundColor: colors.success }]}>
+                <Feather name="check" size={12} color={colors.primaryForeground} />
+              </View>
+              <Text style={[resultStyles.stepText, { color: colors.text }]}>Face detected</Text>
+            </View>
+            <View style={[resultStyles.stepLine, { backgroundColor: colors.border }]} />
+            <View style={resultStyles.step}>
+              <View style={[resultStyles.stepIcon, { backgroundColor: colors.primary }]}>
+                <ActivityIndicator size="small" color={colors.primaryForeground} />
+              </View>
+              <Text style={[resultStyles.stepText, { color: colors.text }]}>Verifying</Text>
+            </View>
+            <View style={[resultStyles.stepLine, { backgroundColor: colors.border }]} />
+            <View style={resultStyles.step}>
+              <View style={[resultStyles.stepIcon, { backgroundColor: colors.muted }]}>
+                <Feather name="clock" size={12} color={colors.mutedForeground} />
+              </View>
+              <Text style={[resultStyles.stepText, { color: colors.mutedForeground }]}>Attendance marked</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
 
 function FaceResultModal({
   visible,
@@ -340,25 +391,33 @@ function FaceResultModal({
               {success ? 'VERIFIED SECURELY' : 'VERIFICATION NEEDED'}
             </Text>
           </View>
-          <View style={[resultStyles.steps, { borderColor: resultColor + '45', backgroundColor: resultBackground }]}>
-            <Text style={[resultStyles.stepText, { color: resultColor }]}>✓ Face detected</Text>
-            <Text style={[resultStyles.stepArrow, { color: resultColor }]}>→</Text>
-            <Text style={[resultStyles.stepText, { color: resultColor }]}>✓ Verifying</Text>
-            <Text style={[resultStyles.stepArrow, { color: resultColor }]}>→</Text>
-            <Text style={[resultStyles.stepText, { color: resultColor }]}>{success ? '✓ Attendance marked' : 'Verification required'}</Text>
-          </View>
           <Text style={[resultStyles.title, { color: colors.text }]}>{title}</Text>
           <Text style={[resultStyles.description, { color: colors.mutedForeground }]}>
             {success ? description : message || description}
           </Text>
 
           {success ? (
-            <View style={[resultStyles.redirectNote, { backgroundColor: colors.muted }]}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[resultStyles.redirectText, { color: colors.mutedForeground }]}>
-                Returning to your dashboard…
-              </Text>
-            </View>
+            <>
+              <View style={resultStyles.steps}>
+                {['Face detected', 'Verifying', 'Attendance marked'].map((step, index) => (
+                  <React.Fragment key={step}>
+                    <View style={resultStyles.step}>
+                      <View style={[resultStyles.stepIcon, { backgroundColor: colors.success }]}>
+                        <Feather name="check" size={12} color={colors.primaryForeground} />
+                      </View>
+                      <Text style={[resultStyles.stepText, { color: colors.text }]}>{step}</Text>
+                    </View>
+                    {index < 2 ? <View style={[resultStyles.stepLine, { backgroundColor: colors.success }]} /> : null}
+                  </React.Fragment>
+                ))}
+              </View>
+              <View style={[resultStyles.redirectNote, { backgroundColor: colors.muted }]}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={[resultStyles.redirectText, { color: colors.mutedForeground }]}>
+                  Returning to your dashboard…
+                </Text>
+              </View>
+            </>
           ) : (
             <View style={resultStyles.actions}>
               <TouchableOpacity
@@ -407,6 +466,7 @@ export default function MyTeacherAttendance() {
   const [error, setError] = useState('');
   const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null);
   const [faceCaptureMode, setFaceCaptureMode] = useState<FaceCapturePurpose | null>(null);
+  const [faceFlowStage, setFaceFlowStage] = useState<FaceFlowStage | null>(null);
   const [faceResult, setFaceResult] = useState<FaceResultKind | null>(null);
   const [faceResultPurpose, setFaceResultPurpose] = useState<'check-in' | 'check-out'>('check-in');
   const [faceResultMessage, setFaceResultMessage] = useState('');
@@ -492,12 +552,17 @@ export default function MyTeacherAttendance() {
     }
   };
 
-  const handleFaceCaptured = async (faceImageBase64List: string[]) => {
+  const handleFaceStageChange = (stage: FaceFlowStage) => {
+    setFaceFlowStage(stage);
+  };
+
+  const handleFaceCaptured = async (faceSamplesBase64: string[]) => {
     const purpose = faceCaptureMode;
+    setFaceCaptureMode(null);
     if (!purpose || !user) return;
     await runAction(async () => {
       if (purpose === 'enroll') {
-        await enrollTeacherFace(user.id, faceImageBase64List);
+        await enrollTeacherFace(user.id, faceSamplesBase64);
         setFaceEnrolled(true);
         return;
       }
@@ -509,38 +574,41 @@ export default function MyTeacherAttendance() {
           ...coordinates,
           faceVerified: true,
           faceVerificationMethod: 'camera_face_match',
-          faceImageBase64Candidates: faceImageBase64List,
+          faceImageBase64: faceSamplesBase64[0],
+          faceSamplesBase64,
         });
       } else {
         if (!todayRecord) throw new Error('No check-in found for today');
         await checkOutTeacher(todayRecord.id, {
           teacherId: user.id,
           ...coordinates,
-          faceImageBase64Candidates: faceImageBase64List,
+          faceImageBase64: faceSamplesBase64[0],
+          faceSamplesBase64,
         });
       }
     }, {
       onSuccess: () => {
+        setFaceFlowStage(null);
         if (purpose !== 'enroll') showFaceResult('success', purpose);
       },
       onError: message => {
-        if (purpose !== 'enroll' && /face did not match|face verification failed|no usable face frame/i.test(message)) {
+        setFaceFlowStage(null);
+        if (purpose !== 'enroll' && /face|selfie|camera|verification|blurry|dark|light|center/i.test(message)) {
           setError('');
           showFaceResult(
             'error',
             purpose,
-            'Your face could not be verified. Please try again with your face centered in good lighting.',
+            message || 'Your face could not be verified. Please try again with your face centered in the frame.',
           );
         }
       },
     });
-    // Keep the camera visible while the server checks all captured frames.
-    setFaceCaptureMode(null);
   };
 
   const handleCheckIn = () => {
     if (teacherAttendanceSettings.requireFaceVerification) {
       setError('');
+      setFaceResultPurpose('check-in');
       setFaceCaptureMode('check-in');
       return;
     }
@@ -560,6 +628,7 @@ export default function MyTeacherAttendance() {
   const handleCheckOut = () => {
     if (teacherAttendanceSettings.requireFaceVerification) {
       setError('');
+      setFaceResultPurpose('check-out');
       setFaceCaptureMode('check-out');
       return;
     }
@@ -847,7 +916,12 @@ export default function MyTeacherAttendance() {
         visible={faceCaptureMode !== null}
         purpose={faceCaptureMode ?? 'check-in'}
         onCancel={() => setFaceCaptureMode(null)}
+        onStageChange={handleFaceStageChange}
         onCaptured={handleFaceCaptured}
+      />
+      <FaceProgressModal
+        visible={faceFlowStage === 'verifying'}
+        purpose={faceResultPurpose}
       />
       <FaceResultModal
         visible={faceResult !== null}
@@ -970,6 +1044,14 @@ const resultStyles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
+  progressIcon: {
+    width: 76,
+    height: 76,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   iconCircle: {
     width: 64,
     height: 64,
@@ -996,9 +1078,6 @@ const resultStyles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.8,
   },
-  steps: { width: '100%', borderWidth: 1, borderRadius: 12, padding: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, marginBottom: 16 },
-  stepText: { fontSize: 10, fontWeight: '800' },
-  stepArrow: { fontSize: 14, fontWeight: '800' },
   title: {
     fontSize: 24,
     fontWeight: '800',
@@ -1009,6 +1088,32 @@ const resultStyles = StyleSheet.create({
     lineHeight: 21,
     textAlign: 'center',
     marginTop: 9,
+  },
+  steps: {
+    width: '100%',
+    marginTop: 21,
+    gap: 8,
+  },
+  step: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+  },
+  stepIcon: {
+    width: 23,
+    height: 23,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  stepLine: {
+    width: 1,
+    height: 9,
+    marginLeft: 11,
   },
   redirectNote: {
     width: '100%',

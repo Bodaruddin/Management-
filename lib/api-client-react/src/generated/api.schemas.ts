@@ -83,6 +83,12 @@ export interface TeacherFaceEnroll {
   teacherId: string;
   /** Camera selfie used to create the private teacher face template */
   faceImageBase64: string;
+  /**
+     * Short burst of independent camera samples used to create a more reliable private template
+     * @minItems 1
+     * @maxItems 5
+     */
+  faceSamplesBase64?: string[];
 }
 
 export interface TeacherCheckIn {
@@ -95,6 +101,12 @@ export interface TeacherCheckIn {
   faceVerificationMethod?: string;
   /** Camera selfie used to enroll or match the teacher face template */
   faceImageBase64?: string;
+  /**
+     * Short burst of camera samples; the server verifies the strongest usable frame
+     * @minItems 1
+     * @maxItems 5
+     */
+  faceSamplesBase64?: string[];
 }
 
 export interface TeacherCheckOut {
@@ -103,6 +115,12 @@ export interface TeacherCheckOut {
   longitude: number;
   /** Camera selfie used to match the enrolled teacher face template */
   faceImageBase64?: string;
+  /**
+     * Short burst of camera samples; the server verifies the strongest usable frame
+     * @minItems 1
+     * @maxItems 5
+     */
+  faceSamplesBase64?: string[];
 }
 
 export type TeacherLeaveStatus = typeof TeacherLeaveStatus[keyof typeof TeacherLeaveStatus];

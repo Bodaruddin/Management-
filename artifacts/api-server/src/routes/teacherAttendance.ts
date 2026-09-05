@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
-import { createFaceTemplateFromSamples, matchFaceTemplate } from "../lib/faceTemplate.js";
+import { createFaceTemplate, faceMatchesAny } from "../lib/faceTemplate.js";
 
 const router = Router();
 const SETTINGS_KEY = "teacher_attendance_settings";
@@ -173,43 +173,25 @@ async function saveFaceProfile(teacherId: string, template: string): Promise<voi
   });
 }
 
-function faceCandidatesFromBody(body: any): string[] {
-  const candidates = Array.isArray(body?.faceImageBase64Candidates)
-    ? body.faceImageBase64Candidates
+function getFaceImages(body: any): string[] {
+  const samples = Array.isArray(body?.faceSamplesBase64)
+    ? body.faceSamplesBase64
     : [body?.faceImageBase64];
-  return candidates
-    .filter((value: unknown): value is string => typeof value === "string" && value.length > 0)
-    .slice(0, 5);
+  return samples.filter((sample: unknown): sample is string =>
+    typeof sample === "string" && sample.trim().length > 0,
+  ).slice(0, 5);
 }
 
-async function verifyFaceCandidates(teacherId: string, imageBase64List: string[]) {
+async function verifyFace(teacherId: string, images: string[]) {
   const existing = await getFaceProfile(teacherId);
   if (!existing) {
-    throw new Error("Face verification is not set up yet. Complete face enrollment before marking attendance.");
+    throw new Error("Face verification is not set up yet. Complete face setup before checking attendance.");
   }
-
-  // Evaluate every captured frame server-side. Quality is checked before
-  // matching, and the strongest valid match wins without lowering the stored
-  // calibrated threshold.
-  const matches = imageBase64List.flatMap((imageBase64) => {
-    try {
-      const match = matchFaceTemplate(existing, imageBase64);
-      return match.usable ? [match] : [];
-    } catch {
-      return [];
-    }
-  });
-  if (!matches.length) {
-    throw new Error("No usable face frame was detected. Improve the lighting, keep your face centered, and try again.");
-  }
-
-  const best = matches.reduce((current, candidate) =>
-    candidate.score > current.score ? candidate : current,
-  );
-  if (!best.matched) {
+  const result = faceMatchesAny(existing, images);
+  if (!result.matched) {
     throw new Error("Face did not match the enrolled teacher. Please look directly at the camera and try again.");
   }
-  return { method: "camera_face_match", score: best.score, threshold: best.threshold };
+  return { method: "camera_face_match", score: result.score };
 }
 
 router.get("/settings/teacher-attendance", async (_req, res) => {
@@ -281,13 +263,9 @@ router.get("/teacher-attendance/face-status", async (req, res) => {
 
 router.post("/teacher-attendance/face-enroll", async (req, res) => {
   const teacherId = String(req.body?.teacherId ?? "");
-  const imageBase64List = Array.isArray(req.body?.faceImageBase64List)
-    ? req.body.faceImageBase64List
-      .filter((value: unknown): value is string => typeof value === "string" && value.length > 0)
-      .slice(0, 5)
-    : [];
-  if (!teacherId || imageBase64List.length < 3) {
-    res.status(400).json({ error: "teacherId and at least 3 clear camera samples are required" });
+  const images = getFaceImages(req.body);
+  if (!teacherId || images.length === 0) {
+    res.status(400).json({ error: "teacherId and camera face samples are required" });
     return;
   }
   try {
@@ -295,8 +273,8 @@ router.post("/teacher-attendance/face-enroll", async (req, res) => {
       res.status(409).json({ enrolled: true, error: "Face verification is already set up for this teacher" });
       return;
     }
-    await saveFaceProfile(teacherId, createFaceTemplateFromSamples(imageBase64List));
-    res.status(201).json({ enrolled: true, sampleCount: imageBase64List.length, method: "camera_face_enrollment" });
+    await saveFaceProfile(teacherId, createFaceTemplate(images));
+    res.status(201).json({ enrolled: true, method: "camera_face_enrollment", sampleCount: images.length });
   } catch (error: any) {
     const message = error?.message ?? "Face enrollment failed. Please capture your face again.";
     const databaseFailure = error?.code === "NO_DB_CONNECTION"
@@ -343,36 +321,44 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
   }
   let faceVerificationMethod = "disabled_by_admin";
   if (settings.requireFaceVerification) {
-    const imageBase64List = faceCandidatesFromBody(body);
-    if (!imageBase64List.length) {
-      res.status(400).json({ error: "A camera selfie is required for face verification" });
+    const faceImages = getFaceImages(body);
+    if (faceImages.length === 0) {
+      res.status(400).json({ error: "Camera face samples are required for face verification" });
       return;
     }
     try {
-      faceVerificationMethod = (await verifyFaceCandidates(teacherId, imageBase64List)).method;
+      faceVerificationMethod = (await verifyFace(teacherId, faceImages)).method;
     } catch (error: any) {
       res.status(403).json({ error: error?.message ?? "Face verification failed" });
       return;
     }
   }
-  const existing = await getAdapter().teacherAttendance.getByTeacherDate(teacherId, date);
-  if (existing) {
-    res.status(409).json({ error: "Attendance has already been checked in for today", record: existing });
-    return;
-  }
   const late = nowMinutes > checkInStart + settings.lateGraceMinutes;
-  const row = await getAdapter().teacherAttendance.create({
-    id: body.id, teacherId, teacherName, date,
-    status: late ? "late" : "present",
-    checkInAt: body.checkInAt ?? new Date().toISOString(),
-    checkInLatitude: latitude, checkInLongitude: longitude,
-    distanceFromSchool: distance, faceVerified: settings.requireFaceVerification,
-    faceVerificationMethod: settings.requireFaceVerification
-      ? faceVerificationMethod
-      : "disabled_by_admin",
-    note: typeof body.note === "string" ? body.note.trim() : null,
-  });
-  res.status(201).json(row);
+   try {
+     const result = await getAdapter().teacherAttendance.createIfAbsent(teacherId, date, {
+       id: body.id, teacherId, teacherName, date,
+       status: late ? "late" : "present",
+       checkInAt: body.checkInAt ?? new Date().toISOString(),
+       checkInLatitude: latitude, checkInLongitude: longitude,
+       distanceFromSchool: distance, faceVerified: settings.requireFaceVerification,
+       faceVerificationMethod: settings.requireFaceVerification
+         ? faceVerificationMethod
+         : "disabled_by_admin",
+       note: typeof body.note === "string" ? body.note.trim() : null,
+     });
+     if (!result.created) {
+       res.status(409).json({ error: "Attendance has already been checked in for today", record: result.row });
+       return;
+     }
+     res.status(201).json(result.row);
+   } catch (error: any) {
+     if (error?.code === "23505") {
+       const existing = await getAdapter().teacherAttendance.getByTeacherDate(teacherId, date);
+       res.status(409).json({ error: "Attendance has already been checked in for today", record: existing });
+       return;
+     }
+     throw error;
+   }
 });
 
 router.post("/teacher-attendance/:id/check-out", async (req, res) => {
@@ -404,13 +390,13 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
     return;
   }
   if (settings.requireFaceVerification) {
-    const imageBase64List = faceCandidatesFromBody(body);
-    if (!imageBase64List.length) {
-      res.status(400).json({ error: "A camera selfie is required for face verification" });
+    const faceImages = getFaceImages(body);
+    if (faceImages.length === 0) {
+      res.status(400).json({ error: "Camera face samples are required for face verification" });
       return;
     }
     try {
-      await verifyFaceCandidates(teacherId, imageBase64List);
+      await verifyFace(teacherId, faceImages);
     } catch (error: any) {
       res.status(403).json({ error: error?.message ?? "Face verification failed" });
       return;

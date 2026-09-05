@@ -400,6 +400,12 @@ components:
       properties:
         teacherId: { type: string }
         faceImageBase64: { type: string, description: "Camera selfie used to create the private teacher face template" }
+        faceSamplesBase64:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items: { type: string }
+          description: "Short burst of independent camera samples used to create a more reliable private template"
     TeacherCheckIn:
       type: object
       required: [teacherId, teacherName, latitude, longitude, faceVerified]
@@ -412,6 +418,12 @@ components:
         faceVerified: { type: boolean }
         faceVerificationMethod: { type: string }
         faceImageBase64: { type: string, description: "Camera selfie used to enroll or match the teacher face template" }
+        faceSamplesBase64:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items: { type: string }
+          description: "Short burst of camera samples; the server verifies the strongest usable frame"
     TeacherCheckOut:
       type: object
       required: [teacherId, latitude, longitude]
@@ -420,6 +432,12 @@ components:
         latitude: { type: number }
         longitude: { type: number }
         faceImageBase64: { type: string, description: "Camera selfie used to match the enrolled teacher face template" }
+        faceSamplesBase64:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items: { type: string }
+          description: "Short burst of camera samples; the server verifies the strongest usable frame"
     TeacherLeave:
       type: object
       properties:

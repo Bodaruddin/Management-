@@ -103,15 +103,24 @@ export const GetTeacherFaceStatusResponse = zod.object({
 })
 
 
+export const enrollTeacherFaceBodyFaceSamplesBase64Max = 5;
+
+
+
 export const EnrollTeacherFaceBody = zod.object({
   "teacherId": zod.string(),
-  "faceImageBase64": zod.string().describe('Camera selfie used to create the private teacher face template')
+  "faceImageBase64": zod.string().describe('Camera selfie used to create the private teacher face template'),
+  "faceSamplesBase64": zod.array(zod.string()).min(1).max(enrollTeacherFaceBodyFaceSamplesBase64Max).optional().describe('Short burst of independent camera samples used to create a more reliable private template')
 })
 
 export const EnrollTeacherFaceResponse = zod.object({
   "enrolled": zod.boolean(),
   "method": zod.string().optional()
 })
+
+
+export const teacherCheckInBodyFaceSamplesBase64Max = 5;
+
 
 
 export const TeacherCheckInBody = zod.object({
@@ -122,7 +131,8 @@ export const TeacherCheckInBody = zod.object({
   "longitude": zod.number(),
   "faceVerified": zod.boolean(),
   "faceVerificationMethod": zod.string().optional(),
-  "faceImageBase64": zod.string().optional().describe('Camera selfie used to enroll or match the teacher face template')
+  "faceImageBase64": zod.string().optional().describe('Camera selfie used to enroll or match the teacher face template'),
+  "faceSamplesBase64": zod.array(zod.string()).min(1).max(teacherCheckInBodyFaceSamplesBase64Max).optional().describe('Short burst of camera samples; the server verifies the strongest usable frame')
 })
 
 export const TeacherCheckInResponse = zod.object({
@@ -147,11 +157,16 @@ export const TeacherCheckOutParams = zod.object({
   "id": zod.coerce.string()
 })
 
+export const teacherCheckOutBodyFaceSamplesBase64Max = 5;
+
+
+
 export const TeacherCheckOutBody = zod.object({
   "teacherId": zod.string(),
   "latitude": zod.number(),
   "longitude": zod.number(),
-  "faceImageBase64": zod.string().optional().describe('Camera selfie used to match the enrolled teacher face template')
+  "faceImageBase64": zod.string().optional().describe('Camera selfie used to match the enrolled teacher face template'),
+  "faceSamplesBase64": zod.array(zod.string()).min(1).max(teacherCheckOutBodyFaceSamplesBase64Max).optional().describe('Short burst of camera samples; the server verifies the strongest usable frame')
 })
 
 export const TeacherCheckOutResponse = zod.object({

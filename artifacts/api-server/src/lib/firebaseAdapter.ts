@@ -817,6 +817,34 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
         await col("teacher_attendance_records").doc(id).set(doc);
         return { id, ...doc };
       },
+      async createIfAbsent(teacherId, date, data) {
+        const existing = await col("teacher_attendance_records")
+          .where("teacherId", "==", teacherId).where("date", "==", date).limit(1).get();
+        if (!existing.empty) return { row: mapDoc(existing.docs[0]), created: false };
+
+        const id = data.id ?? newId();
+        const ref = col("teacher_attendance_records").doc(id);
+        const doc = stamp({
+          teacherId, teacherName: data.teacherName ?? "", date,
+          status: data.status ?? "present", checkInAt: data.checkInAt ?? now(),
+          checkInLatitude: data.checkInLatitude ?? null, checkInLongitude: data.checkInLongitude ?? null,
+          distanceFromSchool: data.distanceFromSchool ?? null, faceVerified: String(Boolean(data.faceVerified)),
+          faceVerificationMethod: data.faceVerificationMethod ?? null, note: data.note ?? null,
+        });
+        await fs.runTransaction(async (transaction) => {
+          const snapshot = await transaction.get(
+            col("teacher_attendance_records")
+              .where("teacherId", "==", teacherId).where("date", "==", date).limit(1),
+          );
+          if (!snapshot.empty) return;
+          transaction.create(ref, doc);
+        });
+        const saved = await ref.get();
+        if (saved.exists) return { row: mapDoc(saved), created: true };
+        const winner = await col("teacher_attendance_records")
+          .where("teacherId", "==", teacherId).where("date", "==", date).limit(1).get();
+        return { row: winner.empty ? null : mapDoc(winner.docs[0]), created: false };
+      },
       async updateCheckOut(id, data) {
         const ref = col("teacher_attendance_records").doc(id);
         const existing = await ref.get();

@@ -87,6 +87,7 @@ export interface DataAdapter {
     list(filters?: { teacherId?: string; month?: string }): Promise<any[]>;
     getByTeacherDate(teacherId: string, date: string): Promise<any | null>;
     create(data: any): Promise<any>;
+    createIfAbsent(teacherId: string, date: string, data: any): Promise<{ row: any; created: boolean }>;
     updateCheckOut(id: string, data: any): Promise<any | null>;
   };
   teacherLeaveApplications: {

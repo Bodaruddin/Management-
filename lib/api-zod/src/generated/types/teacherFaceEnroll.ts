@@ -10,4 +10,10 @@ export interface TeacherFaceEnroll {
   teacherId: string;
   /** Camera selfie used to create the private teacher face template */
   faceImageBase64: string;
+  /**
+     * Short burst of independent camera samples used to create a more reliable private template
+     * @minItems 1
+     * @maxItems 5
+     */
+  faceSamplesBase64?: string[];
 }

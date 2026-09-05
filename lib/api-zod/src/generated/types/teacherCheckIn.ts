@@ -16,6 +16,10 @@ export interface TeacherCheckIn {
   faceVerificationMethod?: string;
   /** Camera selfie used to enroll or match the teacher face template */
   faceImageBase64?: string;
-  /** Several camera frames; the server selects the clearest frame automatically */
-  faceImagesBase64?: string[];
+  /**
+     * Short burst of camera samples; the server verifies the strongest usable frame
+     * @minItems 1
+     * @maxItems 5
+     */
+  faceSamplesBase64?: string[];
 }
