@@ -190,6 +190,7 @@ function FaceCaptureModal({
           // keeping the enrollment template independent from one photo.
           base64: true,
           quality: 0.92,
+          imageType: 'jpg',
           skipProcessing: false,
         });
         images.push(await getFaceImageBase64(photo));
