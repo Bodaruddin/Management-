@@ -1,7 +1,11 @@
 import jpeg from "jpeg-js";
 
 const TEMPLATE_SIZE = 24;
-const MATCH_THRESHOLD = 0.78;
+// Camera framing varies noticeably between Android devices. The matcher still
+// requires a strong structural similarity, but the threshold must allow for
+// the normal crop, mirror, and lighting differences introduced by a second
+// capture of the same face.
+const MATCH_THRESHOLD = 0.72;
 const MAX_STORED_TEMPLATES = 64;
 const MAX_ENROLLMENT_SAMPLES = 5;
 const MIN_IMAGE_SIDE = 160;
@@ -127,10 +131,14 @@ const TEMPLATE_VARIANTS: NormalizationOptions[] = [
   { flipX: true },
   { zoom: 1.12 },
   { zoom: 1.25 },
-  { shiftX: -0.07 },
-  { shiftX: 0.07 },
-  { shiftY: -0.07 },
-  { shiftY: 0.07 },
+  { zoom: 1.45 },
+  { zoom: 1.65 },
+  { shiftX: -0.09 },
+  { shiftX: 0.09 },
+  { shiftY: -0.09 },
+  { shiftY: 0.09 },
+  { zoom: 1.25, shiftX: -0.08 },
+  { zoom: 1.25, shiftX: 0.08 },
 ];
 
 function normalizedPixelsWithOptions(
