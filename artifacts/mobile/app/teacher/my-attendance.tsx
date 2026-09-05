@@ -526,8 +526,8 @@ function getAttendanceErrorCopy(rawMessage: string): AttendanceErrorCopy {
     return {
       isLocationError: true,
       eyebrow: 'LOCATION CHECK',
-      title: 'You’re outside the check-out zone',
-      description: 'Move closer to campus and try again when you are within the approved school perimeter.',
+      title: 'Location Verification Required',
+      description: 'You’re outside the approved check-out area.',
       detail: 'Check-out is protected by your school’s location boundary.',
       distance: `${Math.round(Number(locationMatch[1]))}m`,
       radius: `${Math.round(Number(locationMatch[2]))}m`,
