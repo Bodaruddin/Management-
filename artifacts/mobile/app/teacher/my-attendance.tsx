@@ -501,6 +501,166 @@ function FaceResultModal({
   );
 }
 
+type AttendanceErrorCopy = {
+  isLocationError: boolean;
+  eyebrow: string;
+  title: string;
+  description: string;
+  detail: string;
+  distance?: string;
+  radius?: string;
+};
+
+function getAttendanceErrorCopy(rawMessage: string): AttendanceErrorCopy {
+  const cleanedMessage = rawMessage
+    .replace(/^.*?check-out failed:\s*/i, '')
+    .replace(/^\d{3}\s*[—-]\s*/i, '')
+    .replace(/^(?:GET|POST|PUT|DELETE)\s+\S+\s+(?:failed|error):\s*/i, '')
+    .trim();
+  const locationMatch = cleanedMessage.match(
+    /You are\s+([\d.]+)m from school;\s*check-out is allowed within\s*([\d.]+)m/i,
+  );
+
+  if (locationMatch) {
+    return {
+      isLocationError: true,
+      eyebrow: 'LOCATION CHECK',
+      title: 'You’re outside the check-out zone',
+      description: 'Move closer to campus and try again when you are within the approved school perimeter.',
+      detail: 'Check-out is protected by your school’s location boundary.',
+      distance: `${Math.round(Number(locationMatch[1]))}m`,
+      radius: `${Math.round(Number(locationMatch[2]))}m`,
+    };
+  }
+
+  return {
+    isLocationError: false,
+    eyebrow: 'ACTION NEEDED',
+    title: 'We couldn’t complete that',
+    description: 'Something interrupted this attendance action. Review the detail below and try again.',
+    detail: cleanedMessage || 'Please try again in a moment.',
+  };
+}
+
+function AttendanceErrorModal({
+  visible,
+  message,
+  onDismiss,
+}: {
+  visible: boolean;
+  message: string;
+  onDismiss: () => void;
+}) {
+  const colors = useColors();
+  const copy = getAttendanceErrorCopy(message);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+      <View style={[feedbackStyles.backdrop, { backgroundColor: colors.primary + 'D9' }]}>
+        <View
+          style={[
+            feedbackStyles.card,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              shadowColor: colors.primary,
+            },
+          ]}
+        >
+          <View style={feedbackStyles.topRow}>
+            <View style={[feedbackStyles.kicker, { backgroundColor: colors.warning + '18' }]}>
+              <View style={[feedbackStyles.kickerDot, { backgroundColor: colors.warning }]} />
+              <Text style={[feedbackStyles.kickerText, { color: colors.warning }]}>
+                {copy.eyebrow}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onDismiss}
+              style={[feedbackStyles.closeButton, { backgroundColor: colors.muted }]}
+              accessibilityRole="button"
+              accessibilityLabel="Close attendance message"
+            >
+              <Feather name="x" size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={[feedbackStyles.iconHalo, { backgroundColor: colors.warning + '18' }]}>
+            <View style={[feedbackStyles.iconCircle, { backgroundColor: colors.warning }]}>
+              <Feather
+                name={copy.isLocationError ? 'map-pin' : 'alert-triangle'}
+                size={27}
+                color={colors.primaryForeground}
+              />
+            </View>
+          </View>
+
+          <Text style={[feedbackStyles.title, { color: colors.text }]}>{copy.title}</Text>
+          <Text style={[feedbackStyles.description, { color: colors.mutedForeground }]}>
+            {copy.description}
+          </Text>
+
+          {copy.isLocationError && copy.distance && copy.radius ? (
+            <View style={[feedbackStyles.metrics, { backgroundColor: colors.muted }]}>
+              <View style={feedbackStyles.metric}>
+                <Text style={[feedbackStyles.metricLabel, { color: colors.mutedForeground }]}>
+                  YOUR DISTANCE
+                </Text>
+                <Text style={[feedbackStyles.metricValue, { color: colors.warning }]}>
+                  {copy.distance}
+                </Text>
+                <Text style={[feedbackStyles.metricHint, { color: colors.mutedForeground }]}>
+                  from school
+                </Text>
+              </View>
+              <View style={[feedbackStyles.metricDivider, { backgroundColor: colors.border }]} />
+              <View style={feedbackStyles.metric}>
+                <Text style={[feedbackStyles.metricLabel, { color: colors.mutedForeground }]}>
+                  ALLOWED RADIUS
+                </Text>
+                <Text style={[feedbackStyles.metricValue, { color: colors.primary }]}>
+                  {copy.radius}
+                </Text>
+                <Text style={[feedbackStyles.metricHint, { color: colors.mutedForeground }]}>
+                  maximum distance
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          <View style={[feedbackStyles.detail, { backgroundColor: colors.secondary }]}>
+            <Feather name="info" size={16} color={colors.primary} />
+            <Text style={[feedbackStyles.detailText, { color: colors.secondaryForeground }]}>
+              {copy.detail}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            onPress={onDismiss}
+            style={[feedbackStyles.primaryAction, { backgroundColor: colors.primary }]}
+            accessibilityRole="button"
+            accessibilityLabel="Try the attendance action again"
+          >
+            <Text style={[feedbackStyles.primaryActionText, { color: colors.primaryForeground }]}>
+              Try again
+            </Text>
+            <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={onDismiss}
+            style={feedbackStyles.secondaryAction}
+            accessibilityRole="button"
+            accessibilityLabel="Close attendance message"
+          >
+            <Text style={[feedbackStyles.secondaryActionText, { color: colors.mutedForeground }]}>
+              Close message
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function formatTime(value?: string) {
   if (!value) return '—';
   const date = new Date(value);
@@ -775,13 +935,6 @@ export default function MyTeacherAttendance() {
         ))}
       </View>
 
-      {error ? (
-        <View style={[s.error, { backgroundColor: colors.destructive + '15', borderColor: colors.destructive }]}>
-          <Feather name="alert-circle" size={16} color={colors.destructive} />
-          <Text style={[s.errorText, { color: colors.destructive }]}>{error}</Text>
-        </View>
-      ) : null}
-
       {tab === 'today' && (
         faceEnrolled === null ? (
           <View style={s.loadingState}>
@@ -995,6 +1148,11 @@ export default function MyTeacherAttendance() {
           setFaceResultMessage('');
         }}
       />
+      <AttendanceErrorModal
+        visible={Boolean(error)}
+        message={error}
+        onDismiss={() => setError('')}
+      />
     </View>
   );
 }
@@ -1009,8 +1167,6 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   tabs: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 12 },
   tab: { flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: 2, borderBottomColor: 'transparent' },
   tabText: { fontSize: 13, fontWeight: '700' },
-  error: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, margin: 16, marginBottom: 0, padding: 11, borderRadius: 10, borderWidth: 1 },
-  errorText: { flex: 1, fontSize: 13, lineHeight: 18 },
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { fontSize: 13 },
   setupScroll: { padding: 16, flexGrow: 1, justifyContent: 'center' },
@@ -1069,6 +1225,154 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   leaveAction: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 6 },
   leaveActionText: { fontSize: 10, fontWeight: '800' },
   pendingHint: { fontSize: 10, marginTop: 5 },
+});
+
+const feedbackStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 390,
+    borderRadius: 30,
+    borderWidth: 1,
+    paddingHorizontal: 22,
+    paddingTop: 18,
+    paddingBottom: 16,
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 12,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  kicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  kickerDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  kickerText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconHalo: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginTop: 16,
+    marginBottom: 17,
+  },
+  iconCircle: {
+    width: 62,
+    height: 62,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: -0.4,
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+    marginTop: 9,
+    paddingHorizontal: 3,
+  },
+  metrics: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 18,
+    paddingVertical: 14,
+    marginTop: 20,
+  },
+  metric: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  metricDivider: {
+    width: 1,
+    height: 44,
+  },
+  metricLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  metricValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  metricHint: {
+    fontSize: 10,
+    marginTop: 1,
+  },
+  detail: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 9,
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 14,
+  },
+  detailText: {
+    flex: 1,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  primaryAction: {
+    width: '100%',
+    minHeight: 52,
+    borderRadius: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    marginTop: 18,
+  },
+  primaryActionText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secondaryAction: {
+    alignItems: 'center',
+    paddingVertical: 13,
+  },
+  secondaryActionText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });
 
 const resultStyles = StyleSheet.create({
