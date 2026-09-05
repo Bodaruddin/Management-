@@ -4,12 +4,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import {
   TeacherAttendanceSettings, TeacherLeaveApplication, useApp,
 } from '@/context/AppContext';
+import { readCurrentLocation } from '@/utils/location';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const TIME_SETTING_KEYS = ['checkInStart', 'checkInEnd', 'checkOutStart', 'checkOutEnd'] as const;
@@ -55,22 +55,6 @@ function createTimeDrafts(settings: TeacherAttendanceSettings): Record<TimeSetti
   }, {} as Record<TimeSettingKey, string>);
 }
 
-async function readAdminLocation(): Promise<{ latitude: number; longitude: number }> {
-  if (Platform.OS === 'web') {
-    return new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(
-        p => resolve({ latitude: p.coords.latitude, longitude: p.coords.longitude }),
-        e => reject(new Error(e.message || 'Could not read browser location')),
-        { enableHighAccuracy: true, timeout: 15000 },
-      );
-    });
-  }
-  const permission = await Location.requestForegroundPermissionsAsync();
-  if (!permission.granted) throw new Error('Location permission is required');
-  const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-  return { latitude: location.coords.latitude, longitude: location.coords.longitude };
-}
-
 export default function AdminTeacherAttendance() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -114,7 +98,7 @@ export default function AdminTeacherAttendance() {
   };
 
   const useCurrentLocation = () => save(async () => {
-    const coordinates = await readAdminLocation();
+    const coordinates = await readCurrentLocation();
     const nextSettings = { ...getSettingsForSave(), schoolLatitude: coordinates.latitude, schoolLongitude: coordinates.longitude };
     setSettings(nextSettings);
     await updateTeacherAttendanceSettings(nextSettings);
