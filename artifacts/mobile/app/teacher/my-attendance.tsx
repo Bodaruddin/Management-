@@ -512,6 +512,7 @@ type AttendanceErrorCopy = {
 };
 
 function getAttendanceErrorCopy(rawMessage: string): AttendanceErrorCopy {
+  const isCheckOutError = /check[-\s]?out/i.test(rawMessage);
   const cleanedMessage = rawMessage
     .replace(/^.*?check-out failed:\s*/i, '')
     .replace(/^\d{3}\s*[—-]\s*/i, '')
@@ -536,8 +537,10 @@ function getAttendanceErrorCopy(rawMessage: string): AttendanceErrorCopy {
   return {
     isLocationError: false,
     eyebrow: 'ACTION NEEDED',
-    title: 'We couldn’t complete that',
-    description: 'Something interrupted this attendance action. Review the detail below and try again.',
+    title: isCheckOutError ? 'Check-out Not Available' : 'We couldn’t complete that',
+    description: isCheckOutError
+      ? 'Your check-out cannot be completed at this time.'
+      : 'Something interrupted this attendance action. Review the detail below and try again.',
     detail: cleanedMessage || 'Please try again in a moment.',
   };
 }
