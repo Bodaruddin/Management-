@@ -8,7 +8,6 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
-import * as Location from 'expo-location';
 import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import { router } from 'expo-router';
@@ -18,67 +17,9 @@ import {
   TeacherAttendanceRecord, TeacherLeaveApplication, useApp,
 } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
+import { readCurrentLocation } from '@/utils/location';
 
 type Tab = 'today' | 'history' | 'leave';
-type Coordinates = { latitude: number; longitude: number };
-
-function getWebLocationWithOptions(options: PositionOptions): Promise<Coordinates> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('Location is not available in this browser'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      position => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
-      error => reject(error),
-      options,
-    );
-  });
-}
-
-async function getWebLocation(): Promise<Coordinates> {
-  try {
-    return await getWebLocationWithOptions({
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0,
-    });
-  } catch (error: any) {
-    if (error?.code === 1) {
-      throw new Error('Location permission is required to mark attendance');
-    }
-    if (error?.code !== 3) {
-      throw new Error(error?.message || 'Could not read your location');
-    }
-    // A cold GPS fix can exceed the high-accuracy timeout in mobile Chrome.
-    // Retry for a current network-assisted position; the server still applies
-    // the unchanged geofence check before marking attendance.
-    try {
-      return await getWebLocationWithOptions({
-        enableHighAccuracy: false,
-        timeout: 20000,
-        maximumAge: 0,
-      });
-    } catch {
-      throw new Error('Could not get your current location. Turn on location services and try again.');
-    }
-  }
-}
-
-async function readCurrentLocation(): Promise<Coordinates> {
-  if (Platform.OS === 'web') return getWebLocation();
-  const permission = await Location.requestForegroundPermissionsAsync();
-  if (!permission.granted) throw new Error('Location permission is required to mark attendance');
-  let location;
-  try {
-    location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-  } catch {
-    // Keep the server-side geofence authoritative while allowing devices with
-    // a slow GPS warm-up to retry with a current balanced-accuracy fix.
-    location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-  }
-  return { latitude: location.coords.latitude, longitude: location.coords.longitude };
-}
 
 type FaceCapturePurpose = 'enroll' | 'check-in' | 'check-out';
 type FaceFlowStage = 'detected' | 'verifying';
@@ -520,18 +461,29 @@ function getAttendanceErrorCopy(rawMessage: string): AttendanceErrorCopy {
     .replace(/^(?:GET|POST|PUT|DELETE)\s+\S+\s+(?:failed|error):\s*/i, '')
     .trim();
   const locationMatch = cleanedMessage.match(
-    /You are\s+([\d.]+)m from school;\s*check-out is allowed within\s*([\d.]+)m/i,
+    /You are\s+([\d.]+)m from school;\s*check-(?:in|out) is allowed within\s*([\d.]+)m/i,
   );
+  const isGpsError = /GPS accuracy|precise location|location signal|current location/i.test(cleanedMessage);
 
   if (locationMatch) {
     return {
       isLocationError: true,
       eyebrow: 'LOCATION CHECK',
       title: 'Location Verification Required',
-      description: 'You’re outside the approved check-out area.',
-      detail: 'Check-out is protected by your school’s location boundary.',
+      description: `You’re outside the approved ${isCheckOutError ? 'check-out' : 'check-in'} area.`,
+      detail: `${isCheckOutError ? 'Check-out' : 'Check-in'} is protected by your school’s location boundary.`,
       distance: `${Math.round(Number(locationMatch[1]))}m`,
       radius: `${Math.round(Number(locationMatch[2]))}m`,
+    };
+  }
+
+  if (isGpsError) {
+    return {
+      isLocationError: true,
+      eyebrow: 'LOCATION SIGNAL',
+      title: 'Better GPS signal needed',
+      description: 'Your phone has not received a precise enough location yet.',
+      detail: cleanedMessage || 'Turn on precise location, wait a moment, and try again from the school grounds.',
     };
   }
 
@@ -550,10 +502,12 @@ function AttendanceErrorModal({
   visible,
   message,
   onDismiss,
+  onRetry,
 }: {
   visible: boolean;
   message: string;
   onDismiss: () => void;
+  onRetry: () => void;
 }) {
   const colors = useColors();
   const copy = getAttendanceErrorCopy(message);
@@ -639,7 +593,7 @@ function AttendanceErrorModal({
           </View>
 
           <TouchableOpacity
-            onPress={onDismiss}
+            onPress={onRetry}
             style={[feedbackStyles.primaryAction, { backgroundColor: colors.primary }]}
             accessibilityRole="button"
             accessibilityLabel="Try the attendance action again"
@@ -690,6 +644,7 @@ export default function MyTeacherAttendance() {
   const [faceResult, setFaceResult] = useState<FaceResultKind | null>(null);
   const [faceResultPurpose, setFaceResultPurpose] = useState<'check-in' | 'check-out'>('check-in');
   const [faceResultMessage, setFaceResultMessage] = useState('');
+  const [lastAttendanceAction, setLastAttendanceAction] = useState<'check-in' | 'check-out' | null>(null);
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [leaveStart, setLeaveStart] = useState(new Date().toISOString().slice(0, 10));
   const [leaveEnd, setLeaveEnd] = useState(new Date().toISOString().slice(0, 10));
@@ -724,6 +679,7 @@ export default function MyTeacherAttendance() {
     }
     let active = true;
     setError('');
+    setLastAttendanceAction(null);
     setFaceEnrolled(null);
     getTeacherFaceStatus(user.id)
       .then(enrolled => { if (active) setFaceEnrolled(enrolled); })
@@ -780,6 +736,7 @@ export default function MyTeacherAttendance() {
     const purpose = faceCaptureMode;
     setFaceCaptureMode(null);
     if (!purpose || !user) return;
+    if (purpose !== 'enroll') setLastAttendanceAction(purpose);
     await runAction(async () => {
       if (purpose === 'enroll') {
         await enrollTeacherFace(user.id, faceSamplesBase64);
@@ -809,6 +766,7 @@ export default function MyTeacherAttendance() {
     }, {
       onSuccess: () => {
         setFaceFlowStage(null);
+        setLastAttendanceAction(null);
         if (purpose !== 'enroll') showFaceResult('success', purpose);
       },
       onError: message => {
@@ -826,6 +784,7 @@ export default function MyTeacherAttendance() {
   };
 
   const handleCheckIn = () => {
+    setLastAttendanceAction('check-in');
     if (teacherAttendanceSettings.requireFaceVerification) {
       setError('');
       setFaceResultPurpose('check-in');
@@ -846,6 +805,7 @@ export default function MyTeacherAttendance() {
   };
 
   const handleCheckOut = () => {
+    setLastAttendanceAction('check-out');
     if (teacherAttendanceSettings.requireFaceVerification) {
       setError('');
       setFaceResultPurpose('check-out');
@@ -908,6 +868,20 @@ export default function MyTeacherAttendance() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: remove },
     ]);
+  };
+
+  const retryAttendance = () => {
+    setError('');
+    if (!lastAttendanceAction) return;
+    if (teacherAttendanceSettings.requireFaceVerification) {
+      setFaceCaptureMode(lastAttendanceAction);
+      return;
+    }
+    if (lastAttendanceAction === 'check-out') {
+      handleCheckOut();
+    } else {
+      handleCheckIn();
+    }
   };
 
   const s = styles(colors);
@@ -1215,6 +1189,7 @@ export default function MyTeacherAttendance() {
         visible={Boolean(error)}
         message={error}
         onDismiss={() => setError('')}
+        onRetry={retryAttendance}
       />
     </View>
   );
