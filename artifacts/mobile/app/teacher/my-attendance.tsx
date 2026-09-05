@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as Location from 'expo-location';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera';
 import { router } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
@@ -916,23 +917,29 @@ export default function MyTeacherAttendance() {
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
       <View style={[s.header, { backgroundColor: colors.card, paddingTop: topPad, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.replace('/teacher')} style={s.backButton}>
+        <TouchableOpacity onPress={() => router.replace('/teacher')} style={[s.backButton, { backgroundColor: colors.muted }]}>
           <Feather name="arrow-left" size={22} color={colors.cardForeground} />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
+        <View style={s.headerCopy}>
+          <Text style={[s.eyebrow, { color: colors.primary }]}>SECURE ATTENDANCE</Text>
           <Text style={[s.title, { color: colors.cardForeground }]}>My Attendance</Text>
           <Text style={[s.subtitle, { color: colors.mutedForeground }]}>GPS + face verification</Text>
         </View>
-        <TouchableOpacity onPress={() => refreshTeacherAttendance(user?.id)} style={s.iconButton}>
+        <TouchableOpacity onPress={() => refreshTeacherAttendance(user?.id)} style={[s.iconButton, { backgroundColor: colors.secondary }]}>
           <Feather name="refresh-cw" size={18} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      <View style={[s.tabs, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={[s.tabs, { backgroundColor: colors.muted, borderColor: colors.border }]}>
         {([
           ['today', 'Today'], ['history', 'History'], ['leave', 'Leave'],
         ] as [Tab, string][]).map(([value, label]) => (
-          <TouchableOpacity key={value} onPress={() => setTab(value)} style={[s.tab, tab === value && { borderBottomColor: colors.primary }]}>
+          <TouchableOpacity
+            key={value}
+            onPress={() => setTab(value)}
+            style={[s.tab, tab === value && { backgroundColor: colors.card, shadowColor: colors.primary }]}
+            activeOpacity={0.8}
+          >
             <Text style={[s.tabText, { color: tab === value ? colors.primary : colors.mutedForeground }]}>{label}</Text>
           </TouchableOpacity>
         ))}
@@ -988,12 +995,36 @@ export default function MyTeacherAttendance() {
             </View>
           </ScrollView>
         ) : (
-          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: bottomPad }}>
-            <View style={[s.hero, { backgroundColor: colors.primary }]}>
-              <View style={s.heroIcon}><Feather name="shield" size={26} color={colors.primary} /></View>
+          <ScrollView contentContainerStyle={[s.todayScroll, { paddingBottom: bottomPad }]}>
+            <LinearGradient
+              colors={['#101E4F', '#1E3A8A', '#315BCB']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.hero}
+            >
+              <View style={s.heroDecorOne} />
+              <View style={s.heroDecorTwo} />
+              <View style={s.heroTopRow}>
+                <View style={s.heroIcon}><Feather name="shield" size={23} color="#173B92" /></View>
+                <View style={s.heroSecurePill}>
+                  <View style={s.heroSecureDot} />
+                  <Text style={s.heroSecureText}>SECURE CHECK-IN</Text>
+                </View>
+              </View>
+              <Text style={s.heroKicker}>TODAY’S ATTENDANCE</Text>
               <Text style={s.heroTitle}>{todayRecord ? (todayRecord.status === 'late' ? 'Checked in late' : 'Checked in') : 'Ready to check in?'}</Text>
               <Text style={s.heroCopy}>Your location must be within {teacherAttendanceSettings.radiusMeters}m of school.</Text>
-            </View>
+              <View style={s.heroFooter}>
+                <View style={s.heroFooterItem}>
+                  <Feather name="map-pin" size={14} color="#BFD0FF" />
+                  <Text style={s.heroFooterText}>{teacherAttendanceSettings.radiusMeters}m geofence</Text>
+                </View>
+                <View style={s.heroFooterItem}>
+                  <Feather name="user-check" size={14} color="#BFD0FF" />
+                  <Text style={s.heroFooterText}>Face match on</Text>
+                </View>
+              </View>
+            </LinearGradient>
 
             <View style={[s.recordCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={s.recordRow}>
@@ -1001,31 +1032,58 @@ export default function MyTeacherAttendance() {
                   <Feather name={todayRecord ? 'check-circle' : 'clock'} size={20} color={todayRecord ? colors.success : colors.mutedForeground} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.recordLabel, { color: colors.mutedForeground }]}>Today · {today}</Text>
+                  <View style={s.recordHeading}>
+                    <Text style={[s.recordLabel, { color: colors.mutedForeground }]}>Today · {today}</Text>
+                    <View style={[s.statusPill, { backgroundColor: todayRecord ? colors.success + '18' : colors.secondary }]}>
+                      <View style={[s.statusDot, { backgroundColor: todayRecord ? colors.success : colors.primary }]} />
+                      <Text style={[s.statusPillText, { color: todayRecord ? colors.success : colors.primary }]}>
+                        {todayRecord ? (todayRecord.status === 'late' ? 'LATE' : 'PRESENT') : 'PENDING'}
+                      </Text>
+                    </View>
+                  </View>
                   <Text style={[s.recordValue, { color: colors.text }]}>
                     {todayRecord ? (todayRecord.status === 'late' ? 'Late' : 'Present') : 'Not marked'}
                   </Text>
                 </View>
-                {todayRecord?.distanceFromSchool !== undefined && (
-                  <Text style={[s.distance, { color: colors.mutedForeground }]}>{Math.round(todayRecord.distanceFromSchool)}m away</Text>
-                )}
               </View>
               <View style={[s.timeGrid, { borderTopColor: colors.border }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.smallLabel, { color: colors.mutedForeground }]}>CHECK-IN</Text>
+                  <View style={s.timeLabelRow}>
+                    <Feather name="log-in" size={13} color={colors.primary} />
+                    <Text style={[s.smallLabel, { color: colors.mutedForeground }]}>CHECK-IN</Text>
+                  </View>
                   <Text style={[s.time, { color: colors.text }]}>{formatTime(todayRecord?.checkInAt)}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.smallLabel, { color: colors.mutedForeground }]}>CHECK-OUT</Text>
+                  <View style={s.timeLabelRow}>
+                    <Feather name="log-out" size={13} color={colors.primary} />
+                    <Text style={[s.smallLabel, { color: colors.mutedForeground }]}>CHECK-OUT</Text>
+                  </View>
                   <Text style={[s.time, { color: colors.text }]}>{formatTime(todayRecord?.checkOutAt)}</Text>
                 </View>
               </View>
+              {todayRecord?.distanceFromSchool !== undefined && (
+                <View style={[s.distanceRow, { borderTopColor: colors.border }]}>
+                  <Feather name="navigation" size={13} color={colors.success} />
+                  <Text style={[s.distance, { color: colors.mutedForeground }]}>
+                    Verified {Math.round(todayRecord.distanceFromSchool)}m from school
+                  </Text>
+                </View>
+              )}
             </View>
 
             {!todayRecord ? (
-              <TouchableOpacity style={[s.primaryButton, { backgroundColor: busy ? colors.muted : colors.primary }]} disabled={busy} onPress={handleCheckIn}>
-                <Feather name="camera" size={18} color={colors.primaryForeground} />
-                <Text style={s.primaryButtonText}>{busy ? 'Verifying…' : 'Verify face & check in'}</Text>
+              <TouchableOpacity disabled={busy} onPress={handleCheckIn} activeOpacity={0.9}>
+                <LinearGradient
+                  colors={busy ? [colors.muted, colors.muted] : ['#1E3A8A', '#315BCB']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={s.primaryButton}
+                >
+                  <View style={s.buttonIcon}><Feather name="camera" size={17} color={colors.primary} /></View>
+                  <Text style={s.primaryButtonText}>{busy ? 'Verifying…' : 'Verify face & check in'}</Text>
+                  {!busy && <Feather name="arrow-up-right" size={18} color={colors.primaryForeground} />}
+                </LinearGradient>
               </TouchableOpacity>
             ) : !todayRecord.checkOutAt ? (
               <TouchableOpacity style={[s.secondaryButton, { borderColor: colors.primary }]} disabled={busy} onPress={handleCheckOut}>
@@ -1039,10 +1097,12 @@ export default function MyTeacherAttendance() {
               </View>
             )}
 
-            <View style={[s.info, { backgroundColor: colors.muted }]}>
-              <Feather name="info" size={15} color={colors.mutedForeground} />
+            <View style={[s.info, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[s.infoIcon, { backgroundColor: colors.secondary }]}>
+                <Feather name="lock" size={14} color={colors.primary} />
+              </View>
               <Text style={[s.infoText, { color: colors.mutedForeground }]}>
-                Your private face template is matched in the camera flow. The original photos are not stored.
+                Your private face template is matched securely in the camera flow. Original photos are never stored.
               </Text>
             </View>
           </ScrollView>
@@ -1162,13 +1222,32 @@ export default function MyTeacherAttendance() {
 
 const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, gap: 10 },
-  backButton: { width: 36, height: 36, justifyContent: 'center' },
-  iconButton: { width: 36, height: 36, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 19, fontWeight: '800' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingBottom: 15, gap: 11 },
+  backButton: { width: 38, height: 38, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  headerCopy: { flex: 1 },
+  eyebrow: { fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginBottom: 2 },
+  iconButton: { width: 38, height: 38, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  title: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   subtitle: { fontSize: 12, marginTop: 2 },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 12 },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 14, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabs: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 13,
+    padding: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 38,
+    borderRadius: 12,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
   tabText: { fontSize: 13, fontWeight: '700' },
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { fontSize: 13 },
@@ -1186,26 +1265,82 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   setupStepIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   setupStepText: { fontSize: 13, fontWeight: '600', flex: 1 },
   setupPrivacy: { fontSize: 11, marginTop: 1 },
-  hero: { borderRadius: 18, padding: 18, marginBottom: 14 },
-  heroIcon: { backgroundColor: '#fff', width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  heroTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
-  heroCopy: { color: '#E0E7FF', fontSize: 13, marginTop: 5, lineHeight: 18 },
-  recordCard: { borderRadius: 16, borderWidth: 1, marginBottom: 14 },
-  recordRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  todayScroll: { paddingHorizontal: 16, paddingTop: 16 },
+  hero: {
+    borderRadius: 25,
+    padding: 20,
+    marginBottom: 14,
+    overflow: 'hidden',
+    minHeight: 210,
+    position: 'relative',
+    shadowColor: '#102461',
+    shadowOpacity: 0.22,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 9 },
+    elevation: 5,
+  },
+  heroDecorOne: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    right: -72,
+    top: -72,
+    backgroundColor: 'rgba(126, 160, 255, 0.17)',
+  },
+  heroDecorTwo: {
+    position: 'absolute',
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    right: 20,
+    bottom: -66,
+    backgroundColor: 'rgba(255, 255, 255, 0.07)',
+  },
+  heroTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  heroIcon: { backgroundColor: '#fff', width: 45, height: 45, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  heroSecurePill: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.13)' },
+  heroSecureDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#83F0C0' },
+  heroSecureText: { color: '#DCE6FF', fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
+  heroKicker: { color: '#BFD0FF', fontSize: 10, fontWeight: '800', letterSpacing: 1.1, marginBottom: 5 },
+  heroTitle: { color: '#fff', fontSize: 25, fontWeight: '800', letterSpacing: -0.6 },
+  heroCopy: { color: '#DCE6FF', fontSize: 13, marginTop: 6, lineHeight: 18 },
+  heroFooter: { flexDirection: 'row', alignItems: 'center', gap: 17, marginTop: 21 },
+  heroFooterItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  heroFooterText: { color: '#DCE6FF', fontSize: 11, fontWeight: '600' },
+  recordCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 14,
+    shadowColor: '#0C1F4A',
+    shadowOpacity: 0.06,
+    shadowRadius: 13,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
+  },
+  recordRow: { flexDirection: 'row', alignItems: 'center', padding: 17, gap: 12 },
   recordIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   recordLabel: { fontSize: 12 },
-  recordValue: { fontSize: 18, fontWeight: '800', marginTop: 3 },
-  distance: { fontSize: 11 },
-  timeGrid: { flexDirection: 'row', padding: 16, borderTopWidth: 1 },
+  recordHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  recordValue: { fontSize: 20, fontWeight: '800', marginTop: 4 },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10 },
+  statusDot: { width: 5, height: 5, borderRadius: 3 },
+  statusPillText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.5 },
+  timeGrid: { flexDirection: 'row', padding: 17, borderTopWidth: 1 },
+  timeLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   smallLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
-  time: { fontSize: 18, fontWeight: '700', marginTop: 5 },
-  primaryButton: { minHeight: 54, borderRadius: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16, marginBottom: 12 },
+  time: { fontSize: 19, fontWeight: '800', marginTop: 6 },
+  distanceRow: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 17, paddingVertical: 12, borderTopWidth: 1 },
+  distance: { fontSize: 11, fontWeight: '600' },
+  primaryButton: { minHeight: 58, borderRadius: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingHorizontal: 17, marginBottom: 12 },
+  buttonIcon: { width: 29, height: 29, borderRadius: 10, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
-  secondaryButton: { minHeight: 54, borderRadius: 14, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16, marginBottom: 12 },
+  secondaryButton: { minHeight: 58, borderRadius: 17, borderWidth: 1.5, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, paddingHorizontal: 16, marginBottom: 12 },
   secondaryButtonText: { fontSize: 15, fontWeight: '800' },
-  complete: { minHeight: 54, borderRadius: 14, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 12 },
+  complete: { minHeight: 58, borderRadius: 17, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 12 },
   completeText: { fontSize: 14, fontWeight: '700' },
-  info: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 12 },
+  info: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16, borderWidth: 1 },
+  infoIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   infoText: { flex: 1, fontSize: 12, lineHeight: 17 },
   historyRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 13, marginBottom: 9, gap: 12 },
   dateBadge: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
