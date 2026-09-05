@@ -21,7 +21,7 @@ import EmptyState from '@/components/EmptyState';
 type Tab = 'today' | 'history' | 'leave';
 type Coordinates = { latitude: number; longitude: number };
 
-function getWebLocation(): Promise<Coordinates> {
+function getWebLocationWithOptions(options: PositionOptions): Promise<Coordinates> {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error('Location is not available in this browser'));
@@ -29,17 +29,53 @@ function getWebLocation(): Promise<Coordinates> {
     }
     navigator.geolocation.getCurrentPosition(
       position => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
-      error => reject(new Error(error.message || 'Could not read your location')),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+      error => reject(error),
+      options,
     );
   });
+}
+
+async function getWebLocation(): Promise<Coordinates> {
+  try {
+    return await getWebLocationWithOptions({
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
+    });
+  } catch (error: any) {
+    if (error?.code === 1) {
+      throw new Error('Location permission is required to mark attendance');
+    }
+    if (error?.code !== 3) {
+      throw new Error(error?.message || 'Could not read your location');
+    }
+    // A cold GPS fix can exceed the high-accuracy timeout in mobile Chrome.
+    // Retry for a current network-assisted position; the server still applies
+    // the unchanged geofence check before marking attendance.
+    try {
+      return await getWebLocationWithOptions({
+        enableHighAccuracy: false,
+        timeout: 20000,
+        maximumAge: 0,
+      });
+    } catch {
+      throw new Error('Could not get your current location. Turn on location services and try again.');
+    }
+  }
 }
 
 async function readCurrentLocation(): Promise<Coordinates> {
   if (Platform.OS === 'web') return getWebLocation();
   const permission = await Location.requestForegroundPermissionsAsync();
   if (!permission.granted) throw new Error('Location permission is required to mark attendance');
-  const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+  let location;
+  try {
+    location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+  } catch {
+    // Keep the server-side geofence authoritative while allowing devices with
+    // a slow GPS warm-up to retry with a current balanced-accuracy fix.
+    location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+  }
   return { latitude: location.coords.latitude, longitude: location.coords.longitude };
 }
 
