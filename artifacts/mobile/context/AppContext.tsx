@@ -102,6 +102,7 @@ export interface Teacher {
     promoteStudents: boolean;
     sendFeeReminder: boolean;
     allowMarkEdit: boolean;
+    reEnrollFace: boolean;
   };
 }
 
@@ -513,7 +514,7 @@ interface AppContextType extends AppState {
   deleteAlumni: (id: string) => void;
   bulkAddAlumni: (records: Omit<Alumni, 'id' | 'batch'>[], batch: string) => Promise<void>;
   refreshTeacherAttendance: (teacherId?: string) => Promise<void>;
-  getTeacherFaceStatus: (teacherId: string) => Promise<boolean>;
+  getTeacherFaceStatus: (teacherId: string) => Promise<{ enrolled: boolean; canReEnroll: boolean }>;
   enrollTeacherFace: (teacherId: string, faceSamplesBase64: string[], replaceExisting?: boolean) => Promise<void>;
   checkInTeacher: (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
@@ -543,7 +544,7 @@ const monthNames = ['January','February','March','April','May','June','July','Au
 const SEED_CLASSES = ['Class 1','Class 2','Class 3','Class 4','Class 5','Class 6','Class 7','Class 8','Class 9','Class 10'];
 const SEED_SUBJECTS = ['Mathematics','Science','English','Hindi','Social Science','Sanskrit','Computer','Drawing','Physical Education','General Knowledge'];
 const SEED_TEACHERS: Teacher[] = [
-  { id: 't1', name: 'Rajesh Kumar', subject: 'Mathematics', mobileNumber: '9876543210', salary: 25000, username: 'teacher1', password: 'teacher123', joinDate: '2023-04-01', permissions: { addStudent: true, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false } },
+  { id: 't1', name: 'Rajesh Kumar', subject: 'Mathematics', mobileNumber: '9876543210', salary: 25000, username: 'teacher1', password: 'teacher123', joinDate: '2023-04-01', permissions: { addStudent: true, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false } },
   { id: 't2', name: 'Priya Sharma', subject: 'Science', mobileNumber: '9876543211', salary: 22000, username: 'teacher2', password: 'teacher123', joinDate: '2023-06-01', permissions: { addStudent: false, feeCollection: true, manageClasses: false, manageExams: true, manageResults: true, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false } },
 ];
 const SEED_STUDENTS: Student[] = [
@@ -697,6 +698,7 @@ function mapTeacher(r: any): Teacher {
       promoteStudents: false,
       sendFeeReminder: false,
       allowMarkEdit: false,
+      reEnrollFace: false,
       ...(r.permissions ?? {}),
     },
   };
@@ -1343,10 +1345,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const getTeacherFaceStatus = useCallback(async (teacherId: string) => {
-    const status = await apiGet<{ enrolled: boolean }>(
+    return apiGet<{ enrolled: boolean; canReEnroll: boolean }>(
       `/teacher-attendance/face-status?teacherId=${encodeURIComponent(teacherId)}`,
     );
-    return status.enrolled;
   }, []);
 
   const enrollTeacherFace = useCallback(async (
