@@ -1345,7 +1345,7 @@ export default function MyTeacherAttendance() {
           ] as [string, string, (value: string) => void][]).map(([label, value, setter]) => (
             <View key={label} style={s.field}>
               <Text style={[s.label, { color: colors.text }]}>{label}</Text>
-              <TextInput value={value} onChangeText={setter} placeholder="DD-MM-YYYY" placeholderTextColor={colors.mutedForeground} style={[s.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]} />
+              <TextInput value={value} onChangeText={setter} placeholder="YYYY-MM-DD" placeholderTextColor={colors.mutedForeground} style={[s.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]} />
             </View>
           ))}
           <View style={s.field}>
