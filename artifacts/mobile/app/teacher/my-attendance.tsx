@@ -1027,7 +1027,7 @@ export default function MyTeacherAttendance() {
           <TouchableOpacity
             key={value}
             onPress={() => setTab(value)}
-            style={[s.tab, tab === value && { backgroundColor: colors.card, shadowColor: colors.primary }]}
+            style={[s.tab, tab === value && { backgroundColor: colors.card }]}
             activeOpacity={0.8}
           >
             <Text style={[s.tabText, { color: tab === value ? colors.primary : colors.mutedForeground }]}>{label}</Text>
@@ -1360,10 +1360,6 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
     justifyContent: 'center',
     minHeight: 38,
     borderRadius: 12,
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 2,
   },
   tabText: { fontSize: 13, fontWeight: '700' },
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
