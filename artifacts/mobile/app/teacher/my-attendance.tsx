@@ -446,6 +446,100 @@ function FaceResultModal({
   );
 }
 
+function ReEnrollConfirmModal({
+  visible,
+  onCancel,
+  onContinue,
+}: {
+  visible: boolean;
+  onCancel: () => void;
+  onContinue: () => void;
+}) {
+  const colors = useColors();
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={[reEnrollStyles.backdrop, { backgroundColor: colors.primary + 'D9' }]}>
+        <View
+          style={[
+            reEnrollStyles.card,
+            {
+              backgroundColor: colors.card,
+              borderColor: colors.border,
+              shadowColor: colors.primary,
+            },
+          ]}
+        >
+          <View style={reEnrollStyles.topRow}>
+            <View style={[reEnrollStyles.kicker, { backgroundColor: colors.secondary }]}>
+              <Feather name="shield" size={13} color={colors.primary} />
+              <Text style={[reEnrollStyles.kickerText, { color: colors.primary }]}>SECURITY PROFILE</Text>
+            </View>
+            <TouchableOpacity
+              onPress={onCancel}
+              style={[reEnrollStyles.closeButton, { backgroundColor: colors.muted }]}
+              accessibilityRole="button"
+              accessibilityLabel="Close re-enrollment message"
+            >
+              <Feather name="x" size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          </View>
+
+          <LinearGradient
+            colors={[colors.primary, colors.primary + 'B8']}
+            style={reEnrollStyles.iconHalo}
+          >
+            <View style={reEnrollStyles.iconInner}>
+              <Feather name="refresh-cw" size={30} color={colors.primaryForeground} />
+            </View>
+          </LinearGradient>
+
+          <Text style={[reEnrollStyles.title, { color: colors.text }]}>Refresh your face profile</Text>
+          <Text style={[reEnrollStyles.description, { color: colors.mutedForeground }]}>
+            Create a new secure face profile to improve attendance verification.
+          </Text>
+
+          <View style={[reEnrollStyles.notice, { backgroundColor: colors.secondary }]}>
+            <View style={[reEnrollStyles.noticeIcon, { backgroundColor: colors.card }]}>
+              <Feather name="lock" size={16} color={colors.primary} />
+            </View>
+            <View style={reEnrollStyles.noticeCopy}>
+              <Text style={[reEnrollStyles.noticeTitle, { color: colors.text }]}>Your current profile will be replaced</Text>
+              <Text style={[reEnrollStyles.noticeText, { color: colors.mutedForeground }]}>
+                You will capture your face again before checking in.
+              </Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[reEnrollStyles.primaryAction, { backgroundColor: colors.primary }]}
+            onPress={onContinue}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Continue to re-enroll face"
+          >
+            <Feather name="camera" size={17} color={colors.primaryForeground} />
+            <Text style={[reEnrollStyles.primaryActionText, { color: colors.primaryForeground }]}>
+              Continue to re-enroll
+            </Text>
+            <Feather name="arrow-right" size={17} color={colors.primaryForeground} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={reEnrollStyles.secondaryAction}
+            onPress={onCancel}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel face re-enrollment"
+          >
+            <Text style={[reEnrollStyles.secondaryActionText, { color: colors.mutedForeground }]}>Not now</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 type AttendanceErrorCopy = {
   isLocationError: boolean;
   eyebrow: string;
@@ -644,6 +738,7 @@ export default function MyTeacherAttendance() {
   const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null);
   const [faceCaptureMode, setFaceCaptureMode] = useState<FaceCapturePurpose | null>(null);
   const [replaceFaceEnrollment, setReplaceFaceEnrollment] = useState(false);
+  const [showReEnrollConfirm, setShowReEnrollConfirm] = useState(false);
   const [faceFlowStage, setFaceFlowStage] = useState<FaceFlowStage | null>(null);
   const [faceResult, setFaceResult] = useState<FaceResultKind | null>(null);
   const [faceResultPurpose, setFaceResultPurpose] = useState<'check-in' | 'check-out'>('check-in');
@@ -792,20 +887,7 @@ export default function MyTeacherAttendance() {
   };
 
   const startFaceReEnrollment = () => {
-    const begin = () => {
-      setError('');
-      setReplaceFaceEnrollment(true);
-      setFaceCaptureMode('enroll');
-    };
-    const message = 'This will replace your saved face template. You will need to capture your face again before checking in.';
-    if (Platform.OS === 'web') {
-      if (window.confirm(`Re-enroll face?\n\n${message}`)) begin();
-      return;
-    }
-    Alert.alert('Re-enroll face?', message, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Continue', onPress: begin },
-    ]);
+    setShowReEnrollConfirm(true);
   };
 
   const handleCheckIn = () => {
@@ -1193,6 +1275,17 @@ export default function MyTeacherAttendance() {
           ))}
         </ScrollView>
       )}
+      <ReEnrollConfirmModal
+        visible={showReEnrollConfirm}
+        onCancel={() => setShowReEnrollConfirm(false)}
+        onContinue={() => {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setShowReEnrollConfirm(false);
+          setError('');
+          setReplaceFaceEnrollment(true);
+          setFaceCaptureMode('enroll');
+        }}
+      />
       <FaceCaptureModal
         visible={faceCaptureMode !== null}
         purpose={faceCaptureMode ?? 'check-in'}
@@ -1378,6 +1471,135 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   leaveAction: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 6 },
   leaveActionText: { fontSize: 10, fontWeight: '800' },
   pendingHint: { fontSize: 10, marginTop: 5 },
+});
+
+const reEnrollStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 22,
+  },
+  card: {
+    width: '100%',
+    maxWidth: 390,
+    borderRadius: 30,
+    borderWidth: 1,
+    paddingHorizontal: 22,
+    paddingTop: 18,
+    paddingBottom: 14,
+    shadowOpacity: 0.25,
+    shadowRadius: 30,
+    shadowOffset: { width: 0, height: 18 },
+    elevation: 12,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  kicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    borderRadius: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  kickerText: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  closeButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconHalo: {
+    width: 88,
+    height: 88,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginTop: 18,
+    marginBottom: 17,
+  },
+  iconInner: {
+    width: 62,
+    height: 62,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '800',
+    textAlign: 'center',
+    letterSpacing: -0.4,
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 21,
+    textAlign: 'center',
+    marginTop: 9,
+    paddingHorizontal: 3,
+  },
+  notice: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 17,
+    padding: 13,
+    marginTop: 20,
+  },
+  noticeIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noticeCopy: {
+    flex: 1,
+  },
+  noticeTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 17,
+  },
+  noticeText: {
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  primaryAction: {
+    width: '100%',
+    minHeight: 52,
+    borderRadius: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 9,
+    marginTop: 18,
+  },
+  primaryActionText: {
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  secondaryAction: {
+    alignItems: 'center',
+    paddingVertical: 13,
+  },
+  secondaryActionText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
 });
 
 const feedbackStyles = StyleSheet.create({
