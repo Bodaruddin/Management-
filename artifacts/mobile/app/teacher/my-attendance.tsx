@@ -298,6 +298,9 @@ function FaceCaptureModal({
 
 type FaceResultKind = 'success' | 'error';
 
+const FACE_MISMATCH_MESSAGE =
+  'Your face did not match the registered teacher profile. Please make sure your face is clearly visible, look directly at the camera, and try again';
+
 function FaceProgressModal({
   visible,
   purpose,
@@ -775,10 +778,13 @@ export default function MyTeacherAttendance() {
         setFaceFlowStage(null);
         if (purpose !== 'enroll' && /face|selfie|camera|verification|blurry|dark|light|center/i.test(message)) {
           setError('');
+          const isFaceMismatch = /face.*(?:did not match|not recognized)|(?:did not match|does not match).*face/i.test(message);
           showFaceResult(
             'error',
             purpose,
-            message || 'Your face could not be verified. Please try again with your face centered in the frame.',
+            isFaceMismatch
+              ? FACE_MISMATCH_MESSAGE
+              : message || 'Your face could not be verified. Please try again with your face centered in the frame.',
           );
         }
       },
