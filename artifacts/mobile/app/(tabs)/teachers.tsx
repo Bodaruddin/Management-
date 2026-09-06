@@ -17,7 +17,7 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 
 const BLANK = {
   name: '', subject: '', mobileNumber: '', salary: '', username: '', password: '',
-  permissions: { addStudent: false, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false }, photo: undefined as string | undefined
+  permissions: { addStudent: false, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false }, photo: undefined as string | undefined
 };
 
 export default function TeachersScreen() {
@@ -249,6 +249,7 @@ export default function TeachersScreen() {
                       { key: 'manageResults' as const, label: 'Manage Results', desc: 'Can view and enter student marks' },
                       { key: 'allowMarkEdit' as const, label: 'Allow Mark Edit', desc: 'Can edit marks after submitting them' },
                       { key: 'promoteStudents' as const, label: 'Promote Students', desc: 'Can promote students to next class' },
+                      { key: 'reEnrollFace' as const, label: 'Re-enroll Face Permission', desc: 'Allow one face profile replacement; revokes automatically after success' },
                     ]).map(perm => (
                       <View key={perm.key} style={[detail.permRow, { borderBottomColor: colors.border }]}>
                         <View style={{ flex: 1 }}>
