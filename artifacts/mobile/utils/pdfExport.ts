@@ -308,7 +308,10 @@ function applyNativePrintMargins(html: string, marginMm: number): string {
    .page.combined-page .inner-content {
      zoom: 1 !important;
      width: calc(100% / var(--native-scale, 0.82)) !important;
-     min-height: calc(100% / var(--native-scale, 0.82)) !important;
+      height: calc(100% / var(--native-scale, 0.82)) !important;
+      min-height: 0 !important;
+      max-height: calc(100% / var(--native-scale, 0.82)) !important;
+      overflow: hidden !important;
      transform: scale(var(--native-scale, 0.82)) !important;
      transform-origin: top left !important;
   }
@@ -1033,15 +1036,18 @@ export async function printMultipleHtmlsAsPdf(
   }
 }
 
-/**
- * Open the system print dialog for an HTML document string.
- * (Unchanged — not affected by PDF pipeline changes.)
- */
+/** Open the system print dialog for an HTML document string. */
 export async function printHtml(html: string): Promise<void> {
   if (Platform.OS === 'web') {
     const w = window.open('', '_blank');
     if (w) { w.document.write(html); w.document.close(); w.print(); }
   } else {
-    await Print.printAsync({ html });
+    // The combined marksheet uses a fixed A4 page with a dense table. Apply
+    // the same bounded native-print layout used by the PDF download path so
+    // Android cannot paginate the fixed-height sheet onto a second page.
+    const printableHtml = html.includes('combined-page')
+      ? applyNativePrintMargins(html, 8)
+      : html;
+    await Print.printAsync({ html: printableHtml });
   }
 }

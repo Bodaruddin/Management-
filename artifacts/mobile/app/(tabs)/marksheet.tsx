@@ -767,18 +767,18 @@ function buildCombinedMarksheetHtml(
       const v = row.marks[key];
       const ex = examMap[key];
       if (v === null || !ex)
-         return `<td style="padding:2px 3px;line-height:1;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`
-             + `<td style="padding:2px 3px;line-height:1;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`;
-      return `<td style="padding:2px 3px;line-height:1;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${v}</td>`
-           + `<td style="padding:2px 3px;line-height:1;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0">${getSubjectMaxMarks(ex, row.subject, student.class)}</td>`;
+          return `<td style="padding:4px 3px;line-height:1;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`
+              + `<td style="padding:4px 3px;line-height:1;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`;
+      return `<td style="padding:4px 3px;line-height:1;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${v}</td>`
+           + `<td style="padding:4px 3px;line-height:1;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0">${getSubjectMaxMarks(ex, row.subject, student.class)}</td>`;
     }).join('');
     return `<tr style="background:${bg}">
-       <td style="padding:2px 8px;line-height:1;font-size:10.5px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:nowrap">${icon}&nbsp;${row.subject}</td>
+       <td style="padding:4px 8px;line-height:1.2;font-size:10.5px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:nowrap">${icon}&nbsp;${row.subject}</td>
       ${examCells}
-       <td style="padding:3px 4px;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:2px solid #b0bcd4;border-bottom:1px solid #dde4f0">${row.total}</td>
-        <td style="padding:3px 3px;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.max}</td>
-       <td style="padding:3px 4px;font-size:11px;font-weight:600;color:#1a1a2e;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.pct.toFixed(2)}</td>
-       <td style="padding:3px 4px;font-size:13px;font-weight:900;color:${sg.color};text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.grade}</td>
+        <td style="padding:4px 4px;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:2px solid #b0bcd4;border-bottom:1px solid #dde4f0">${row.total}</td>
+         <td style="padding:4px 3px;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.max}</td>
+        <td style="padding:4px 4px;font-size:11px;font-weight:600;color:#1a1a2e;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.pct.toFixed(2)}</td>
+        <td style="padding:4px 4px;font-size:13px;font-weight:900;color:${sg.color};text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.grade}</td>
     </tr>`;
   }).join('');
 
@@ -854,14 +854,14 @@ function buildCombinedMarksheetHtml(
     * can collapse the later flex children while rendering HTML to PDF,
     * leaving only the first student-detail row visible.
     */
-    .info-box { border:1.5px solid #c8a040; border-radius:8px; display:table; width:100%; table-layout:fixed; margin-top:5px; overflow:hidden; background:#fdfcf5; }
-    .info-col { display:table-cell; width:50%; vertical-align:top; padding:5px 8px; }
+     .info-box { border:1.5px solid #c8a040; border-radius:8px; display:table; width:100%; table-layout:fixed; margin-top:8px; overflow:hidden; background:#fdfcf5; }
+     .info-col { display:table-cell; width:50%; vertical-align:top; padding:8px 12px; }
   .info-col + .info-col { border-left:1px solid #e8d9a8; }
-    .irow { display:table; width:100%; table-layout:fixed; height:15px; margin-bottom:0; font-size:10px; line-height:1; }
+     .irow { display:table; width:100%; table-layout:fixed; height:17px; margin-bottom:1px; font-size:11px; line-height:1; }
   .irow:last-child { margin-bottom:0; }
-    .irow .ic { display:table-cell; width:16px; height:15px; vertical-align:middle; text-align:center; font-size:10px; }
-    .irow .lbl { display:table-cell; width:70px; vertical-align:middle; font-weight:600; color:#0c1f4a; white-space:nowrap; }
-   .irow .colon { display:table-cell; width:12px; vertical-align:middle; text-align:center; font-weight:700; color:#c8a040; }
+     .irow .ic { display:table-cell; width:18px; height:17px; vertical-align:middle; text-align:center; font-size:11px; }
+     .irow .lbl { display:table-cell; width:88px; vertical-align:middle; font-weight:600; color:#0c1f4a; white-space:nowrap; }
+    .irow .colon { display:table-cell; width:20px; vertical-align:middle; text-align:center; font-weight:700; color:#c8a040; }
    .irow .val { display:table-cell; vertical-align:middle; font-weight:700; color:#1a1a2e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* ---------- QR card ---------- */
   .qr-card { margin-top:4px; border:2px solid #c8a040; border-radius:8px; padding:4px 7px; display:inline-flex; flex-direction:column; align-items:center; gap:2px; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
@@ -878,8 +878,8 @@ function buildCombinedMarksheetHtml(
   table.mt tr.tr td { background:#0c1f4a; font-weight:800; font-size:13px; border-top:2px solid #0c1f4a; border-bottom:none; }
   table.mt tr.tr td:first-child { font-size:12px; }
   /* summary cards */
-  .summary { display:grid; flex:1 1 auto; min-height:0; align-items:stretch; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:6px; margin-bottom:0; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .sc { border:1.5px solid #e2e8f0; border-radius:11px; padding:4px 4px 3px; text-align:center; background:#fff; box-shadow:0 6px 20px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; height:100%; min-height:0; flex-direction:column; align-items:center; justify-content:center; }
+   .summary { display:grid; flex:0 0 auto; align-items:stretch; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:6px; margin-bottom:0; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+   .sc { border:1.5px solid #e2e8f0; border-radius:11px; padding:8px 4px 7px; text-align:center; background:#fff; box-shadow:0 6px 20px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; min-height:126px; flex-direction:column; align-items:center; justify-content:center; }
   .sc .si { display:flex; justify-content:center; align-items:center; margin:0 auto 3px; width:32px; height:32px; border-radius:50%; flex-shrink:0; }
   .sc .si svg { width:23px; height:23px; }
   .sc .sl { font-size:7.5px; font-weight:700; color:#0c1f4a; letter-spacing:0.3px; line-height:1.35; text-transform:uppercase; }
@@ -897,7 +897,7 @@ function buildCombinedMarksheetHtml(
    .rem-tag { display:table-cell; width:110px; vertical-align:middle; background:#0c1f4a; color:#fff; padding:5px 12px 5px 9px; font-size:10px; font-weight:700; letter-spacing:0.4px; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:24px; }
    .rem-txt { display:table-cell; vertical-align:middle; padding:5px 10px; font-size:10.5px; line-height:1.25; color:#222; font-weight:500; word-break:normal; }
   /* signatures — flex-shrink:0 keeps them out of the scrolling inner area */
-  .sigs { display:flex; justify-content:space-around; margin-top:8px; min-height:82px; align-items:flex-end; text-align:center; flex-shrink:0; }
+   .sigs { display:flex; justify-content:space-around; margin-top:auto; padding-top:8px; min-height:82px; align-items:flex-end; text-align:center; flex-shrink:0; }
   .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
   .sig-block .role { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:0.2px; }
   /* footer — flex-shrink:0 always pins it at page bottom */
@@ -987,7 +987,7 @@ function buildCombinedMarksheetHtml(
     <table class="mt">
       <thead>
         <tr>
-          <th class="sh" rowspan="2" style="width:16%">SUBJECTS</th>
+           <th class="sh" rowspan="2" style="width:22%">SUBJECTS</th>
           ${examTopHeaders}
           <th class="total-h" colspan="2" rowspan="1" style="width:10%">TOTAL</th>
           <th rowspan="2" style="width:7%">%</th>
