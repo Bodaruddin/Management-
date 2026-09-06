@@ -20,6 +20,14 @@ import EmptyState from '@/components/EmptyState';
 import { readCurrentLocation } from '@/utils/location';
 
 type Tab = 'today' | 'history' | 'leave';
+type HistoryFilter = 'weekly' | 'monthly' | 'yearly' | 'custom';
+
+const HISTORY_FILTERS: Array<{ value: HistoryFilter; label: string }> = [
+  { value: 'weekly', label: 'Weekly' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'yearly', label: 'Yearly' },
+  { value: 'custom', label: 'Custom' },
+];
 
 type FaceCapturePurpose = 'enroll' | 'check-in' | 'check-out';
 type FaceFlowStage = 'detected' | 'verifying';
@@ -722,6 +730,10 @@ function formatTime(value?: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatIsoDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 export default function MyTeacherAttendance() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -745,6 +757,9 @@ export default function MyTeacherAttendance() {
   const [faceResultPurpose, setFaceResultPurpose] = useState<'check-in' | 'check-out'>('check-in');
   const [faceResultMessage, setFaceResultMessage] = useState('');
   const [lastAttendanceAction, setLastAttendanceAction] = useState<'check-in' | 'check-out' | null>(null);
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('monthly');
+  const [customStartDate, setCustomStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [customEndDate, setCustomEndDate] = useState(() => new Date().toISOString().slice(0, 10));
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [leaveStart, setLeaveStart] = useState(new Date().toISOString().slice(0, 10));
   const [leaveEnd, setLeaveEnd] = useState(new Date().toISOString().slice(0, 10));
@@ -763,6 +778,29 @@ export default function MyTeacherAttendance() {
     () => teacherLeaves.filter(leave => leave.teacherId === user?.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [teacherLeaves, user?.id],
   );
+  const historyRange = useMemo((): [string, string] | null => {
+    if (historyFilter === 'custom') {
+      const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+      return validDate(customStartDate) && validDate(customEndDate) && customStartDate <= customEndDate
+        ? [customStartDate, customEndDate]
+        : null;
+    }
+    const end = new Date(today + 'T12:00:00Z');
+    const start = new Date(end);
+    if (historyFilter === 'weekly') start.setUTCDate(start.getUTCDate() - 6);
+    if (historyFilter === 'monthly') start.setUTCDate(1);
+    if (historyFilter === 'yearly') start.setUTCMonth(0, 1);
+    return [formatIsoDate(start), today];
+  }, [customEndDate, customStartDate, historyFilter, today]);
+  const historyRecords = useMemo(
+    () => historyRange
+      ? myRecords.filter(record => record.date >= historyRange[0] && record.date <= historyRange[1])
+      : [],
+    [historyRange, myRecords],
+  );
+  const customDateError = historyFilter === 'custom' && !historyRange
+    ? 'Enter valid dates with the start date on or before the end date.'
+    : '';
 
   useEffect(() => {
     if (user?.id) refreshTeacherAttendance(user.id).catch(error => console.error('[TeacherAttendance]', error));
@@ -1212,13 +1250,60 @@ export default function MyTeacherAttendance() {
       )}
 
       {tab === 'history' && (
-        <FlatList
-          data={myRecords}
-          keyExtractor={item => item.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: bottomPad, flexGrow: 1 }}
-          ListEmptyComponent={<EmptyState icon="calendar" title="No Attendance Yet" subtitle="Your check-in history will appear here" />}
-          renderItem={({ item }) => (
-            <View style={[s.historyRow, { backgroundColor: colors.card }]}>
+        <View style={{ flex: 1 }}>
+          <View style={[s.historyFilters, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.historyFilterScroll}>
+              {HISTORY_FILTERS.map(filter => {
+                const active = historyFilter === filter.value;
+                return (
+                  <TouchableOpacity
+                    key={filter.value}
+                    onPress={() => setHistoryFilter(filter.value)}
+                    style={[s.historyFilterChip, active && { backgroundColor: colors.card }]}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[s.historyFilterText, { color: active ? colors.primary : colors.mutedForeground }]}>{filter.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+          {historyFilter === 'custom' && (
+            <View style={[s.customDatePanel, { backgroundColor: colors.card, borderColor: colors.border }]}> 
+              <View style={s.customDateField}>
+                <Text style={[s.customDateLabel, { color: colors.mutedForeground }]}>From</Text>
+                <TextInput
+                  value={customStartDate}
+                  onChangeText={setCustomStartDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[s.customDateInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.muted }]}
+                  autoCapitalize="none"
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+              <View style={s.customDateField}>
+                <Text style={[s.customDateLabel, { color: colors.mutedForeground }]}>To</Text>
+                <TextInput
+                  value={customEndDate}
+                  onChangeText={setCustomEndDate}
+                  placeholder="YYYY-MM-DD"
+                  placeholderTextColor={colors.mutedForeground}
+                  style={[s.customDateInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.muted }]}
+                  autoCapitalize="none"
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+              {!!customDateError && <Text style={[s.customDateError, { color: colors.destructive }]}>{customDateError}</Text>}
+            </View>
+          )}
+          <FlatList
+            data={historyRecords}
+            keyExtractor={item => item.id}
+            contentContainerStyle={{ padding: 16, paddingTop: 10, paddingBottom: bottomPad, flexGrow: 1 }}
+            ListEmptyComponent={<EmptyState icon="calendar" title="No Attendance Yet" subtitle={customDateError || 'No attendance records in this period'} />}
+            renderItem={({ item }) => (
+              <View style={[s.historyRow, { backgroundColor: colors.card }]}>
               <View style={[s.dateBadge, { backgroundColor: item.status === 'late' ? colors.warning + '18' : colors.success + '18' }]}>
                 <Text style={[s.dateDay, { color: item.status === 'late' ? colors.warning : colors.success }]}>{item.date.slice(-2)}</Text>
                 <Text style={[s.dateMonth, { color: colors.mutedForeground }]}>{item.date.slice(5, 7)}</Text>
@@ -1229,8 +1314,9 @@ export default function MyTeacherAttendance() {
               </View>
               <Text style={[s.statusText, { color: item.status === 'late' ? colors.warning : colors.success }]}>{item.status.toUpperCase()}</Text>
             </View>
-          )}
-        />
+            )}
+          />
+        </View>
       )}
 
       {tab === 'leave' && (
@@ -1362,6 +1448,15 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
     borderRadius: 12,
   },
   tabText: { fontSize: 13, fontWeight: '700' },
+  historyFilters: { marginHorizontal: 16, marginTop: 12, borderWidth: 1, borderRadius: 14, padding: 4 },
+  historyFilterScroll: { gap: 6 },
+  historyFilterChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10 },
+  historyFilterText: { fontSize: 12, fontWeight: '700' },
+  customDatePanel: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginHorizontal: 16, marginTop: 8, padding: 10, borderRadius: 14, borderWidth: 1 },
+  customDateField: { flex: 1, minWidth: 130 },
+  customDateLabel: { fontSize: 11, fontWeight: '700', marginBottom: 5 },
+  customDateInput: { borderWidth: 1, borderRadius: 9, paddingHorizontal: 9, paddingVertical: 8, fontSize: 12 },
+  customDateError: { width: '100%', fontSize: 11, lineHeight: 15 },
   loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { fontSize: 13 },
   setupScroll: { padding: 16, flexGrow: 1, justifyContent: 'center' },
