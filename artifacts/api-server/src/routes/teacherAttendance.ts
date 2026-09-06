@@ -182,6 +182,15 @@ function getFaceImages(body: any): string[] {
   ).slice(0, 5);
 }
 
+async function getTeacherById(teacherId: string): Promise<any | null> {
+  const teachers = await getAdapter().teachers.list();
+  return teachers.find((teacher: any) => String(teacher.id) === teacherId) ?? null;
+}
+
+function hasFaceReEnrollmentPermission(teacher: any): boolean {
+  return teacher?.permissions?.reEnrollFace === true;
+}
+
 async function verifyFace(teacherId: string, images: string[]) {
   const existing = await getFaceProfile(teacherId);
   if (!existing) {
@@ -258,7 +267,11 @@ router.get("/teacher-attendance/face-status", async (req, res) => {
     res.status(400).json({ error: "teacherId is required" });
     return;
   }
-  res.json({ enrolled: Boolean(await getFaceProfile(teacherId)) });
+  const teacher = await getTeacherById(teacherId);
+  res.json({
+    enrolled: Boolean(await getFaceProfile(teacherId)),
+    canReEnroll: hasFaceReEnrollmentPermission(teacher),
+  });
 });
 
 router.post("/teacher-attendance/face-enroll", async (req, res) => {
@@ -270,14 +283,35 @@ router.post("/teacher-attendance/face-enroll", async (req, res) => {
     return;
   }
   try {
+    let teacherForReEnrollment: any | null = null;
+    if (replaceExisting) {
+      teacherForReEnrollment = await getTeacherById(teacherId);
+      if (!teacherForReEnrollment) {
+        res.status(404).json({ error: "Teacher not found" });
+        return;
+      }
+      if (!hasFaceReEnrollmentPermission(teacherForReEnrollment)) {
+        res.status(403).json({ error: "An administrator must grant face re-enrollment permission before replacing this profile" });
+        return;
+      }
+    }
     if (!replaceExisting && await getFaceProfile(teacherId)) {
       res.status(409).json({ enrolled: true, error: "Face verification is already set up for this teacher" });
       return;
     }
     await saveFaceProfile(teacherId, createFaceTemplate(images));
+    if (replaceExisting && teacherForReEnrollment) {
+      await getAdapter().teachers.update(teacherId, {
+        permissions: {
+          ...(teacherForReEnrollment.permissions ?? {}),
+          reEnrollFace: false,
+        },
+      });
+    }
     res.status(201).json({
       enrolled: true,
       replaced: replaceExisting,
+      permissionRevoked: replaceExisting,
       method: "camera_face_enrollment",
       sampleCount: images.length,
     });
