@@ -336,7 +336,16 @@ export default function TeacherExams() {
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
           >
-            <View style={[mo.sheet, { backgroundColor: colors.card, maxHeight: Platform.OS === 'android' && keyboardHeight > 0 ? '100%' : '92%' }]}>
+            <View
+              style={[
+                mo.sheet,
+                {
+                  backgroundColor: colors.card,
+                  height: Platform.OS === 'android' && keyboardHeight > 0 ? '100%' : '92%',
+                  maxHeight: Platform.OS === 'android' && keyboardHeight > 0 ? '100%' : '92%',
+                },
+              ]}
+            >
             <View style={[mo.header, { borderBottomColor: colors.border }]}>
               <Text style={[mo.title, { color: colors.text }]}>{editingExam ? 'Edit Exam' : 'Create Exam'}</Text>
               <TouchableOpacity onPress={closeExamForm}>
