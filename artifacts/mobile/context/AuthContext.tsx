@@ -16,6 +16,7 @@ export interface AuthUser {
     promoteStudents: boolean;
     sendFeeReminder: boolean;
     allowMarkEdit: boolean;
+    reEnrollFace: boolean;
   };
 }
 
@@ -72,6 +73,7 @@ async function loginTeacher(
         promoteStudents: false,
         sendFeeReminder: false,
         allowMarkEdit: false,
+        reEnrollFace: false,
         ...(t.permissions ?? {}),
       },
     };
