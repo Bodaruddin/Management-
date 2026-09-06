@@ -736,6 +736,7 @@ export default function MyTeacherAttendance() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null);
+  const [canReEnrollFace, setCanReEnrollFace] = useState(false);
   const [faceCaptureMode, setFaceCaptureMode] = useState<FaceCapturePurpose | null>(null);
   const [replaceFaceEnrollment, setReplaceFaceEnrollment] = useState(false);
   const [showReEnrollConfirm, setShowReEnrollConfirm] = useState(false);
@@ -774,6 +775,7 @@ export default function MyTeacherAttendance() {
   useEffect(() => {
     if (!user?.id || !teacherAttendanceSettings.requireFaceVerification) {
       setFaceEnrolled(true);
+      setCanReEnrollFace(false);
       return;
     }
     let active = true;
@@ -781,13 +783,18 @@ export default function MyTeacherAttendance() {
     setLastAttendanceAction(null);
     setFaceEnrolled(null);
     getTeacherFaceStatus(user.id)
-      .then(enrolled => { if (active) setFaceEnrolled(enrolled); })
+      .then(status => {
+        if (!active) return;
+        setFaceEnrolled(status.enrolled);
+        setCanReEnrollFace(status.canReEnroll);
+      })
       .catch((e: any) => {
         if (!active) return;
         // A status-read failure must not leave the teacher on an infinite
         // loading screen. Showing setup is safe because the enrollment API
         // refuses duplicate profiles and persists before returning success.
         setFaceEnrolled(false);
+        setCanReEnrollFace(false);
         setError(e?.message ?? 'Could not check face verification status. You can try setting up your face now.');
       })
       .finally(() => undefined);
@@ -840,6 +847,7 @@ export default function MyTeacherAttendance() {
       if (purpose === 'enroll') {
         await enrollTeacherFace(user.id, faceSamplesBase64, replaceFaceEnrollment);
         setFaceEnrolled(true);
+        setCanReEnrollFace(false);
         setReplaceFaceEnrollment(false);
         return;
       }
@@ -887,6 +895,7 @@ export default function MyTeacherAttendance() {
   };
 
   const startFaceReEnrollment = () => {
+    if (!canReEnrollFace) return;
     setShowReEnrollConfirm(true);
   };
 
@@ -1185,16 +1194,18 @@ export default function MyTeacherAttendance() {
               <Text style={[s.infoText, { color: colors.mutedForeground }]}>
                 Your private face template is matched securely in the camera flow. Original photos are never stored.
               </Text>
-              <TouchableOpacity
-                onPress={startFaceReEnrollment}
-                disabled={busy}
-                style={[s.reEnrollButton, { borderColor: colors.border }]}
-                accessibilityRole="button"
-                accessibilityLabel="Re-enroll face"
-              >
-                <Feather name="refresh-cw" size={14} color={colors.primary} />
-                <Text style={[s.reEnrollText, { color: colors.primary }]}>Re-enroll</Text>
-              </TouchableOpacity>
+              {canReEnrollFace && (
+                <TouchableOpacity
+                  onPress={startFaceReEnrollment}
+                  disabled={busy}
+                  style={[s.reEnrollButton, { borderColor: colors.border }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Re-enroll face"
+                >
+                  <Feather name="refresh-cw" size={14} color={colors.primary} />
+                  <Text style={[s.reEnrollText, { color: colors.primary }]}>Re-enroll</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </ScrollView>
         )
