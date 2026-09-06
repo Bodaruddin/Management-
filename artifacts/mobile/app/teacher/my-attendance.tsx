@@ -734,6 +734,22 @@ function formatIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function formatDisplayDate(isoDate: string): string {
+  const [year, month, day] = isoDate.split('-');
+  return day + '-' + month + '-' + year;
+}
+
+function parseDisplayDate(value: string): string | null {
+  const match = value.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!match) return null;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+  return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+}
+
 export default function MyTeacherAttendance() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -758,8 +774,8 @@ export default function MyTeacherAttendance() {
   const [faceResultMessage, setFaceResultMessage] = useState('');
   const [lastAttendanceAction, setLastAttendanceAction] = useState<'check-in' | 'check-out' | null>(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('monthly');
-  const [customStartDate, setCustomStartDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [customEndDate, setCustomEndDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [customStartDate, setCustomStartDate] = useState(() => formatDisplayDate(new Date().toISOString().slice(0, 10)));
+  const [customEndDate, setCustomEndDate] = useState(() => formatDisplayDate(new Date().toISOString().slice(0, 10)));
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [leaveStart, setLeaveStart] = useState(new Date().toISOString().slice(0, 10));
   const [leaveEnd, setLeaveEnd] = useState(new Date().toISOString().slice(0, 10));
@@ -780,9 +796,10 @@ export default function MyTeacherAttendance() {
   );
   const historyRange = useMemo((): [string, string] | null => {
     if (historyFilter === 'custom') {
-      const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value);
-      return validDate(customStartDate) && validDate(customEndDate) && customStartDate <= customEndDate
-        ? [customStartDate, customEndDate]
+      const startDate = parseDisplayDate(customStartDate);
+      const endDate = parseDisplayDate(customEndDate);
+      return startDate && endDate && startDate <= endDate
+        ? [startDate, endDate]
         : null;
     }
     const end = new Date(today + 'T12:00:00Z');
@@ -799,7 +816,7 @@ export default function MyTeacherAttendance() {
     [historyRange, myRecords],
   );
   const customDateError = historyFilter === 'custom' && !historyRange
-    ? 'Enter valid dates with the start date on or before the end date.'
+    ? 'Enter valid dates in DD-MM-YYYY format with the start date on or before the end date.'
     : '';
 
   useEffect(() => {
@@ -1275,7 +1292,7 @@ export default function MyTeacherAttendance() {
                 <TextInput
                   value={customStartDate}
                   onChangeText={setCustomStartDate}
-                  placeholder="YYYY-MM-DD"
+                  placeholder="DD-MM-YYYY"
                   placeholderTextColor={colors.mutedForeground}
                   style={[s.customDateInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.muted }]}
                   autoCapitalize="none"
@@ -1287,7 +1304,7 @@ export default function MyTeacherAttendance() {
                 <TextInput
                   value={customEndDate}
                   onChangeText={setCustomEndDate}
-                  placeholder="YYYY-MM-DD"
+                  placeholder="DD-MM-YYYY"
                   placeholderTextColor={colors.mutedForeground}
                   style={[s.customDateInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.muted }]}
                   autoCapitalize="none"
@@ -1328,7 +1345,7 @@ export default function MyTeacherAttendance() {
           ] as [string, string, (value: string) => void][]).map(([label, value, setter]) => (
             <View key={label} style={s.field}>
               <Text style={[s.label, { color: colors.text }]}>{label}</Text>
-              <TextInput value={value} onChangeText={setter} placeholder="YYYY-MM-DD" placeholderTextColor={colors.mutedForeground} style={[s.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]} />
+              <TextInput value={value} onChangeText={setter} placeholder="DD-MM-YYYY" placeholderTextColor={colors.mutedForeground} style={[s.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.text }]} />
             </View>
           ))}
           <View style={s.field}>
