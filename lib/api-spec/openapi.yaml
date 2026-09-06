@@ -406,6 +406,9 @@ components:
           maxItems: 5
           items: { type: string }
           description: "Short burst of independent camera samples used to create a more reliable private template"
+        replaceExisting:
+          type: boolean
+          description: "Replace the teacher's existing template after an explicit re-enrollment"
     TeacherCheckIn:
       type: object
       required: [teacherId, teacherName, latitude, longitude, faceVerified]

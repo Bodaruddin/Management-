@@ -640,6 +640,7 @@ export default function MyTeacherAttendance() {
   const [error, setError] = useState('');
   const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null);
   const [faceCaptureMode, setFaceCaptureMode] = useState<FaceCapturePurpose | null>(null);
+  const [replaceFaceEnrollment, setReplaceFaceEnrollment] = useState(false);
   const [faceFlowStage, setFaceFlowStage] = useState<FaceFlowStage | null>(null);
   const [faceResult, setFaceResult] = useState<FaceResultKind | null>(null);
   const [faceResultPurpose, setFaceResultPurpose] = useState<'check-in' | 'check-out'>('check-in');
@@ -739,8 +740,9 @@ export default function MyTeacherAttendance() {
     if (purpose !== 'enroll') setLastAttendanceAction(purpose);
     await runAction(async () => {
       if (purpose === 'enroll') {
-        await enrollTeacherFace(user.id, faceSamplesBase64);
+        await enrollTeacherFace(user.id, faceSamplesBase64, replaceFaceEnrollment);
         setFaceEnrolled(true);
+        setReplaceFaceEnrollment(false);
         return;
       }
       const coordinates = await readCurrentLocation();
@@ -781,6 +783,23 @@ export default function MyTeacherAttendance() {
         }
       },
     });
+  };
+
+  const startFaceReEnrollment = () => {
+    const begin = () => {
+      setError('');
+      setReplaceFaceEnrollment(true);
+      setFaceCaptureMode('enroll');
+    };
+    const message = 'This will replace your saved face template. You will need to capture your face again before checking in.';
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Re-enroll face?\n\n${message}`)) begin();
+      return;
+    }
+    Alert.alert('Re-enroll face?', message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Continue', onPress: begin },
+    ]);
   };
 
   const handleCheckIn = () => {
@@ -1078,6 +1097,16 @@ export default function MyTeacherAttendance() {
               <Text style={[s.infoText, { color: colors.mutedForeground }]}>
                 Your private face template is matched securely in the camera flow. Original photos are never stored.
               </Text>
+              <TouchableOpacity
+                onPress={startFaceReEnrollment}
+                disabled={busy}
+                style={[s.reEnrollButton, { borderColor: colors.border }]}
+                accessibilityRole="button"
+                accessibilityLabel="Re-enroll face"
+              >
+                <Feather name="refresh-cw" size={14} color={colors.primary} />
+                <Text style={[s.reEnrollText, { color: colors.primary }]}>Re-enroll</Text>
+              </TouchableOpacity>
             </View>
           </ScrollView>
         )
@@ -1161,7 +1190,10 @@ export default function MyTeacherAttendance() {
       <FaceCaptureModal
         visible={faceCaptureMode !== null}
         purpose={faceCaptureMode ?? 'check-in'}
-        onCancel={() => setFaceCaptureMode(null)}
+        onCancel={() => {
+          setFaceCaptureMode(null);
+          setReplaceFaceEnrollment(false);
+        }}
         onStageChange={handleFaceStageChange}
         onCaptured={handleFaceCaptured}
       />
@@ -1317,6 +1349,8 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   info: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16, borderWidth: 1 },
   infoIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   infoText: { flex: 1, fontSize: 12, lineHeight: 17 },
+  reEnrollButton: { alignItems: 'center', justifyContent: 'center', gap: 3, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 7 },
+  reEnrollText: { fontSize: 10, fontWeight: '800' },
   historyRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 13, marginBottom: 9, gap: 12 },
   dateBadge: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
   dateDay: { fontSize: 17, fontWeight: '800' },

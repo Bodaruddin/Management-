@@ -514,7 +514,7 @@ interface AppContextType extends AppState {
   bulkAddAlumni: (records: Omit<Alumni, 'id' | 'batch'>[], batch: string) => Promise<void>;
   refreshTeacherAttendance: (teacherId?: string) => Promise<void>;
   getTeacherFaceStatus: (teacherId: string) => Promise<boolean>;
-  enrollTeacherFace: (teacherId: string, faceSamplesBase64: string[]) => Promise<void>;
+  enrollTeacherFace: (teacherId: string, faceSamplesBase64: string[], replaceExisting?: boolean) => Promise<void>;
   checkInTeacher: (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
     faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string;
@@ -1349,11 +1349,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return status.enrolled;
   }, []);
 
-  const enrollTeacherFace = useCallback(async (teacherId: string, faceSamplesBase64: string[]) => {
+  const enrollTeacherFace = useCallback(async (
+    teacherId: string,
+    faceSamplesBase64: string[],
+    replaceExisting = false,
+  ) => {
     const result = await apiPost<{ enrolled?: boolean }>('/teacher-attendance/face-enroll', {
       teacherId,
       faceImageBase64: faceSamplesBase64[0],
       faceSamplesBase64,
+      ...(replaceExisting ? { replaceExisting: true } : {}),
     });
     if (result.enrolled !== true) {
       throw new Error('Face enrollment was not saved. Please capture your face again.');

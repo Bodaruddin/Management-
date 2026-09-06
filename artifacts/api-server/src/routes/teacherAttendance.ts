@@ -264,17 +264,23 @@ router.get("/teacher-attendance/face-status", async (req, res) => {
 router.post("/teacher-attendance/face-enroll", async (req, res) => {
   const teacherId = String(req.body?.teacherId ?? "");
   const images = getFaceImages(req.body);
+  const replaceExisting = req.body?.replaceExisting === true;
   if (!teacherId || images.length === 0) {
     res.status(400).json({ error: "teacherId and camera face samples are required" });
     return;
   }
   try {
-    if (await getFaceProfile(teacherId)) {
+    if (!replaceExisting && await getFaceProfile(teacherId)) {
       res.status(409).json({ enrolled: true, error: "Face verification is already set up for this teacher" });
       return;
     }
     await saveFaceProfile(teacherId, createFaceTemplate(images));
-    res.status(201).json({ enrolled: true, method: "camera_face_enrollment", sampleCount: images.length });
+    res.status(201).json({
+      enrolled: true,
+      replaced: replaceExisting,
+      method: "camera_face_enrollment",
+      sampleCount: images.length,
+    });
   } catch (error: any) {
     const message = error?.message ?? "Face enrollment failed. Please capture your face again.";
     const databaseFailure = error?.code === "NO_DB_CONNECTION"

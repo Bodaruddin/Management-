@@ -5,8 +5,9 @@ const TEMPLATE_SIZE = 24;
 // requires a strong structural similarity, but the threshold must allow for
 // the normal crop, mirror, and lighting differences introduced by a second
 // capture of the same face.
-const MATCH_THRESHOLD = 0.72;
-const MAX_STORED_TEMPLATES = 64;
+const MATCH_THRESHOLD = 0.64;
+const MULTI_SAMPLE_THRESHOLD = 0.56;
+const MAX_STORED_TEMPLATES = 96;
 const MAX_ENROLLMENT_SAMPLES = 5;
 const MIN_IMAGE_SIDE = 160;
 
@@ -133,12 +134,16 @@ const TEMPLATE_VARIANTS: NormalizationOptions[] = [
   { zoom: 1.25 },
   { zoom: 1.45 },
   { zoom: 1.65 },
+  { zoom: 1.9 },
+  { zoom: 2.15 },
   { shiftX: -0.09 },
   { shiftX: 0.09 },
   { shiftY: -0.09 },
   { shiftY: 0.09 },
   { zoom: 1.25, shiftX: -0.08 },
   { zoom: 1.25, shiftX: 0.08 },
+  { zoom: 1.6, shiftY: -0.1 },
+  { zoom: 1.6, shiftY: 0.1 },
 ];
 
 function normalizedPixelsWithOptions(
@@ -240,9 +245,16 @@ function similarity(left: number[], right: number[]): number {
   let leftMagnitude = 0;
   let rightMagnitude = 0;
   for (let index = 0; index < left.length; index += 1) {
-    dot += left[index] * right[index];
-    leftMagnitude += left[index] ** 2;
-    rightMagnitude += right[index] ** 2;
+    // The face is normally in the middle of the camera guide. Down-weighting
+    // the outside of the crop makes the score much less sensitive to a wall,
+    // window, or different camera exposure behind the teacher.
+    const x = (index % TEMPLATE_SIZE) / (TEMPLATE_SIZE - 1) - 0.5;
+    const y = Math.floor(index / TEMPLATE_SIZE) / (TEMPLATE_SIZE - 1) - 0.5;
+    const distanceFromCenter = Math.min(1, Math.sqrt(x * x + y * y) / 0.7072);
+    const weight = 1 - distanceFromCenter * 0.55;
+    dot += left[index] * right[index] * weight;
+    leftMagnitude += left[index] ** 2 * weight;
+    rightMagnitude += right[index] ** 2 * weight;
   }
   if (!leftMagnitude || !rightMagnitude) return 0;
   return dot / Math.sqrt(leftMagnitude * rightMagnitude);
@@ -270,18 +282,29 @@ export function faceMatches(storedTemplate: unknown, imageBase64: string): boole
 export function faceMatchesAny(storedTemplate: unknown, images: string[]): { matched: boolean; score: number } {
   let bestScore = 0;
   let usableImageCount = 0;
+  const scores: number[] = [];
   let lastQualityError: unknown;
   for (const image of images.slice(0, MAX_ENROLLMENT_SAMPLES)) {
     try {
       const score = faceMatchScore(storedTemplate, image);
       usableImageCount += 1;
+      scores.push(score);
       bestScore = Math.max(bestScore, score);
     } catch (error) {
       lastQualityError = error;
     }
   }
   if (!usableImageCount && lastQualityError instanceof FaceImageQualityError) throw lastQualityError;
-  return { matched: bestScore >= MATCH_THRESHOLD, score: bestScore };
+  // A single sharp frame can be enough. If the camera produced several
+  // usable frames, also accept two consistent near-matches; this handles
+  // small autofocus/framing changes without allowing one accidental frame to
+  // pass on its own.
+  const nearMatches = scores
+    .filter((score) => score >= MULTI_SAMPLE_THRESHOLD)
+    .sort((left, right) => right - left);
+  const consistentSamples = nearMatches.length >= 2
+    && nearMatches.slice(0, 2).reduce((sum, score) => sum + score, 0) / 2 >= 0.60;
+  return { matched: bestScore >= MATCH_THRESHOLD || consistentSamples, score: bestScore };
 }
 
 export const faceMatchThreshold = MATCH_THRESHOLD;
