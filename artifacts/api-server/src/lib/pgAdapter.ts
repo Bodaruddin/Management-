@@ -734,7 +734,7 @@ export function createPgAdapter(db: DB): DataAdapter {
       async create(data) {
         const values: any = {
           teacherId: data.teacherId, teacherName: data.teacherName ?? "", date: data.date,
-          status: data.status ?? "present", checkInAt: data.checkInAt ? new Date(data.checkInAt) : new Date(),
+          status: data.status ?? "present", checkInAt: data.checkInAt === null ? null : data.checkInAt ? new Date(data.checkInAt) : new Date(),
           checkInLatitude: data.checkInLatitude ?? null, checkInLongitude: data.checkInLongitude ?? null,
           distanceFromSchool: data.distanceFromSchool ?? null, faceVerified: String(Boolean(data.faceVerified)),
           faceVerificationMethod: data.faceVerificationMethod ?? null, note: data.note ?? null,
