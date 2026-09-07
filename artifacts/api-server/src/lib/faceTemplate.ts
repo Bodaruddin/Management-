@@ -76,10 +76,16 @@ function inspectImageQuality(image: DecodedImage): FaceImageQuality {
   let gradientTotal = 0;
   const sampleWidth = 32;
   const sampleHeight = 32;
+  // Judge lighting and sharpness inside the same centered face region used by
+  // matching. A wall, window, or shirt should not make a clear face unusable.
+  const side = Math.min(image.width, image.height);
+  const cropSide = Math.max(1, Math.floor(side / 1.45));
+  const cropLeft = Math.max(0, Math.floor((image.width - cropSide) / 2));
+  const cropTop = Math.max(0, Math.floor((image.height - cropSide) / 2));
   for (let y = 0; y < sampleHeight; y += 1) {
-    const sourceY = Math.min(image.height - 1, Math.floor((y + 0.5) * image.height / sampleHeight));
+    const sourceY = Math.min(image.height - 1, cropTop + Math.floor((y + 0.5) * cropSide / sampleHeight));
     for (let x = 0; x < sampleWidth; x += 1) {
-      const sourceX = Math.min(image.width - 1, Math.floor((x + 0.5) * image.width / sampleWidth));
+      const sourceX = Math.min(image.width - 1, cropLeft + Math.floor((x + 0.5) * cropSide / sampleWidth));
       const value = luminanceAt(image, sourceX, sourceY);
       samples.push(value);
       if (x > 0) gradientTotal += Math.abs(value - samples[samples.length - 2]);
@@ -128,22 +134,24 @@ type NormalizationOptions = {
 };
 
 const TEMPLATE_VARIANTS: NormalizationOptions[] = [
-  {},
-  { flipX: true },
+  // Keep comparisons inside the face guide instead of allowing the background
+  // or shoulders to dominate the template.
   { zoom: 1.12 },
-  { zoom: 1.25 },
+  { zoom: 1.28 },
   { zoom: 1.45 },
   { zoom: 1.65 },
   { zoom: 1.9 },
   { zoom: 2.15 },
-  { shiftX: -0.09 },
-  { shiftX: 0.09 },
-  { shiftY: -0.09 },
-  { shiftY: 0.09 },
-  { zoom: 1.25, shiftX: -0.08 },
-  { zoom: 1.25, shiftX: 0.08 },
-  { zoom: 1.6, shiftY: -0.1 },
-  { zoom: 1.6, shiftY: 0.1 },
+  { zoom: 1.28, flipX: true },
+  { zoom: 1.65, flipX: true },
+  { zoom: 1.45, shiftX: -0.08 },
+  { zoom: 1.45, shiftX: 0.08 },
+  { zoom: 1.45, shiftY: -0.08 },
+  { zoom: 1.45, shiftY: 0.08 },
+  { zoom: 1.7, shiftX: -0.1 },
+  { zoom: 1.7, shiftX: 0.1 },
+  { zoom: 1.7, shiftY: -0.1 },
+  { zoom: 1.7, shiftY: 0.1 },
 ];
 
 function normalizedPixelsWithOptions(
@@ -245,13 +253,12 @@ function similarity(left: number[], right: number[]): number {
   let leftMagnitude = 0;
   let rightMagnitude = 0;
   for (let index = 0; index < left.length; index += 1) {
-    // The face is normally in the middle of the camera guide. Down-weighting
-    // the outside of the crop makes the score much less sensitive to a wall,
-    // window, or different camera exposure behind the teacher.
+    // The face is normally in the middle of the camera guide. Strongly
+    // down-weight the outside so clothing and background have little influence.
     const x = (index % TEMPLATE_SIZE) / (TEMPLATE_SIZE - 1) - 0.5;
     const y = Math.floor(index / TEMPLATE_SIZE) / (TEMPLATE_SIZE - 1) - 0.5;
     const distanceFromCenter = Math.min(1, Math.sqrt(x * x + y * y) / 0.7072);
-    const weight = 1 - distanceFromCenter * 0.55;
+    const weight = 1 - distanceFromCenter * 0.75;
     dot += left[index] * right[index] * weight;
     leftMagnitude += left[index] ** 2 * weight;
     rightMagnitude += right[index] ** 2 * weight;
