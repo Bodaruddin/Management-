@@ -152,6 +152,9 @@ function FaceCaptureModal({
       setCaptureNumber(0);
       return;
     }
+    // Always begin verification with the front camera. This also recovers
+    // from a previous session where the user switched to the rear camera.
+    setFacing('front');
     const animation = Animated.loop(
       Animated.sequence([
         Animated.timing(scanProgress, { toValue: 1, duration: 2200, useNativeDriver: true }),
@@ -242,7 +245,7 @@ function FaceCaptureModal({
                 <Animated.View style={[cs.scanLine, { transform: [{ translateY: scanLineY }], opacity: scanLineOpacity }]} />
               </View>
               <Text style={cs.guideTitle}>Center your face in the frame</Text>
-              <Text style={cs.guideCopy}>Keep your eyes visible · face a light source · hold still</Text>
+              <Text style={cs.guideCopy}>Keep only your face in the frame · keep your eyes visible · hold still</Text>
             </View>
 
             <View style={cs.bottomPanel}>
