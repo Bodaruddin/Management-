@@ -273,8 +273,10 @@ export function faceMatchScore(storedTemplate: unknown, imageBase64: string): nu
   const image = decodeImage(imageBase64);
   assertUsableFaceImage(image);
   const candidates = TEMPLATE_VARIANTS.map((options) => normalizedPixelsWithOptions(image, options));
-  const legacyCandidates = typeof storedTemplate === "string" && storedTemplate.startsWith("v1:")
-    ? TEMPLATE_VARIANTS.map((options) => normalizedPixelsWithOptions(image, options, true))
+  // v1/v2 templates were enrolled with a full-frame candidate. Keep only
+  // that narrow compatibility path; new v3 templates never rely on the room.
+  const legacyCandidates = typeof storedTemplate === "string" && /^(v1|v2):/.test(storedTemplate)
+    ? [{}, { flipX: true }].map((options) => normalizedPixelsWithOptions(image, options, true))
     : [];
   return Math.max(
     ...storedTemplates.flatMap((stored) =>
