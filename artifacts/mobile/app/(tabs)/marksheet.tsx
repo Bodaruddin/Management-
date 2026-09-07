@@ -294,7 +294,7 @@ function calcCombinedMarksheet(
   // Rank among classmates
   const examIds = Object.values(examMap).filter(Boolean).map(e => e!.id);
   const studentTotals: Record<string, number> = {};
-  allResults.filter(r => examIds.includes(r.examId) && r.class === className).forEach(r => {
+  allResults.filter(r => examIds.includes(r.examId) && classNamesMatch(r.class, className)).forEach(r => {
     const exam = Object.values(examMap).find(e => e?.id === r.examId);
     if (!exam) return;
     const tot = exam.subjects.reduce((s, sub) => s + (r.marks[sub] ?? 0), 0);
@@ -747,17 +747,22 @@ function buildCombinedMarksheetHtml(
     const exam = examMap[key];
     const label = key === '1ut' ? '1ST UNIT TEST' : key === '2ut' ? '2ND UNIT TEST' : key === 'half' ? 'HALF YEARLY' : 'ANNUAL EXAM';
     const col = exam ? '#e8c96a' : 'rgba(255,255,255,0.28)';
-    return `<th colspan="2" style="padding:8px 4px;font-size:10px;font-weight:700;color:${col};text-align:center;border-left:1px solid rgba(255,255,255,0.18);letter-spacing:0.5px">${label}</th>`;
+    return `<th colspan="2" style="padding:7px 2px;font-size:9px;font-weight:700;color:${col};text-align:center;border-left:1px solid rgba(255,255,255,0.18);letter-spacing:0.5px">${label}</th>`;
   }).join('');
 
   const examSubHeaders = EXAM_TYPE_ORDER.map(key => {
     const exam = examMap[key];
     const ca = exam ? '#e8c96a' : 'rgba(255,255,255,0.2)';
     const cb = exam ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.18)';
-    return `<th style="padding:5px 4px;font-size:10px;font-weight:700;color:${ca};text-align:center;border-left:1px solid rgba(255,255,255,0.12)">OBT.</th>`
-         + `<th style="padding:5px 4px;font-size:9px;font-weight:600;color:${cb};text-align:center;border-left:1px solid rgba(255,255,255,0.06)">/MAX</th>`;
+    return `<th style="padding:5px 2px;font-size:8px;font-weight:700;color:${ca};text-align:center;border-left:1px solid rgba(255,255,255,0.12)">OBT.</th>`
+         + `<th style="padding:5px 2px;font-size:8px;font-weight:600;color:${cb};text-align:center;border-left:1px solid rgba(255,255,255,0.06)">/MAX</th>`;
   }).join('');
 
+  const tableColgroup = `<colgroup>
+    <col style="width:20%">
+    ${EXAM_TYPE_ORDER.map(() => '<col style="width:8%"><col style="width:6%">').join('')}
+    <col style="width:6%"><col style="width:5%"><col style="width:6.5%"><col style="width:6.5%">
+  </colgroup>`;
   // Subject rows
   const subjectRowsHtml = subjectRows.map((row, i) => {
     const bg = i % 2 === 0 ? '#ffffff' : '#f5f7fc';
@@ -773,7 +778,7 @@ function buildCombinedMarksheetHtml(
            + `<td style="padding:4px 3px;line-height:1;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0">${getSubjectMaxMarks(ex, row.subject, student.class)}</td>`;
     }).join('');
     return `<tr style="background:${bg}">
-       <td style="padding:4px 8px;line-height:1.2;font-size:10.5px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:nowrap">${icon}&nbsp;${row.subject}</td>
+       <td style="padding:4px 8px;line-height:1.2;font-size:10.5px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:normal;word-break:break-word">${icon}&nbsp;${row.subject}</td>
       ${examCells}
         <td style="padding:4px 4px;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:2px solid #b0bcd4;border-bottom:1px solid #dde4f0">${row.total}</td>
          <td style="padding:4px 3px;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.max}</td>
@@ -807,8 +812,8 @@ function buildCombinedMarksheetHtml(
   // font line boxes a little taller than the browser preview. The page remains
   // a single A4 sheet; the flex layout below uses the remaining height instead
   // of leaving it as unused white space after the footer.
-  const _innerContentH = 900 + subjectRows.length * 30;
-  const _innerZoomVal = Math.min(0.86, 990 / _innerContentH);
+  const _innerContentH = 820 + subjectRows.length * 30;
+  const _innerZoomVal = Math.min(1, 1040 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
   return `<!DOCTYPE html>
@@ -870,7 +875,8 @@ function buildCombinedMarksheetHtml(
   .perf-title { background:#0c1f4a; display:flex; align-items:center; gap:8px; padding:4px 10px; border-radius:6px 6px 0 0; margin-top:6px; }
   .pt-line { flex:1; height:1px; background:rgba(200,160,64,0.45); }
   .pt-txt { font-size:10px; font-weight:700; color:#fff; letter-spacing:2px; }
-  table.mt { width:100%; border-collapse:collapse; font-size:12px; border:1.5px solid #0c1f4a; border-top:none; }
+  table.mt { width:100%; table-layout:fixed; border-collapse:collapse; font-size:12px; border:1.5px solid #0c1f4a; border-top:none; }
+   table.mt th, table.mt td { vertical-align:middle; }
   table.mt th { background:#0c1f4a; color:#fff; padding:3px 3px; font-size:9px; font-weight:700; letter-spacing:0.3px; text-align:center; border-right:1px solid rgba(255,255,255,0.12); }
   table.mt th.sh { text-align:left; padding-left:8px; }
   table.mt th.sub { background:#122d60; font-size:8.5px; color:rgba(255,255,255,0.85); font-weight:600; }
@@ -878,8 +884,8 @@ function buildCombinedMarksheetHtml(
   table.mt tr.tr td { background:#0c1f4a; font-weight:800; font-size:13px; border-top:2px solid #0c1f4a; border-bottom:none; }
   table.mt tr.tr td:first-child { font-size:12px; }
   /* summary cards */
-   .summary { display:grid; flex:0 0 auto; align-items:stretch; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:6px; margin-bottom:0; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-   .sc { border:1.5px solid #e2e8f0; border-radius:11px; padding:8px 4px 7px; text-align:center; background:#fff; box-shadow:0 6px 20px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; min-height:126px; flex-direction:column; align-items:center; justify-content:center; }
+   .summary { display:grid; flex:1 1 auto; min-height:160px; align-items:stretch; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:6px; margin-bottom:0; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+   .sc { border:1.5px solid #e2e8f0; border-radius:11px; padding:8px 4px 7px; text-align:center; background:#fff; box-shadow:0 6px 20px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; height:100%; min-height:0; flex-direction:column; align-items:center; justify-content:center; }
   .sc .si { display:flex; justify-content:center; align-items:center; margin:0 auto 3px; width:32px; height:32px; border-radius:50%; flex-shrink:0; }
   .sc .si svg { width:23px; height:23px; }
   .sc .sl { font-size:7.5px; font-weight:700; color:#0c1f4a; letter-spacing:0.3px; line-height:1.35; text-transform:uppercase; }
@@ -897,7 +903,7 @@ function buildCombinedMarksheetHtml(
    .rem-tag { display:table-cell; width:110px; vertical-align:middle; background:#0c1f4a; color:#fff; padding:5px 12px 5px 9px; font-size:10px; font-weight:700; letter-spacing:0.4px; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:24px; }
    .rem-txt { display:table-cell; vertical-align:middle; padding:5px 10px; font-size:10.5px; line-height:1.25; color:#222; font-weight:500; word-break:normal; }
   /* signatures — flex-shrink:0 keeps them out of the scrolling inner area */
-   .sigs { display:flex; justify-content:space-around; margin-top:auto; padding-top:8px; min-height:82px; align-items:flex-end; text-align:center; flex-shrink:0; }
+   .sigs { display:flex; justify-content:space-around; margin-top:8px; padding-top:0; min-height:82px; align-items:flex-end; text-align:center; flex-shrink:0; }
   .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
   .sig-block .role { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:0.2px; }
   /* footer — flex-shrink:0 always pins it at page bottom */
@@ -985,13 +991,14 @@ function buildCombinedMarksheetHtml(
       <div class="pt-line"></div>
     </div>
     <table class="mt">
+      ${tableColgroup}
       <thead>
         <tr>
-           <th class="sh" rowspan="2" style="width:22%">SUBJECTS</th>
+           <th class="sh" rowspan="2" style="width:20%">SUBJECTS</th>
           ${examTopHeaders}
-          <th class="total-h" colspan="2" rowspan="1" style="width:10%">TOTAL</th>
-          <th rowspan="2" style="width:7%">%</th>
-          <th rowspan="2" style="width:7%">GRADE</th>
+          <th class="total-h" colspan="2" rowspan="1" style="width:11%">TOTAL</th>
+          <th rowspan="2" style="width:6.5%">%</th>
+          <th rowspan="2" style="width:6.5%">GRADE</th>
         </tr>
         <tr>
           ${examSubHeaders}
@@ -1242,7 +1249,7 @@ export default function MarksheetScreen() {
   // ── Combined: match exams by type for selected class ──────────────────────────
   const combinedExamMap = useMemo((): Partial<Record<ExamTypeKey, Exam>> => {
     if (!combinedClass) return {};
-    const classExams = exams.filter(e => e.class === combinedClass);
+    const classExams = exams.filter(e => classNamesMatch(e.class, combinedClass));
     const map: Partial<Record<ExamTypeKey, Exam>> = {};
     classExams.forEach(e => {
       const key = classifyExam(e.name);
@@ -1256,7 +1263,7 @@ export default function MarksheetScreen() {
     const examIds = Object.values(combinedExamMap).map(e => e!.id);
     const withAnyResult = new Set(examResults.filter(r => examIds.includes(r.examId)).map(r => r.studentId));
     return students
-      .filter(s => s.class === combinedClass && withAnyResult.has(s.id))
+      .filter(s => classNamesMatch(s.class, combinedClass) && withAnyResult.has(s.id))
       .sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true }));
   }, [students, combinedClass, combinedExamMap, examResults]);
 
