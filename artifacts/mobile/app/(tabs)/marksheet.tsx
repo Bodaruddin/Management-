@@ -812,7 +812,9 @@ function buildCombinedMarksheetHtml(
   // font line boxes a little taller than the browser preview. The page remains
   // a single A4 sheet; the flex layout below uses the remaining height instead
   // of leaving it as unused white space after the footer.
-  const _innerContentH = 820 + subjectRows.length * 30;
+  // Reserve a little extra room for the combined summary cards and footer so
+  // the footer stays inside the single-page print area.
+  const _innerContentH = 880 + subjectRows.length * 30;
   const _innerZoomVal = Math.min(1, 1040 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
@@ -884,18 +886,18 @@ function buildCombinedMarksheetHtml(
   table.mt tr.tr td { background:#0c1f4a; font-weight:800; font-size:13px; border-top:2px solid #0c1f4a; border-bottom:none; }
   table.mt tr.tr td:first-child { font-size:12px; }
   /* summary cards */
-   .summary { display:grid; flex:1 1 auto; min-height:160px; align-items:stretch; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:6px; margin-bottom:0; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-   .sc { border:1.5px solid #e2e8f0; border-radius:11px; padding:8px 4px 7px; text-align:center; background:#fff; box-shadow:0 6px 20px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; height:100%; min-height:0; flex-direction:column; align-items:center; justify-content:center; }
-  .sc .si { display:flex; justify-content:center; align-items:center; margin:0 auto 3px; width:32px; height:32px; border-radius:50%; flex-shrink:0; }
-  .sc .si svg { width:23px; height:23px; }
-  .sc .sl { font-size:7.5px; font-weight:700; color:#0c1f4a; letter-spacing:0.3px; line-height:1.35; text-transform:uppercase; }
-  .sc .sv { font-family:'Archivo Black',sans-serif; font-size:15px; color:#0c1f4a; margin-top:1px; line-height:1.05; }
-  .sc .ss { font-size:8px; color:#64748b; margin-top:1px; line-height:1.3; }
-  .sc .result { display:inline-block; margin-top:3px; padding:2px 8px; border-radius:20px; font-size:9.5px; font-weight:700; }
+   .summary { display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-top:10px; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+   .sc { border:1.5px solid #e2e8f0; border-radius:14px; padding:10px 6px 8px; text-align:center; background:#fff; box-shadow:0 6px 22px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .sc .si { display:flex; justify-content:center; align-items:center; margin:0 auto 8px; width:50px; height:50px; border-radius:50%; flex-shrink:0; }
+  .sc .si svg { width:34px; height:34px; }
+   .sc .sl { font-size:8.5px; font-weight:700; color:#0c1f4a; letter-spacing:0.4px; line-height:1.5; text-transform:uppercase; }
+   .sc .sv { font-family:'Archivo Black',sans-serif; font-size:20px; color:#0c1f4a; margin-top:4px; line-height:1.1; }
+   .sc .ss { font-size:8px; color:#64748b; margin-top:2px; line-height:1.4; }
+   .sc .result { display:inline-block; margin-top:3px; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700; }
   .sc .pass { background:#d4edda; color:#1a7a40; }
   .sc .fail { background:#f8d7da; color:#b02020; }
-  .gs-mini { width:100%; margin-top:3px; border-collapse:collapse; }
-  .gs-mini td { font-size:7.5px; padding:1px 2px; border-bottom:1px solid #f0f4f8; text-align:left; color:#475569; }
+   .gs-mini { width:100%; margin-top:4px; border-collapse:collapse; }
+   .gs-mini td { font-size:8.5px; padding:2px 3px; border-bottom:1px solid #f0f4f8; text-align:left; color:#475569; }
   .gs-mini td:last-child { text-align:right; font-weight:800; color:#0c1f4a; font-size:10px; padding-right:4px; }
   @media print { .summary { display:grid !important; grid-template-columns:repeat(6,1fr) !important; } }
   /* remarks */
@@ -907,8 +909,8 @@ function buildCombinedMarksheetHtml(
   .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
   .sig-block .role { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:0.2px; }
   /* footer — flex-shrink:0 always pins it at page bottom */
-  .footer { position:relative; z-index:11; background:#0c1f4a; border-radius:0 0 6px 6px; margin-top:4px; padding:5px 14px; text-align:center; flex-shrink:0; }
-  .footer-quote { font-size:8px; color:#c8a040; letter-spacing:2px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; }
+  .footer { position:relative; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin-top:6px; min-height:32px; padding:8px 22px; text-align:center; flex-shrink:0; }
+  .footer-quote { font-size:10px; line-height:normal; color:#c8a040; letter-spacing:2.5px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; }
 </style>
 </head>
 <body>
