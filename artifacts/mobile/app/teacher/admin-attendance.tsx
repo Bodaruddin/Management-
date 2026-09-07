@@ -55,6 +55,16 @@ function createTimeDrafts(settings: TeacherAttendanceSettings): Record<TimeSetti
   }, {} as Record<TimeSettingKey, string>);
 }
 
+function parseOptionalCoordinate(value: unknown, label: string, min: number, max: number): number | null {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    throw new Error(`${label} must be between ${min} and ${max}.`);
+  }
+  return parsed;
+}
+
 export default function AdminTeacherAttendance() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -107,11 +117,17 @@ export default function AdminTeacherAttendance() {
   const getSettingsForSave = (): TeacherAttendanceSettings => {
     const nextSettings = {
       ...settings,
+      schoolLatitude: parseOptionalCoordinate(settings.schoolLatitude, 'School latitude', -90, 90),
+      schoolLongitude: parseOptionalCoordinate(settings.schoolLongitude, 'School longitude', -180, 180),
       radiusMeters: Number(settings.radiusMeters),
       workingDaysPerMonth: Number(settings.workingDaysPerMonth),
       lateGraceMinutes: Number(settings.lateGraceMinutes),
       lateDeductionAmount: Number(settings.lateDeductionAmount),
     };
+
+    if ((nextSettings.schoolLatitude === null) !== (nextSettings.schoolLongitude === null)) {
+      throw new Error('Enter both school latitude and longitude, or clear both fields.');
+    }
 
     for (const key of TIME_SETTING_KEYS) {
       const parsed = parseTime12Hour(timeDrafts[key]);
@@ -226,11 +242,18 @@ export default function AdminTeacherAttendance() {
               <Text style={[s.mutedText, { color: colors.mutedForeground }]}>
                 {settings.schoolLatitude === null ? 'Not configured' : `${settings.schoolLatitude.toFixed(5)}, ${settings.schoolLongitude?.toFixed(5)}`}
               </Text>
+              <Text style={[s.mutedText, { color: colors.mutedForeground }]}>
+                Set the actual school entrance coordinates. Use your current location only while standing at school.
+              </Text>
             </View>
             <TouchableOpacity style={[s.smallButton, { backgroundColor: colors.primary }]} onPress={useCurrentLocation} disabled={saving}>
               <Feather name="crosshair" size={14} color="#fff" />
               <Text style={s.smallButtonText}>Use my location</Text>
             </TouchableOpacity>
+          </View>
+          <View style={s.twoCol}>
+            {field('School latitude', 'schoolLatitude', 'numeric')}
+            {field('School longitude', 'schoolLongitude', 'numeric')}
           </View>
           {field('Allowed radius (meters)', 'radiusMeters', 'numeric')}
           <View style={s.twoCol}>

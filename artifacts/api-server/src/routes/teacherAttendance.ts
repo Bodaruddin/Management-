@@ -299,8 +299,11 @@ router.put("/settings/teacher-attendance", async (req, res) => {
     lateDeductionAmount: Number(body.lateDeductionAmount),
     deductionType: body.deductionType === "fixed" ? "fixed" : "daily_rate",
   };
-  if ((settings.schoolLatitude !== null && !isValidCoordinate(settings.schoolLatitude, -90, 90))
-    || (settings.schoolLongitude !== null && !isValidCoordinate(settings.schoolLongitude, -180, 180))
+  const hasLatitude = settings.schoolLatitude !== null;
+  const hasLongitude = settings.schoolLongitude !== null;
+  if (hasLatitude !== hasLongitude
+    || (hasLatitude && !isValidCoordinate(settings.schoolLatitude, -90, 90))
+    || (hasLongitude && !isValidCoordinate(settings.schoolLongitude, -180, 180))
     || !Number.isFinite(settings.radiusMeters) || settings.radiusMeters <= 0
     || !checkInStart || !checkInEnd || !checkOutStart || !checkOutEnd
     || !Number.isInteger(settings.workingDaysPerMonth) || settings.workingDaysPerMonth < 1
@@ -481,12 +484,14 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
     return;
   }
   const settings = await getSettings();
-  if (settings.schoolLatitude !== null && settings.schoolLongitude !== null) {
-    const distance = distanceInMeters(settings.schoolLatitude, settings.schoolLongitude, latitude, longitude);
-    if (distance > settings.radiusMeters) {
-      res.status(403).json({ error: `You are ${Math.round(distance)}m from school; check-out is allowed within ${settings.radiusMeters}m` });
-      return;
-    }
+  if (settings.schoolLatitude === null || settings.schoolLongitude === null) {
+    res.status(400).json({ error: "School attendance location has not been configured by an administrator" });
+    return;
+  }
+  const distance = distanceInMeters(settings.schoolLatitude, settings.schoolLongitude, latitude, longitude);
+  if (distance > settings.radiusMeters) {
+    res.status(403).json({ error: `You are ${Math.round(distance)}m from school; check-out is allowed within ${settings.radiusMeters}m` });
+    return;
   }
   const nowMinutes = currentTimeMinutes();
   const checkOutStart = timeToMinutes(settings.checkOutStart);
