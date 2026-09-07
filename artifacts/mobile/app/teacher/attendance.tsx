@@ -419,7 +419,10 @@ export default function TeacherAttendance() {
       if (!validDate(customStartDate) || !validDate(customEndDate) || customStartDate > customEndDate) return [];
       records = records.filter(a => a.date >= customStartDate && a.date <= customEndDate);
     }
-    return [...records].sort((a, b) => b.date.localeCompare(a.date));
+    // Reports are aggregated by student below, so chronological ordering is
+    // unnecessary here. Copying and sorting the complete history can block
+    // Android's JS thread on larger schools and may make the app look frozen.
+    return records;
   }, [attendanceRecords, filterReportClass, reportRange, reportMonth, reportYear, customStartDate, customEndDate, view]);
 
   const reportStudents = useMemo<ReportStudent[]>(() => {
@@ -815,6 +818,11 @@ export default function TeacherAttendance() {
           <FlatList
             data={reportStudents}
             keyExtractor={student => student.id}
+            initialNumToRender={12}
+            maxToRenderPerBatch={8}
+            updateCellsBatchingPeriod={50}
+            windowSize={5}
+            removeClippedSubviews={Platform.OS === 'android'}
             contentContainerStyle={{ padding: 16, paddingBottom: botPad, flexGrow: 1 }}
             ListEmptyComponent={<EmptyState icon="users" title="No Students" subtitle="No active or inactive students found" />}
             renderItem={({ item: student }) => {
