@@ -203,6 +203,72 @@ async function verifyFace(teacherId: string, images: string[]) {
   return { method: "camera_face_match", score: result.score };
 }
 
+
+let absenceSweepInProgress = false;
+
+/** Mark teachers absent once the configured check-out window has ended.
+ *  This is intentionally server-side so it runs even when a teacher never opens the app.
+ */
+export async function markMissedTeacherAttendance() {
+  const date = asDate(undefined);
+  if (absenceSweepInProgress) return { date, created: 0, skipped: true, reason: "in_progress" };
+  absenceSweepInProgress = true;
+  try {
+    const settings = await getSettings();
+    if (currentTimeMinutes() < timeToMinutes(settings.checkOutEnd)) {
+      return { date, created: 0, skipped: true, reason: "before_check_out_end" };
+    }
+
+    const weekday = new Date(date + "T12:00:00Z").getUTCDay();
+    if (weekday === 0 || weekday === 6) {
+      return { date, created: 0, skipped: true, reason: "weekend" };
+    }
+
+    const [teachers, records, leaves, holidays] = await Promise.all([
+      getAdapter().teachers.list(),
+      getAdapter().teacherAttendance.list({ month: date.slice(0, 7) }),
+      getAdapter().teacherLeaveApplications.list({ status: "approved" }),
+      getAdapter().teacherHolidays.list(),
+    ]);
+    if ((holidays as any[]).some((holiday) => String(holiday.date) === date)) {
+      return { date, created: 0, skipped: true, reason: "holiday" };
+    }
+
+    const existing = new Set((records as any[]).map((record) => String(record.teacherId) + ":" + String(record.date)));
+    const leaveDatesByTeacher = new Map<string, Set<string>>();
+    for (const leave of leaves as any[]) {
+      const teacherId = String(leave.teacherId ?? "");
+      if (!teacherId) continue;
+      const dates = leaveDatesByTeacher.get(teacherId) ?? new Set<string>();
+      for (const leaveDate of dateRange(String(leave.startDate ?? ""), String(leave.endDate ?? ""))) dates.add(leaveDate);
+      leaveDatesByTeacher.set(teacherId, dates);
+    }
+
+    let created = 0;
+    for (const teacher of teachers as any[]) {
+      const teacherId = String(teacher.id ?? "");
+      if (!teacherId || leaveDatesByTeacher.get(teacherId)?.has(date)) continue;
+      const key = teacherId + ":" + date;
+      if (existing.has(key)) continue;
+      const result = await getAdapter().teacherAttendance.createIfAbsent(teacherId, date, {
+        teacherName: teacher.name,
+        status: "absent",
+        checkInAt: null,
+        faceVerified: false,
+        faceVerificationMethod: "automatic_absence",
+        note: "Automatically marked absent after check-out time (" + settings.checkOutEnd + ")",
+      });
+      if (result.created) {
+        created += 1;
+        existing.add(key);
+      }
+    }
+    return { date, created, skipped: false };
+  } finally {
+    absenceSweepInProgress = false;
+  }
+}
+
 router.get("/settings/teacher-attendance", async (_req, res) => {
   res.json(await getSettings());
 });
@@ -579,7 +645,10 @@ router.post("/teacher-attendance/payroll/calculate", async (req, res) => {
   for (const teacher of teachers as any[]) {
     const teacherRecords = records.filter((record: any) => record.teacherId === teacher.id);
     const recordByDate = new Map(teacherRecords.map((record: any) => [record.date, record]));
-    const absentDates = workingDates.filter(date => !recordByDate.has(date));
+    const absentDates = workingDates.filter(date => {
+      const record = recordByDate.get(date);
+      return !record || record.status === "absent";
+    });
     const lateRecords = teacherRecords.filter((record: any) => record.status === "late");
     const absentDeduction = settings.deductionType === "fixed"
       ? absentDates.length * settings.lateDeductionAmount
