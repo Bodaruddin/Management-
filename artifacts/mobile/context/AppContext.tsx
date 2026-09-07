@@ -622,6 +622,31 @@ async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json();
 }
 
+const BOOTSTRAP_TIMEOUT_MS = 15_000;
+const BOOTSTRAP_RETRY_DELAYS_MS = [500, 1_500, 3_000];
+
+async function loadBootstrapWithRetry<T>(): Promise<T> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt <= BOOTSTRAP_RETRY_DELAYS_MS.length; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), BOOTSTRAP_TIMEOUT_MS);
+
+    try {
+      return await apiGet<T>('/bootstrap', { signal: controller.signal });
+    } catch (error) {
+      lastError = error;
+      if (attempt < BOOTSTRAP_RETRY_DELAYS_MS.length) {
+        await new Promise(resolve => setTimeout(resolve, BOOTSTRAP_RETRY_DELAYS_MS[attempt]));
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('Could not load school data');
+}
+
 async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${getApiBase()}/api${path}`, {
     method: 'POST',
@@ -865,7 +890,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const loadAllData = React.useCallback(async (): Promise<boolean> => {
     try {
-      const loadBootstrap = () => apiGet<any>('/bootstrap');
       const applyBootstrap = (data: any) => {
         const {
           classes = [], sections = [], students = [], teachers = [], subjects = [],
@@ -903,13 +927,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         });
       };
 
-      const initialData = await loadBootstrap();
+      const initialData = await loadBootstrapWithRetry<any>();
       const isEmpty = initialData.classes.length === 0
         && initialData.students.length === 0
         && initialData.teachers.length === 0;
       if (isEmpty) {
         await seedAllData();
-        applyBootstrap(await loadBootstrap());
+        applyBootstrap(await loadBootstrapWithRetry<any>());
       } else {
         applyBootstrap(initialData);
       }
@@ -954,8 +978,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     };
 
     if (!loadedRef.current) {
-      loadedRef.current = true;
-      refreshIfNeeded();
+      void refreshAllData().then(success => {
+        loadedRef.current = success;
+        // Keep the flag false after a failed startup load so a later
+        // foreground event can retry instead of leaving the initial empty
+        // state on screen until the user signs in again.
+        if (!success && !disposed) loadedRef.current = false;
+      });
     }
 
     const subscription = NativeAppState.addEventListener('change', nextState => {
