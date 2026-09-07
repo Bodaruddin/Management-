@@ -809,7 +809,7 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
         const id = data.id ?? newId();
         const doc = stamp({
           teacherId: data.teacherId, teacherName: data.teacherName ?? "", date: data.date,
-          status: data.status ?? "present", checkInAt: data.checkInAt ?? now(),
+          status: data.status ?? "present", checkInAt: data.checkInAt === null ? null : data.checkInAt ?? now(),
           checkInLatitude: data.checkInLatitude ?? null, checkInLongitude: data.checkInLongitude ?? null,
           distanceFromSchool: data.distanceFromSchool ?? null, faceVerified: String(Boolean(data.faceVerified)),
           faceVerificationMethod: data.faceVerificationMethod ?? null, note: data.note ?? null,
