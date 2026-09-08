@@ -814,8 +814,11 @@ function buildCombinedMarksheetHtml(
   // of leaving it as unused white space after the footer.
   // Reserve a little extra room for the combined summary cards and footer so
   // the footer stays inside the single-page print area.
+  // Combined annual sheets have the densest table. Keep a deliberate reserve
+  // for the signature row and footer instead of allowing the page shell to
+  // clip them after the summary cards.
   const _innerContentH = 880 + subjectRows.length * 30;
-  const _innerZoomVal = Math.min(1, 1040 / _innerContentH);
+  const _innerZoomVal = Math.min(0.82, 940 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
   return `<!DOCTYPE html>
@@ -838,7 +841,7 @@ function buildCombinedMarksheetHtml(
   .corner.bl { bottom:5px; left:5px; transform:rotate(-90deg); transform-origin:50% 50%; }
   .corner.br { bottom:5px; right:5px; transform:rotate(180deg); transform-origin:50% 50%; }
   .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:visible; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; }
-  .inner-content { display:flex; flex:1 1 auto; min-height:0; flex-direction:column; ${_innerZoomCss} }
+  .inner-content { display:flex; flex:1 1 auto; min-height:0; overflow:visible; flex-direction:column; ${_innerZoomCss} }
   /* header */
   .hdr { display:flex; align-items:flex-start; gap:12px; padding-bottom:5px; border-bottom:3px solid #0c1f4a; }
   .hdr-center { flex:1; text-align:center; }

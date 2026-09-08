@@ -311,7 +311,7 @@ function applyNativePrintMargins(html: string, marginMm: number): string {
       height: calc(100% / var(--native-scale, 0.82)) !important;
       min-height: 0 !important;
       max-height: calc(100% / var(--native-scale, 0.82)) !important;
-      overflow: hidden !important;
+      overflow: visible !important;
      transform: scale(var(--native-scale, 0.82)) !important;
      transform-origin: top left !important;
   }
