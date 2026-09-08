@@ -772,18 +772,18 @@ function buildCombinedMarksheetHtml(
       const v = row.marks[key];
       const ex = examMap[key];
       if (v === null || !ex)
-          return `<td style="padding:4px 3px;line-height:1;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`
-              + `<td style="padding:4px 3px;line-height:1;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`;
-      return `<td style="padding:4px 3px;line-height:1;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${v}</td>`
-           + `<td style="padding:4px 3px;line-height:1;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0">${getSubjectMaxMarks(ex, row.subject, student.class)}</td>`;
+          return `<td style="padding:5px 3px;line-height:1;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`
+              + `<td style="padding:5px 3px;line-height:1;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0;color:#c0c9d8">—</td>`;
+      return `<td style="padding:5px 3px;line-height:1;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${v}</td>`
+           + `<td style="padding:5px 3px;line-height:1;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #eef1f8;border-bottom:1px solid #dde4f0">${getSubjectMaxMarks(ex, row.subject, student.class)}</td>`;
     }).join('');
     return `<tr style="background:${bg}">
-       <td style="padding:4px 8px;line-height:1.2;font-size:10.5px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:normal;word-break:break-word">${icon}&nbsp;${row.subject}</td>
+       <td style="padding:5px 8px;line-height:1.2;font-size:10.5px;font-weight:700;color:#0c1f4a;text-transform:uppercase;border-bottom:1px solid #dde4f0;border-right:1px solid #dde4f0;white-space:normal;word-break:break-word">${icon}&nbsp;${row.subject}</td>
       ${examCells}
-        <td style="padding:4px 4px;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:2px solid #b0bcd4;border-bottom:1px solid #dde4f0">${row.total}</td>
-         <td style="padding:4px 3px;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.max}</td>
-        <td style="padding:4px 4px;font-size:11px;font-weight:600;color:#1a1a2e;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.pct.toFixed(2)}</td>
-        <td style="padding:4px 4px;font-size:13px;font-weight:900;color:${sg.color};text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.grade}</td>
+        <td style="padding:5px 4px;font-size:12px;font-weight:800;color:#0c1f4a;text-align:center;border-left:2px solid #b0bcd4;border-bottom:1px solid #dde4f0">${row.total}</td>
+         <td style="padding:5px 3px;font-size:10px;color:#0c1f4a;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.max}</td>
+        <td style="padding:5px 4px;font-size:11px;font-weight:600;color:#1a1a2e;text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.pct.toFixed(2)}</td>
+        <td style="padding:5px 4px;font-size:13px;font-weight:900;color:${sg.color};text-align:center;border-left:1px solid #dde4f0;border-bottom:1px solid #dde4f0">${row.grade}</td>
     </tr>`;
   }).join('');
 
@@ -843,9 +843,9 @@ function buildCombinedMarksheetHtml(
    .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:visible; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; position:relative; }
   .inner-content { display:flex; flex:1 1 auto; min-height:0; overflow:visible; flex-direction:column; ${_innerZoomCss} }
   /* header */
-  .hdr { display:flex; align-items:flex-start; gap:12px; padding-bottom:5px; border-bottom:3px solid #0c1f4a; }
+   .hdr { display:flex; align-items:flex-start; gap:8px; padding-bottom:5px; border-bottom:3px solid #0c1f4a; }
   .hdr-center { flex:1; text-align:center; }
-  .school-h1 { font-family:'Archivo Black',sans-serif; font-size:22px; color:#0c1f4a; line-height:1.15; letter-spacing:0.3px; }
+   .school-h1 { font-family:'Archivo Black',sans-serif; font-size:22px; color:#0c1f4a; line-height:1.15; letter-spacing:0; white-space:nowrap; transform:scaleX(0.94); transform-origin:center; }
   .tagline-row { display:flex; align-items:center; gap:6px; margin:3px 0 2px; }
   .tline { flex:1; height:1.5px; background:#c8a040; }
   .tagline-txt { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:3px; white-space:nowrap; }
@@ -882,7 +882,7 @@ function buildCombinedMarksheetHtml(
   .pt-txt { font-size:10px; font-weight:700; color:#fff; letter-spacing:2px; }
   table.mt { width:100%; table-layout:fixed; border-collapse:collapse; font-size:12px; border:1.5px solid #0c1f4a; border-top:none; }
    table.mt th, table.mt td { vertical-align:middle; }
-  table.mt th { background:#0c1f4a; color:#fff; padding:3px 3px; font-size:9px; font-weight:700; letter-spacing:0.3px; text-align:center; border-right:1px solid rgba(255,255,255,0.12); }
+   table.mt th { background:#0c1f4a; color:#fff; padding:4px 3px; font-size:9px; font-weight:700; letter-spacing:0.3px; text-align:center; border-right:1px solid rgba(255,255,255,0.12); }
   table.mt th.sh { text-align:left; padding-left:8px; }
   table.mt th.sub { background:#122d60; font-size:8.5px; color:rgba(255,255,255,0.85); font-weight:600; }
   table.mt th.total-h { color:#e8c96a; border-left:2px solid rgba(255,255,255,0.28); }
@@ -913,7 +913,7 @@ function buildCombinedMarksheetHtml(
   .sig-block .role { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:0.2px; }
   /* footer — flex-shrink:0 always pins it at page bottom */
    .footer { position:absolute; left:8px; right:8px; bottom:8px; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin:0; min-height:32px; padding:8px 22px; text-align:center; }
-  .footer-quote { font-size:10px; line-height:normal; color:#c8a040; letter-spacing:2.5px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; }
+   .footer-quote { font-size:10px; line-height:normal; color:#c8a040; letter-spacing:1.2px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -932,7 +932,7 @@ function buildCombinedMarksheetHtml(
     <div class="hdr">
       <!-- Badge -->
       <div style="flex-shrink:0">
-           ${branding.logoDataUrl ? documentLogoHtml(branding, 112, 112) : `<svg xmlns="http://www.w3.org/2000/svg" width="112" height="112" viewBox="0 0 110 110">
+           ${branding.logoDataUrl ? documentLogoHtml(branding, 122, 122) : `<svg xmlns="http://www.w3.org/2000/svg" width="122" height="122" viewBox="0 0 110 110">
           <defs>
             <path id="cta" d="M 11,55 A 44,44 0 1,0 99,55"/>
             <path id="cba" d="M 18,55 A 37,37 0 0,1 92,55"/>
