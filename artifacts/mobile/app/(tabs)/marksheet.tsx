@@ -840,7 +840,7 @@ function buildCombinedMarksheetHtml(
   .corner.tr { top:5px; right:5px; transform:rotate(90deg); transform-origin:50% 50%; }
   .corner.bl { bottom:5px; left:5px; transform:rotate(-90deg); transform-origin:50% 50%; }
   .corner.br { bottom:5px; right:5px; transform:rotate(180deg); transform-origin:50% 50%; }
-  .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:visible; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; }
+   .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:visible; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; position:relative; }
   .inner-content { display:flex; flex:1 1 auto; min-height:0; overflow:visible; flex-direction:column; ${_innerZoomCss} }
   /* header */
   .hdr { display:flex; align-items:flex-start; gap:12px; padding-bottom:5px; border-bottom:3px solid #0c1f4a; }
@@ -908,11 +908,11 @@ function buildCombinedMarksheetHtml(
    .rem-tag { display:table-cell; width:110px; vertical-align:middle; background:#0c1f4a; color:#fff; padding:5px 12px 5px 9px; font-size:10px; font-weight:700; letter-spacing:0.4px; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:24px; }
    .rem-txt { display:table-cell; vertical-align:middle; padding:5px 10px; font-size:10.5px; line-height:1.25; color:#222; font-weight:500; word-break:normal; }
   /* signatures — flex-shrink:0 keeps them out of the scrolling inner area */
-   .sigs { display:flex; justify-content:space-around; margin-top:8px; padding-top:0; min-height:82px; align-items:flex-end; text-align:center; flex-shrink:0; }
+   .sigs { position:absolute; left:0; right:0; bottom:44px; display:flex; justify-content:space-around; margin:0; padding-top:8px; min-height:82px; align-items:flex-end; text-align:center; z-index:12; }
   .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
   .sig-block .role { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:0.2px; }
   /* footer — flex-shrink:0 always pins it at page bottom */
-  .footer { position:relative; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin-top:6px; min-height:32px; padding:8px 22px; text-align:center; flex-shrink:0; }
+   .footer { position:absolute; left:8px; right:8px; bottom:8px; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin:0; min-height:32px; padding:8px 22px; text-align:center; }
   .footer-quote { font-size:10px; line-height:normal; color:#c8a040; letter-spacing:2.5px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; }
 </style>
 </head>
@@ -1123,6 +1123,7 @@ function buildCombinedMarksheetHtml(
       <div class="rem-txt">${escapeHtml(remark)}</div>
     </div>
 
+   </div><!-- /inner-content -->
 
   <!-- ══ SIGNATURES ══ -->
   <div class="sigs">
@@ -1139,7 +1140,6 @@ function buildCombinedMarksheetHtml(
     <div class="footer-quote">Education is the most powerful weapon which you can use to change the world.</div>
   </div>
 
-   </div><!-- /inner-content -->
   </div><!-- /inner -->
 
 </div><!-- /page -->
