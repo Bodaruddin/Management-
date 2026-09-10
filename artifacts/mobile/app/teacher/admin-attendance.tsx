@@ -176,6 +176,7 @@ export default function AdminTeacherAttendance() {
   const pendingLeaves = teacherLeaves.filter(leave => leave.status === 'pending');
   const reportMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const monthlyRecords = teacherAttendanceRecords.filter(record => record.date.startsWith(reportMonthKey));
+  const monthlyHolidays = teacherHolidays.filter(holiday => holiday.date.startsWith(reportMonthKey));
   const leaveHistory = teacherLeaves
     .filter(leave => leave.status !== 'pending')
     .sort((a, b) => (b.reviewedAt ?? b.createdAt).localeCompare(a.reviewedAt ?? a.createdAt));
@@ -288,7 +289,7 @@ export default function AdminTeacherAttendance() {
           <View style={s.sectionHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[s.sectionTitle, { color: colors.text }]}>This month&apos;s attendance</Text>
-              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>A live summary of recorded check-ins for {reportMonthKey}.</Text>
+              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>Present, absent, late, leave, and holiday totals for {reportMonthKey}.</Text>
             </View>
             <Feather name="calendar" size={20} color={colors.primary} />
           </View>
@@ -296,13 +297,16 @@ export default function AdminTeacherAttendance() {
             const rows = monthlyRecords.filter(record => record.teacherId === teacher.id);
             const present = rows.filter(record => record.status === 'present').length;
             const late = rows.filter(record => record.status === 'late').length;
+            const absent = rows.filter(record => record.status === 'absent').length;
+            const leave = rows.filter(record => record.status === 'leave').length;
             return (
-              <View key={teacher.id} style={[s.payrollRow, { borderBottomColor: colors.border }]}>
+              <View key={teacher.id} style={[s.payrollRow, { borderBottomColor: colors.border }]}> 
                 <View style={{ flex: 1 }}>
                   <Text style={[s.historyTitle, { color: colors.text }]}>{teacher.name}</Text>
-                  <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Present {present} · Late {late} · Check-outs {rows.filter(record => record.checkOutAt).length}</Text>
+                  <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Present {present} · Absent {absent} · Holidays {monthlyHolidays.length}</Text>
+                  <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Late {late} · Leave {leave} · Check-outs {rows.filter(record => record.checkOutAt).length}</Text>
                 </View>
-                <Text style={[s.amount, { color: rows.length ? colors.success : colors.mutedForeground }]}>{rows.length ? `${rows.length} days` : 'No records'}</Text>
+                <Text style={[s.amount, { color: rows.length ? colors.success : colors.mutedForeground }]}>{rows.length ? rows.length + ' records' : 'No records'}</Text>
               </View>
             );
           })}
