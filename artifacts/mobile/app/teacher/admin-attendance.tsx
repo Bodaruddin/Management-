@@ -322,7 +322,7 @@ export default function AdminTeacherAttendance() {
           </View>
           {field('Working-day divisor', 'workingDaysPerMonth', 'numeric')}
           <View style={s.twoCol}>
-            {field('Late grace (minutes)', 'lateGraceMinutes', 'numeric')}
+            {field('Late check-in grace after closing (minutes)', 'lateGraceMinutes', 'numeric')}
             {field('Late deduction (₹)', 'lateDeductionAmount', 'numeric')}
           </View>
           <Text style={[s.label, { color: colors.text }]}>Absence deduction method</Text>
