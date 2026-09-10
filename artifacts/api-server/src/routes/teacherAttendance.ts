@@ -447,7 +447,8 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
       return;
     }
   }
-  const late = nowMinutes > checkInStart + settings.lateGraceMinutes;
+  // A check-in inside the configured window is on time. Grace applies only after closing.
+  const late = nowMinutes > checkInEnd + settings.lateGraceMinutes;
    try {
      const result = await getAdapter().teacherAttendance.createIfAbsent(teacherId, date, {
        id: body.id, teacherId, teacherName, date,
