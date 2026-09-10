@@ -5,8 +5,13 @@ const TEMPLATE_SIZE = 24;
 // requires a strong structural similarity, but the threshold must allow for
 // the normal crop, mirror, and lighting differences introduced by a second
 // capture of the same face.
-const MATCH_THRESHOLD = 0.64;
-const MULTI_SAMPLE_THRESHOLD = 0.56;
+// A camera frame is not a biometric scan: Android changes exposure, portrait
+// crop, mirror orientation, and autofocus between two captures. Keep the
+// threshold strict enough to reject unrelated faces, but do not require the
+// same pixel crop twice.
+const MATCH_THRESHOLD = 0.58;
+const MULTI_SAMPLE_THRESHOLD = 0.50;
+const CONSISTENT_SAMPLE_THRESHOLD = 0.54;
 const MAX_STORED_TEMPLATES = 96;
 const MAX_ENROLLMENT_SAMPLES = 5;
 const MIN_IMAGE_SIDE = 160;
@@ -134,24 +139,29 @@ type NormalizationOptions = {
 };
 
 const TEMPLATE_VARIANTS: NormalizationOptions[] = [
-  // Keep comparisons inside the face guide instead of allowing the background
-  // or shoulders to dominate the template.
+  // Keep a full centered crop as a compatibility path. The face is not
+  // always vertically centered in a portrait Android frame.
+  { zoom: 1 },
   { zoom: 1.12 },
   { zoom: 1.28 },
   { zoom: 1.45 },
   { zoom: 1.65 },
   { zoom: 1.9 },
   { zoom: 2.15 },
-  { zoom: 1.28, flipX: true },
-  { zoom: 1.65, flipX: true },
-  { zoom: 1.45, shiftX: -0.08 },
-  { zoom: 1.45, shiftX: 0.08 },
-  { zoom: 1.45, shiftY: -0.08 },
-  { zoom: 1.45, shiftY: 0.08 },
-  { zoom: 1.7, shiftX: -0.1 },
-  { zoom: 1.7, shiftX: 0.1 },
-  { zoom: 1.7, shiftY: -0.1 },
-  { zoom: 1.7, shiftY: 0.1 },
+  // Wider translations handle a face that is inside the guide but not
+  // perfectly centered. This is especially important for tall phone frames.
+  { zoom: 1.28, shiftX: -0.16 },
+  { zoom: 1.28, shiftX: 0.16 },
+  { zoom: 1.28, shiftY: -0.20 },
+  { zoom: 1.28, shiftY: 0.20 },
+  { zoom: 1.45, shiftX: -0.16 },
+  { zoom: 1.45, shiftX: 0.16 },
+  { zoom: 1.45, shiftY: -0.20 },
+  { zoom: 1.45, shiftY: 0.20 },
+  { zoom: 1.65, shiftX: -0.16 },
+  { zoom: 1.65, shiftX: 0.16 },
+  { zoom: 1.65, shiftY: -0.20 },
+  { zoom: 1.65, shiftY: 0.20 },
 ];
 
 function normalizedPixelsWithOptions(
@@ -272,9 +282,16 @@ export function faceMatchScore(storedTemplate: unknown, imageBase64: string): nu
   if (!storedTemplates) return 0;
   const image = decodeImage(imageBase64);
   assertUsableFaceImage(image);
-  const candidates = TEMPLATE_VARIANTS.map((options) => normalizedPixelsWithOptions(image, options));
-  // v1/v2 templates were enrolled with a full-frame candidate. Keep only
-  // that narrow compatibility path; new v3 templates never rely on the room.
+  // Compare both orientations for every crop. The preview is mirrored on
+  // some Android devices while the saved JPEG is not (and on other devices
+  // the opposite is true). Only checking two zoom levels made that mismatch
+  // look like an unrecognized face.
+  const candidates = TEMPLATE_VARIANTS.flatMap((options) => [
+    normalizedPixelsWithOptions(image, options),
+    normalizedPixelsWithOptions(image, { ...options, flipX: !options.flipX }),
+  ]);
+  // v1/v2 templates were enrolled with a full-frame candidate. Keep an
+  // explicit compatibility path for those older profiles as well.
   const legacyCandidates = typeof storedTemplate === "string" && /^(v1|v2):/.test(storedTemplate)
     ? [{}, { flipX: true }].map((options) => normalizedPixelsWithOptions(image, options, true))
     : [];
@@ -312,7 +329,7 @@ export function faceMatchesAny(storedTemplate: unknown, images: string[]): { mat
     .filter((score) => score >= MULTI_SAMPLE_THRESHOLD)
     .sort((left, right) => right - left);
   const consistentSamples = nearMatches.length >= 2
-    && nearMatches.slice(0, 2).reduce((sum, score) => sum + score, 0) / 2 >= 0.60;
+    && nearMatches.slice(0, 2).reduce((sum, score) => sum + score, 0) / 2 >= CONSISTENT_SAMPLE_THRESHOLD;
   return { matched: bestScore >= MATCH_THRESHOLD || consistentSamples, score: bestScore };
 }
 
