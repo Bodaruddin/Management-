@@ -21,6 +21,14 @@ import { readCurrentLocation } from '@/utils/location';
 
 type Tab = 'today' | 'history' | 'leave';
 type HistoryFilter = 'weekly' | 'monthly' | 'yearly' | 'custom';
+type HistoryEntry = {
+  id: string;
+  date: string;
+  status: 'present' | 'late' | 'absent' | 'leave' | 'holiday';
+  checkInAt?: string;
+  checkOutAt?: string;
+  holidayName?: string;
+};
 
 const HISTORY_FILTERS: Array<{ value: HistoryFilter; label: string }> = [
   { value: 'weekly', label: 'Weekly' },
@@ -758,7 +766,7 @@ export default function MyTeacherAttendance() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const {
-    teacherAttendanceRecords, teacherLeaves, teacherAttendanceSettings,
+    teacherAttendanceRecords, teacherLeaves, teacherHolidays, teacherAttendanceSettings,
     refreshTeacherAttendance, getTeacherFaceStatus, enrollTeacherFace,
     checkInTeacher, checkOutTeacher, applyTeacherLeave,
     updateTeacherLeave, deleteTeacherLeave,
@@ -818,6 +826,25 @@ export default function MyTeacherAttendance() {
       : [],
     [historyRange, myRecords],
   );
+  const historyEntries = useMemo<HistoryEntry[]>(() => {
+    if (!historyRange) return [];
+    const records: HistoryEntry[] = historyRecords.map(record => ({
+      id: record.id, date: record.date, status: record.status,
+      checkInAt: record.checkInAt, checkOutAt: record.checkOutAt,
+    }));
+    const holidays: HistoryEntry[] = teacherHolidays
+      .filter(holiday => holiday.date >= historyRange[0] && holiday.date <= historyRange[1])
+      .map(holiday => ({
+        id: `holiday-${holiday.id}`, date: holiday.date, status: 'holiday', holidayName: holiday.name,
+      }));
+    return [...records, ...holidays].sort((a, b) => b.date.localeCompare(a.date));
+  }, [historyRange, historyRecords, teacherHolidays]);
+  const historySummary = useMemo(() => ({
+    present: historyEntries.filter(entry => entry.status === 'present').length,
+    late: historyEntries.filter(entry => entry.status === 'late').length,
+    absent: historyEntries.filter(entry => entry.status === 'absent').length,
+    holidays: historyEntries.filter(entry => entry.status === 'holiday').length,
+  }), [historyEntries]);
   const customDateError = historyFilter === 'custom' && !historyRange
     ? 'Enter valid dates in DD-MM-YYYY format with the start date on or before the end date.'
     : '';
@@ -1317,24 +1344,42 @@ export default function MyTeacherAttendance() {
               {!!customDateError && <Text style={[s.customDateError, { color: colors.destructive }]}>{customDateError}</Text>}
             </View>
           )}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingTop: 12 }}>
+            {[
+              ['Present', historySummary.present, colors.success],
+              ['Late', historySummary.late, colors.warning],
+              ['Absent', historySummary.absent, colors.destructive],
+              ['Holidays', historySummary.holidays, colors.primary],
+            ].map(([label, value, color]) => (
+              <View key={String(label)} style={{ flexGrow: 1, minWidth: '22%', borderRadius: 12, padding: 10, backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 11, color: colors.mutedForeground }}>{label}</Text>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: color as string, marginTop: 3 }}>{value}</Text>
+              </View>
+            ))}
+          </View>
           <FlatList
-            data={historyRecords}
+            data={historyEntries}
             keyExtractor={item => item.id}
             contentContainerStyle={{ padding: 16, paddingTop: 10, paddingBottom: bottomPad, flexGrow: 1 }}
-            ListEmptyComponent={<EmptyState icon="calendar" title="No Attendance Yet" subtitle={customDateError || 'No attendance records in this period'} />}
-            renderItem={({ item }) => (
-              <View style={[s.historyRow, { backgroundColor: colors.card }]}>
-              <View style={[s.dateBadge, { backgroundColor: item.status === 'late' ? colors.warning + '18' : colors.success + '18' }]}>
-                <Text style={[s.dateDay, { color: item.status === 'late' ? colors.warning : colors.success }]}>{item.date.slice(-2)}</Text>
-                <Text style={[s.dateMonth, { color: colors.mutedForeground }]}>{item.date.slice(5, 7)}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.historyTitle, { color: colors.text }]}>{item.status === 'late' ? 'Late' : 'Present'}</Text>
-                <Text style={[s.historyMeta, { color: colors.mutedForeground }]}>In {formatTime(item.checkInAt)} · Out {formatTime(item.checkOutAt)}</Text>
-              </View>
-              <Text style={[s.statusText, { color: item.status === 'late' ? colors.warning : colors.success }]}>{item.status.toUpperCase()}</Text>
-            </View>
-            )}
+            ListEmptyComponent={<EmptyState icon="calendar" title="No Attendance Yet" subtitle={customDateError || 'No attendance records or holidays in this period'} />}
+            renderItem={({ item }) => {
+              const statusColor = item.status === 'late' ? colors.warning : item.status === 'absent' ? colors.destructive : item.status === 'holiday' ? colors.primary : item.status === 'leave' ? colors.warning : colors.success;
+              const title = item.status === 'holiday' ? item.holidayName || 'Holiday' : item.status === 'late' ? 'Late' : item.status === 'absent' ? 'Absent' : item.status === 'leave' ? 'Leave' : 'Present';
+              const details = item.status === 'holiday' ? 'School holiday' : `In ${formatTime(item.checkInAt)} · Out ${formatTime(item.checkOutAt)}`;
+              return (
+                <View style={[s.historyRow, { backgroundColor: colors.card }]}> 
+                  <View style={[s.dateBadge, { backgroundColor: statusColor + '18' }]}> 
+                    <Text style={[s.dateDay, { color: statusColor }]}>{item.date.slice(-2)}</Text>
+                    <Text style={[s.dateMonth, { color: colors.mutedForeground }]}>{item.date.slice(5, 7)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.historyTitle, { color: colors.text }]}>{title}</Text>
+                    <Text style={[s.historyMeta, { color: colors.mutedForeground }]}>{details}</Text>
+                  </View>
+                  <Text style={[s.statusText, { color: statusColor }]}>{item.status.toUpperCase()}</Text>
+                </View>
+              );
+            }}
           />
         </View>
       )}
