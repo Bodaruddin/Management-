@@ -482,6 +482,13 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
   const existing = (await getAdapter().teacherAttendance.list({ teacherId }))
     .find((record: any) => record.id === req.params.id);
   if (!existing) { res.status(404).json({ error: "Attendance record not found" }); return; }
+  if (!existing.checkInAt) {
+    res.status(409).json({
+      error: "Check-out is unavailable because no check-in was recorded for today",
+      record: existing,
+    });
+    return;
+  }
   if (existing.checkOutAt) { res.status(409).json({ error: "Attendance has already been checked out", record: existing }); return; }
   const latitude = Number(body.latitude);
   const longitude = Number(body.longitude);

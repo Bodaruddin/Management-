@@ -801,6 +801,7 @@ export default function MyTeacherAttendance() {
     [teacherAttendanceRecords, user?.id],
   );
   const todayRecord = myRecords.find(record => record.date === today);
+  const hasCheckedInToday = Boolean(todayRecord?.checkInAt);
   const myLeaves = useMemo(
     () => teacherLeaves.filter(leave => leave.teacherId === user?.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [teacherLeaves, user?.id],
@@ -948,7 +949,7 @@ export default function MyTeacherAttendance() {
           faceSamplesBase64,
         });
       } else {
-        if (!todayRecord) throw new Error('No check-in found for today');
+        if (!todayRecord?.checkInAt) throw new Error('No check-in found for today');
         await checkOutTeacher(todayRecord.id, {
           teacherId: user.id,
           ...coordinates,
@@ -1006,6 +1007,11 @@ export default function MyTeacherAttendance() {
   };
 
   const handleCheckOut = () => {
+    if (!todayRecord?.checkInAt) {
+      setLastAttendanceAction(null);
+      setError('Check-out is unavailable because no check-in was recorded for today.');
+      return;
+    }
     setLastAttendanceAction('check-out');
     if (teacherAttendanceSettings.requireFaceVerification) {
       setError('');
@@ -1014,7 +1020,7 @@ export default function MyTeacherAttendance() {
       return;
     }
     runAction(async () => {
-      if (!todayRecord) throw new Error('No check-in found for today');
+      if (!todayRecord?.checkInAt) throw new Error('No check-in found for today');
       const coordinates = await readCurrentLocation();
       await checkOutTeacher(todayRecord.id, { teacherId: user?.id ?? '', ...coordinates });
     });
@@ -1187,7 +1193,11 @@ export default function MyTeacherAttendance() {
                 </View>
               </View>
               <Text style={s.heroKicker}>TODAY’S ATTENDANCE</Text>
-              <Text style={s.heroTitle}>{todayRecord ? (todayRecord.status === 'late' ? 'Checked in late' : 'Checked in') : 'Ready to check in?'}</Text>
+              <Text style={s.heroTitle}>
+                {hasCheckedInToday
+                  ? (todayRecord?.status === 'late' ? 'Checked in late' : 'Checked in')
+                  : todayRecord?.status === 'absent' ? 'Marked absent' : 'Ready to check in?'}
+              </Text>
               <Text style={s.heroCopy}>Your location must be within {teacherAttendanceSettings.radiusMeters}m of school.</Text>
               <View style={s.heroFooter}>
                 <View style={s.heroFooterItem}>
@@ -1203,21 +1213,25 @@ export default function MyTeacherAttendance() {
 
             <View style={[s.recordCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={s.recordRow}>
-                <View style={[s.recordIcon, { backgroundColor: todayRecord ? colors.success + '18' : colors.muted }]}>
-                  <Feather name={todayRecord ? 'check-circle' : 'clock'} size={20} color={todayRecord ? colors.success : colors.mutedForeground} />
+                <View style={[s.recordIcon, { backgroundColor: hasCheckedInToday ? colors.success + '18' : todayRecord?.status === 'absent' ? colors.destructive + '18' : colors.muted }]}>
+                  <Feather
+                    name={hasCheckedInToday ? 'check-circle' : todayRecord?.status === 'absent' ? 'x-circle' : 'clock'}
+                    size={20}
+                    color={hasCheckedInToday ? colors.success : todayRecord?.status === 'absent' ? colors.destructive : colors.mutedForeground}
+                  />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={s.recordHeading}>
                     <Text style={[s.recordLabel, { color: colors.mutedForeground }]}>Today · {today}</Text>
-                    <View style={[s.statusPill, { backgroundColor: todayRecord ? colors.success + '18' : colors.secondary }]}>
-                      <View style={[s.statusDot, { backgroundColor: todayRecord ? colors.success : colors.primary }]} />
-                      <Text style={[s.statusPillText, { color: todayRecord ? colors.success : colors.primary }]}>
-                        {todayRecord ? (todayRecord.status === 'late' ? 'LATE' : 'PRESENT') : 'PENDING'}
+                    <View style={[s.statusPill, { backgroundColor: hasCheckedInToday ? colors.success + '18' : todayRecord?.status === 'absent' ? colors.destructive + '18' : colors.secondary }]}>
+                      <View style={[s.statusDot, { backgroundColor: hasCheckedInToday ? colors.success : todayRecord?.status === 'absent' ? colors.destructive : colors.primary }]} />
+                      <Text style={[s.statusPillText, { color: hasCheckedInToday ? colors.success : todayRecord?.status === 'absent' ? colors.destructive : colors.primary }]}>
+                        {hasCheckedInToday ? (todayRecord?.status === 'late' ? 'LATE' : 'PRESENT') : todayRecord?.status === 'absent' ? 'ABSENT' : 'PENDING'}
                       </Text>
                     </View>
                   </View>
                   <Text style={[s.recordValue, { color: colors.text }]}>
-                    {todayRecord ? (todayRecord.status === 'late' ? 'Late' : 'Present') : 'Not marked'}
+                    {hasCheckedInToday ? (todayRecord?.status === 'late' ? 'Late' : 'Present') : todayRecord?.status === 'absent' ? 'Absent' : 'Not marked'}
                   </Text>
                 </View>
               </View>
@@ -1260,11 +1274,18 @@ export default function MyTeacherAttendance() {
                   {!busy && <Feather name="arrow-up-right" size={18} color={colors.primaryForeground} />}
                 </LinearGradient>
               </TouchableOpacity>
-            ) : !todayRecord.checkOutAt ? (
+            ) : hasCheckedInToday && !todayRecord.checkOutAt ? (
               <TouchableOpacity style={[s.secondaryButton, { borderColor: colors.primary }]} disabled={busy} onPress={handleCheckOut}>
                 <Feather name="log-out" size={18} color={colors.primary} />
                 <Text style={[s.secondaryButtonText, { color: colors.primary }]}>{busy ? 'Verifying…' : 'Verify face & check out'}</Text>
               </TouchableOpacity>
+            ) : !hasCheckedInToday ? (
+              <View style={[s.complete, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Feather name="lock" size={18} color={colors.mutedForeground} />
+                <Text style={[s.completeText, { color: colors.mutedForeground }]}>
+                  Check-out unavailable — check-in was not recorded
+                </Text>
+              </View>
             ) : (
               <View style={[s.complete, { backgroundColor: colors.success + '15', borderColor: colors.success }]}>
                 <Feather name="check-circle" size={18} color={colors.success} />
