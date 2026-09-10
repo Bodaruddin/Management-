@@ -206,8 +206,11 @@ async function verifyFace(teacherId: string, images: string[]) {
 
 let absenceSweepInProgress = false;
 
-/** Mark teachers absent once the configured check-out window has ended.
+/** Mark teachers absent after the configured attendance cutoff.
  *  This is intentionally server-side so it runs even when a teacher never opens the app.
+ *  When late check-in is disabled, the cutoff is the check-in closing time. If late
+ *  check-in is enabled, keep the window open until check-out closes so late teachers
+ *  can still record a late arrival.
  */
 export async function markMissedTeacherAttendance() {
   const date = asDate(undefined);
@@ -215,8 +218,10 @@ export async function markMissedTeacherAttendance() {
   absenceSweepInProgress = true;
   try {
     const settings = await getSettings();
-    if (currentTimeMinutes() < timeToMinutes(settings.checkOutEnd)) {
-      return { date, created: 0, skipped: true, reason: "before_check_out_end" };
+    const absenceCutoff = settings.allowLateCheckIn ? settings.checkOutEnd : settings.checkInEnd;
+    const absenceCutoffLabel = settings.allowLateCheckIn ? "check-out" : "check-in";
+    if (currentTimeMinutes() < timeToMinutes(absenceCutoff)) {
+      return { date, created: 0, skipped: true, reason: `before_${absenceCutoffLabel}_end` };
     }
 
     const weekday = new Date(date + "T12:00:00Z").getUTCDay();
@@ -256,7 +261,7 @@ export async function markMissedTeacherAttendance() {
         checkInAt: null,
         faceVerified: false,
         faceVerificationMethod: "automatic_absence",
-        note: "Automatically marked absent after check-out time (" + settings.checkOutEnd + ")",
+        note: `Automatically marked absent after ${absenceCutoffLabel} time (${absenceCutoff})`,
       });
       if (result.created) {
         created += 1;
