@@ -5,12 +5,15 @@ export type LocationCoordinates = {
   latitude: number;
   longitude: number;
   accuracy?: number;
+  timestamp?: number;
 };
 
 const TARGET_ACCURACY_METERS = 80;
 const MAX_ACCEPTABLE_ACCURACY_METERS = 250;
+const MAX_LOCATION_AGE_MS = 30_000;
 const NATIVE_SAMPLES = 3;
 const SAMPLE_DELAY_MS = 500;
+const LIVE_LOCATION_TIMEOUT_MS = 12_000;
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -40,6 +43,20 @@ function chooseBetterLocation(
   if (next.accuracy === undefined) return current;
   if (current.accuracy === undefined || next.accuracy < current.accuracy) return next;
   return current;
+}
+
+function toCoordinates(location: Location.LocationObject): LocationCoordinates {
+  return {
+    latitude: location.coords.latitude,
+    longitude: location.coords.longitude,
+    accuracy: location.coords.accuracy ?? undefined,
+    timestamp: location.timestamp,
+  };
+}
+
+function isFreshLocation(location: LocationCoordinates): boolean {
+  return location.timestamp === undefined
+    || Math.abs(Date.now() - location.timestamp) <= MAX_LOCATION_AGE_MS;
 }
 
 function ensureUsableAccuracy(location: LocationCoordinates): LocationCoordinates {
@@ -85,7 +102,7 @@ async function readWebLocation(): Promise<LocationCoordinates> {
         maximumAge: 0,
       });
       best = chooseBetterLocation(best, current);
-      if (best.accuracy !== undefined && best.accuracy <= TARGET_ACCURACY_METERS) break;
+      if (best && best.accuracy !== undefined && best.accuracy <= TARGET_ACCURACY_METERS) break;
     } catch (error: any) {
       lastError = error;
       if (error?.code === 1) {
@@ -125,17 +142,14 @@ async function readNativeLocation(): Promise<LocationCoordinates> {
     try {
       const location = await withTimeout(
         Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Highest,
+          accuracy: Location.Accuracy.BestForNavigation,
           mayShowUserSettingsDialog: true,
         }),
         12000,
       );
-      best = chooseBetterLocation(best, {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy ?? undefined,
-      });
-      if (best.accuracy !== undefined && best.accuracy <= TARGET_ACCURACY_METERS) break;
+      const current = toCoordinates(location);
+      if (isFreshLocation(current)) best = chooseBetterLocation(best, current);
+      if (best && best.accuracy !== undefined && best.accuracy <= TARGET_ACCURACY_METERS) break;
     } catch (error) {
       lastError = error;
     }
@@ -144,21 +158,11 @@ async function readNativeLocation(): Promise<LocationCoordinates> {
 
   if (!best) {
     try {
-      const location = await withTimeout(
-        Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-          mayShowUserSettingsDialog: true,
-        }),
-        15000,
-      );
-      best = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy ?? undefined,
-      };
+      best = await readLiveNativeLocation();
     } catch {
       throw new Error(
-        lastError?.message || 'Could not get your current location. Turn on location services and try again.',
+        lastError?.message
+          || 'Could not get a fresh GPS fix. Turn on precise location, wait a moment, and try again.',
       );
     }
   }
@@ -167,6 +171,49 @@ async function readNativeLocation(): Promise<LocationCoordinates> {
     throw new Error('Could not get your current location. Turn on location services and try again.');
   }
   return ensureUsableAccuracy(best);
+}
+
+async function readLiveNativeLocation(): Promise<LocationCoordinates> {
+  let best: LocationCoordinates | null = null;
+  let subscription: Location.LocationSubscription | null = null;
+  let settled = false;
+
+  return new Promise((resolve, reject) => {
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      if (subscription) subscription.remove();
+      if (error) reject(error);
+      else if (best) resolve(best);
+      else reject(new Error('Could not get a fresh GPS fix'));
+    };
+
+    const timeout = setTimeout(() => finish(), LIVE_LOCATION_TIMEOUT_MS);
+
+    Location.watchPositionAsync(
+      {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1000,
+        distanceInterval: 0,
+        mayShowUserSettingsDialog: true,
+      },
+      location => {
+        const current = toCoordinates(location);
+        if (!isFreshLocation(current)) return;
+        best = chooseBetterLocation(best, current);
+        if (best.accuracy !== undefined && best.accuracy <= TARGET_ACCURACY_METERS) {
+          clearTimeout(timeout);
+          finish();
+        }
+      },
+    ).then(nextSubscription => {
+      subscription = nextSubscription;
+      if (settled) subscription.remove();
+    }).catch(error => {
+      clearTimeout(timeout);
+      finish(error instanceof Error ? error : new Error('Could not read your current location'));
+    });
+  });
 }
 
 export async function readCurrentLocation(): Promise<LocationCoordinates> {
