@@ -9,9 +9,9 @@ const TEMPLATE_SIZE = 24;
 // crop, mirror orientation, and autofocus between two captures. Keep the
 // threshold strict enough to reject unrelated faces, but do not require the
 // same pixel crop twice.
-const MATCH_THRESHOLD = 0.58;
-const MULTI_SAMPLE_THRESHOLD = 0.50;
-const CONSISTENT_SAMPLE_THRESHOLD = 0.54;
+const MATCH_THRESHOLD = 0.54;
+const MULTI_SAMPLE_THRESHOLD = 0.47;
+const CONSISTENT_SAMPLE_THRESHOLD = 0.50;
 const MAX_STORED_TEMPLATES = 96;
 const MAX_ENROLLMENT_SAMPLES = 5;
 const MIN_IMAGE_SIDE = 160;
@@ -106,9 +106,11 @@ function inspectImageQuality(image: DecodedImage): FaceImageQuality {
   const contrast = Math.sqrt(variance);
   const sharpness = gradientTotal / (sampleWidth * sampleHeight * 2);
   const brightness = 1 - Math.abs(mean - 128) / 128;
-  const brightnessScore = mean < 25 || mean > 235 ? 0 : clamp(brightness, 0, 1);
+  // Mildly dark or soft Android frames can still contain enough identity
+  // structure after normalization. Reserve a hard failure for unusable frames.
+  const brightnessScore = mean < 16 || mean > 242 ? 0 : clamp(brightness, 0, 1);
   const contrastScore = clamp((contrast - 7) / 34, 0, 1);
-  const sharpnessScore = clamp((sharpness - 2) / 28, 0, 1);
+  const sharpnessScore = clamp((sharpness - 1.5) / 28, 0, 1);
   const score = brightnessScore * 0.45 + contrastScore * 0.35 + sharpnessScore * 0.2;
 
   return { score, brightness: mean, contrast, sharpness };
@@ -116,14 +118,14 @@ function inspectImageQuality(image: DecodedImage): FaceImageQuality {
 
 function assertUsableFaceImage(image: DecodedImage): FaceImageQuality {
   const quality = inspectImageQuality(image);
-  if (quality.score < 0.25) {
-    if (quality.brightness < 25) {
+  if (quality.score < 0.16) {
+    if (quality.brightness < 16) {
       throw new FaceImageQualityError("The selfie is too dark. Face a light source without placing it behind you.");
     }
-    if (quality.brightness > 235) {
+    if (quality.brightness > 242) {
       throw new FaceImageQualityError("The selfie is overexposed. Move away from direct light and try again.");
     }
-    if (quality.sharpness < 2.5) {
+    if (quality.sharpness < 1.5) {
       throw new FaceImageQualityError("The selfie is blurry. Hold the phone steady and try again.");
     }
     throw new FaceImageQualityError("The face is not clear enough. Center it in the frame and try again.");

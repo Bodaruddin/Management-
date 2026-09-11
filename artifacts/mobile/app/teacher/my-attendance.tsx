@@ -182,6 +182,9 @@ function FaceCaptureModal({
       const images: string[] = [];
       for (let index = 0; index < sampleCount; index += 1) {
         setCaptureNumber(index + 1);
+        // Give Android autofocus and exposure a moment to settle after the
+        // camera modal opens, especially in dim rooms.
+        if (index === 0) await wait(850);
         const photo = await cameraRef.current.takePictureAsync({
           // A short burst lets the server choose the clearest frame while
           // keeping the enrollment template independent from one photo.
@@ -191,7 +194,7 @@ function FaceCaptureModal({
           skipProcessing: false,
         });
         images.push(await getFaceImageBase64(photo));
-        if (index < sampleCount - 1) await wait(180);
+        if (index < sampleCount - 1) await wait(350);
       }
       onStageChange('detected');
       await wait(160);
