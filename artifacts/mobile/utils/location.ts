@@ -8,6 +8,10 @@ export type LocationCoordinates = {
   timestamp?: number;
 };
 
+export type LocationReadOptions = {
+  allowCoarse?: boolean;
+};
+
 const TARGET_ACCURACY_METERS = 80;
 const MAX_ACCEPTABLE_ACCURACY_METERS = 250;
 const MAX_LOCATION_AGE_MS = 30_000;
@@ -59,7 +63,11 @@ function isFreshLocation(location: LocationCoordinates): boolean {
     || Math.abs(Date.now() - location.timestamp) <= MAX_LOCATION_AGE_MS;
 }
 
-function ensureUsableAccuracy(location: LocationCoordinates): LocationCoordinates {
+function ensureUsableAccuracy(
+  location: LocationCoordinates,
+  allowCoarse = false,
+): LocationCoordinates {
+  if (allowCoarse) return location;
   if (
     location.accuracy !== undefined
     && location.accuracy > MAX_ACCEPTABLE_ACCURACY_METERS
@@ -90,7 +98,7 @@ function getWebLocation(options: PositionOptions): Promise<LocationCoordinates> 
   });
 }
 
-async function readWebLocation(): Promise<LocationCoordinates> {
+async function readWebLocation(options: LocationReadOptions = {}): Promise<LocationCoordinates> {
   let best: LocationCoordinates | null = null;
   let lastError: any;
 
@@ -128,10 +136,10 @@ async function readWebLocation(): Promise<LocationCoordinates> {
     }
   }
 
-  return ensureUsableAccuracy(best);
+  return ensureUsableAccuracy(best, options.allowCoarse);
 }
 
-async function readNativeLocation(): Promise<LocationCoordinates> {
+async function readNativeLocation(options: LocationReadOptions = {}): Promise<LocationCoordinates> {
   const permission = await Location.requestForegroundPermissionsAsync();
   if (!permission.granted) throw new Error('Location permission is required');
 
@@ -170,7 +178,7 @@ async function readNativeLocation(): Promise<LocationCoordinates> {
   if (!best) {
     throw new Error('Could not get your current location. Turn on location services and try again.');
   }
-  return ensureUsableAccuracy(best);
+  return ensureUsableAccuracy(best, options.allowCoarse);
 }
 
 async function readLiveNativeLocation(): Promise<LocationCoordinates> {
@@ -216,7 +224,9 @@ async function readLiveNativeLocation(): Promise<LocationCoordinates> {
   });
 }
 
-export async function readCurrentLocation(): Promise<LocationCoordinates> {
-  if (Platform.OS === 'web') return readWebLocation();
-  return readNativeLocation();
+export async function readCurrentLocation(
+  options: LocationReadOptions = {},
+): Promise<LocationCoordinates> {
+  if (Platform.OS === 'web') return readWebLocation(options);
+  return readNativeLocation(options);
 }

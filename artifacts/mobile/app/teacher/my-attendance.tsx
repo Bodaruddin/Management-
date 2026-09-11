@@ -940,7 +940,9 @@ export default function MyTeacherAttendance() {
         setReplaceFaceEnrollment(false);
         return;
       }
-      const coordinates = await readCurrentLocation();
+      // Browser geolocation commonly reports ±300m even with high accuracy.
+      // Let the server's school-boundary check decide attendance eligibility.
+      const coordinates = await readCurrentLocation({ allowCoarse: true });
       if (purpose === 'check-in') {
         await checkInTeacher({
           teacherId: user.id,
@@ -998,7 +1000,7 @@ export default function MyTeacherAttendance() {
     }
     runAction(async () => {
       if (!user) throw new Error('Please sign in again');
-      const coordinates = await readCurrentLocation();
+      const coordinates = await readCurrentLocation({ allowCoarse: true });
       await checkInTeacher({
         teacherId: user.id,
         teacherName: user.name,
@@ -1024,7 +1026,7 @@ export default function MyTeacherAttendance() {
     }
     runAction(async () => {
       if (!todayRecord?.checkInAt) throw new Error('No check-in found for today');
-      const coordinates = await readCurrentLocation();
+      const coordinates = await readCurrentLocation({ allowCoarse: true });
       await checkOutTeacher(todayRecord.id, { teacherId: user?.id ?? '', ...coordinates });
     });
   };
