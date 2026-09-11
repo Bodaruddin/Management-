@@ -5,6 +5,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import {
   TeacherAttendanceSettings, TeacherLeaveApplication, useApp,
@@ -65,6 +66,16 @@ function parseOptionalCoordinate(value: unknown, label: string, min: number, max
   return parsed;
 }
 
+function formatReportDate(value: string): string {
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return value;
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 export default function AdminTeacherAttendance() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -85,6 +96,7 @@ export default function AdminTeacherAttendance() {
   const [leaveView, setLeaveView] = useState<'pending' | 'history'>('pending');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'approved' | 'rejected'>('all');
   const [selectedLeaveHistory, setSelectedLeaveHistory] = useState<TeacherLeaveApplication | null>(null);
+  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
 
   useEffect(() => {
     refreshTeacherAttendance().catch(error => console.error('[AdminTeacherAttendance]', error));
@@ -177,6 +189,24 @@ export default function AdminTeacherAttendance() {
   const reportMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const monthlyRecords = teacherAttendanceRecords.filter(record => record.date.startsWith(reportMonthKey));
   const monthlyHolidays = teacherHolidays.filter(holiday => holiday.date.startsWith(reportMonthKey));
+  const selectedTeacher = teachers.find(teacher => teacher.id === selectedTeacherId) ?? null;
+  const selectedTeacherRows = selectedTeacherId
+    ? monthlyRecords.filter(record => record.teacherId === selectedTeacherId)
+    : [];
+  const selectedTeacherAbsentDates = selectedTeacherRows
+    .filter(record => record.status === 'absent')
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const selectedTeacherLeaveDates = selectedTeacherRows
+    .filter(record => record.status === 'leave')
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const selectedTeacherPresent = selectedTeacherRows.filter(record => record.status === 'present').length;
+  const selectedTeacherLate = selectedTeacherRows.filter(record => record.status === 'late').length;
+  const selectedTeacherAbsent = selectedTeacherAbsentDates.length;
+  const selectedTeacherLeave = selectedTeacherLeaveDates.length;
+  const selectedTeacherTrackedDays = selectedTeacherPresent + selectedTeacherLate + selectedTeacherAbsent + selectedTeacherLeave;
+  const selectedTeacherAttendanceRate = selectedTeacherTrackedDays
+    ? Math.round(((selectedTeacherPresent + selectedTeacherLate) / selectedTeacherTrackedDays) * 100)
+    : 0;
   const leaveHistory = teacherLeaves
     .filter(leave => leave.status !== 'pending')
     .sort((a, b) => (b.reviewedAt ?? b.createdAt).localeCompare(a.reviewedAt ?? a.createdAt));
@@ -289,7 +319,7 @@ export default function AdminTeacherAttendance() {
           <View style={s.sectionHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[s.sectionTitle, { color: colors.text }]}>This month&apos;s attendance</Text>
-              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>Present, absent, late, leave, and holiday totals for {reportMonthKey}.</Text>
+              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>Present, absent, late, leave, and holiday totals for {reportMonthKey}. Tap a teacher for the full report.</Text>
             </View>
             <Feather name="calendar" size={20} color={colors.primary} />
           </View>
@@ -300,14 +330,22 @@ export default function AdminTeacherAttendance() {
             const absent = rows.filter(record => record.status === 'absent').length;
             const leave = rows.filter(record => record.status === 'leave').length;
             return (
-              <View key={teacher.id} style={[s.payrollRow, { borderBottomColor: colors.border }]}> 
+              <TouchableOpacity
+                key={teacher.id}
+                style={[s.payrollRow, { borderBottomColor: colors.border }]}
+                onPress={() => setSelectedTeacherId(teacher.id)}
+                activeOpacity={0.78}
+              >
                 <View style={{ flex: 1 }}>
                   <Text style={[s.historyTitle, { color: colors.text }]}>{teacher.name}</Text>
                   <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Present {present} · Absent {absent} · Holidays {monthlyHolidays.length}</Text>
                   <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Late {late} · Leave {leave} · Check-outs {rows.filter(record => record.checkOutAt).length}</Text>
                 </View>
-                <Text style={[s.amount, { color: rows.length ? colors.success : colors.mutedForeground }]}>{rows.length ? rows.length + ' records' : 'No records'}</Text>
-              </View>
+                <View style={s.reportLink}>
+                  <Text style={[s.amount, { color: rows.length ? colors.success : colors.mutedForeground }]}>{rows.length ? rows.length + ' records' : 'No records'}</Text>
+                  <Feather name="chevron-right" size={17} color={colors.primary} />
+                </View>
+              </TouchableOpacity>
             );
           })}
         </View>
@@ -507,6 +545,138 @@ export default function AdminTeacherAttendance() {
       </ScrollView>
 
       <Modal
+        visible={!!selectedTeacher}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedTeacherId(null)}
+      >
+        <View style={s.modalOverlay}>
+          <View style={[s.teacherReportModal, { backgroundColor: colors.background }]}>
+            <LinearGradient
+              colors={[colors.primary, '#5B4FE8']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.teacherReportHero}
+            >
+              <View style={s.teacherReportHeroTop}>
+                <View style={s.teacherAvatar}>
+                  <Text style={s.teacherAvatarText}>{selectedTeacher?.name?.trim().charAt(0).toUpperCase() ?? 'T'}</Text>
+                </View>
+                <TouchableOpacity onPress={() => setSelectedTeacherId(null)} hitSlop={10}>
+                  <Feather name="x" size={22} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              <Text style={s.teacherReportName}>{selectedTeacher?.name ?? 'Teacher'}</Text>
+              <Text style={s.teacherReportPeriod}>{MONTHS[new Date().getMonth()]} {new Date().getFullYear()} · Attendance report</Text>
+              <View style={s.teacherRateRow}>
+                <View>
+                  <Text style={s.teacherRateLabel}>Attendance rate</Text>
+                  <Text style={s.teacherRateValue}>{selectedTeacherAttendanceRate}%</Text>
+                </View>
+                <View style={s.teacherRateRing}>
+                  <Feather name="trending-up" size={20} color="#fff" />
+                </View>
+              </View>
+            </LinearGradient>
+
+            <ScrollView contentContainerStyle={s.teacherReportContent} showsVerticalScrollIndicator={false}>
+              <View style={s.reportStatsGrid}>
+                {[
+                  ['check-circle', 'Present', selectedTeacherPresent, '#0EA875'],
+                  ['x-circle', 'Absent', selectedTeacherAbsent, '#E05252'],
+                  ['clock', 'Late', selectedTeacherLate, '#E9A23B'],
+                  ['calendar', 'Holidays', monthlyHolidays.length, '#5B5FEF'],
+                ].map(([icon, label, value, color]) => (
+                  <View key={label as string} style={[s.reportStatCard, { backgroundColor: `${color}12`, borderColor: `${color}26` }]}>
+                    <Feather name={icon as any} size={17} color={color as string} />
+                    <Text style={[s.reportStatValue, { color: colors.text }]}>{value as number}</Text>
+                    <Text style={[s.reportStatLabel, { color: colors.mutedForeground }]}>{label as string}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={[s.reportPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={s.reportPanelHeader}>
+                  <View>
+                    <Text style={[s.reportPanelTitle, { color: colors.text }]}>Absent dates</Text>
+                    <Text style={[s.reportPanelCopy, { color: colors.mutedForeground }]}>Days this teacher missed in {MONTHS[new Date().getMonth()]}</Text>
+                  </View>
+                  <View style={[s.reportCountBadge, { backgroundColor: selectedTeacherAbsent ? colors.destructive + '16' : colors.success + '16' }]}>
+                    <Text style={[s.reportCountText, { color: selectedTeacherAbsent ? colors.destructive : colors.success }]}>{selectedTeacherAbsent}</Text>
+                  </View>
+                </View>
+                {selectedTeacherAbsentDates.length === 0 ? (
+                  <View style={s.reportEmpty}>
+                    <Feather name="sun" size={18} color={colors.success} />
+                    <Text style={[s.reportEmptyText, { color: colors.mutedForeground }]}>No absent dates recorded</Text>
+                  </View>
+                ) : selectedTeacherAbsentDates.map(record => (
+                  <View key={record.id} style={[s.reportDateRow, { borderTopColor: colors.border }]}>
+                    <View style={[s.reportDateIcon, { backgroundColor: colors.destructive + '14' }]}>
+                      <Feather name="x" size={15} color={colors.destructive} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.reportDateTitle, { color: colors.text }]}>{formatReportDate(record.date)}</Text>
+                      <Text style={[s.reportDateMeta, { color: colors.mutedForeground }]}>{record.note || 'No check-in was recorded'}</Text>
+                    </View>
+                    <Text style={[s.reportStatus, { color: colors.destructive }]}>Absent</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={[s.reportPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={s.reportPanelHeader}>
+                  <View>
+                    <Text style={[s.reportPanelTitle, { color: colors.text }]}>School holidays</Text>
+                    <Text style={[s.reportPanelCopy, { color: colors.mutedForeground }]}>Non-working days for the school</Text>
+                  </View>
+                  <Feather name="sun" size={19} color={colors.warning} />
+                </View>
+                {monthlyHolidays.length === 0 ? (
+                  <View style={s.reportEmpty}>
+                    <Feather name="calendar" size={18} color={colors.mutedForeground} />
+                    <Text style={[s.reportEmptyText, { color: colors.mutedForeground }]}>No holidays recorded</Text>
+                  </View>
+                ) : monthlyHolidays.map(holiday => (
+                  <View key={holiday.id} style={[s.reportDateRow, { borderTopColor: colors.border }]}>
+                    <View style={[s.reportDateIcon, { backgroundColor: colors.warning + '18' }]}>
+                      <Feather name="sun" size={15} color={colors.warning} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.reportDateTitle, { color: colors.text }]}>{holiday.name}</Text>
+                      <Text style={[s.reportDateMeta, { color: colors.mutedForeground }]}>{formatReportDate(holiday.date)}</Text>
+                    </View>
+                    <Text style={[s.reportStatus, { color: colors.warning }]}>Holiday</Text>
+                  </View>
+                ))}
+              </View>
+
+              {selectedTeacherLeaveDates.length > 0 && (
+                <View style={[s.reportPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={s.reportPanelHeader}>
+                    <View>
+                      <Text style={[s.reportPanelTitle, { color: colors.text }]}>Approved leave</Text>
+                      <Text style={[s.reportPanelCopy, { color: colors.mutedForeground }]}>Leave days are excluded from absence totals</Text>
+                    </View>
+                    <Feather name="briefcase" size={19} color={colors.primary} />
+                  </View>
+                  {selectedTeacherLeaveDates.map(record => (
+                    <View key={record.id} style={[s.reportDateRow, { borderTopColor: colors.border }]}>
+                      <View style={[s.reportDateIcon, { backgroundColor: colors.primary + '14' }]}>
+                        <Feather name="briefcase" size={15} color={colors.primary} />
+                      </View>
+                      <Text style={[s.reportDateTitle, { color: colors.text, flex: 1 }]}>{formatReportDate(record.date)}</Text>
+                      <Text style={[s.reportStatus, { color: colors.primary }]}>Leave</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
         visible={!!selectedLeaveHistory}
         transparent
         animationType="slide"
@@ -591,6 +761,7 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   cancelText: { fontSize: 12, fontWeight: '700' },
   payrollBox: { borderRadius: 11, padding: 11, marginTop: 2 },
   payrollRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
+  reportLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 },
   historyTitle: { fontSize: 13, fontWeight: '700' },
   historyMeta: { fontSize: 12, lineHeight: 17, marginTop: 3 },
   amount: { fontSize: 15, fontWeight: '800' },
@@ -606,6 +777,35 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   historyStatusText: { fontSize: 10, fontWeight: '800' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.5)', justifyContent: 'flex-end' },
   historyModal: { borderTopLeftRadius: 22, borderTopRightRadius: 22, padding: 18, paddingBottom: 28 },
+  teacherReportModal: { flex: 1, marginTop: Platform.OS === 'web' ? 58 : 34, borderTopLeftRadius: 26, borderTopRightRadius: 26, overflow: 'hidden' },
+  teacherReportHero: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 22 },
+  teacherReportHeroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 15 },
+  teacherAvatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
+  teacherAvatarText: { color: '#fff', fontSize: 21, fontWeight: '800' },
+  teacherReportName: { color: '#fff', fontSize: 24, fontWeight: '800' },
+  teacherReportPeriod: { color: 'rgba(255,255,255,0.78)', fontSize: 13, marginTop: 4 },
+  teacherRateRow: { marginTop: 21, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  teacherRateLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 12, fontWeight: '600' },
+  teacherRateValue: { color: '#fff', fontSize: 29, fontWeight: '800', marginTop: 2 },
+  teacherRateRing: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.16)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' },
+  teacherReportContent: { padding: 16, paddingBottom: 34 },
+  reportStatsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginBottom: 14 },
+  reportStatCard: { width: '48%', minHeight: 91, borderRadius: 15, borderWidth: 1, padding: 12, justifyContent: 'space-between' },
+  reportStatValue: { fontSize: 22, fontWeight: '800', marginTop: 7 },
+  reportStatLabel: { fontSize: 11, fontWeight: '700' },
+  reportPanel: { borderRadius: 17, borderWidth: 1, padding: 14, marginBottom: 13 },
+  reportPanelHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 },
+  reportPanelTitle: { fontSize: 15, fontWeight: '800' },
+  reportPanelCopy: { fontSize: 11, marginTop: 3 },
+  reportCountBadge: { minWidth: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  reportCountText: { fontSize: 14, fontWeight: '800' },
+  reportEmpty: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'center' },
+  reportEmptyText: { fontSize: 12, fontWeight: '600' },
+  reportDateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderTopWidth: 1, paddingVertical: 11 },
+  reportDateIcon: { width: 31, height: 31, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  reportDateTitle: { fontSize: 13, fontWeight: '700' },
+  reportDateMeta: { fontSize: 11, marginTop: 3 },
+  reportStatus: { fontSize: 11, fontWeight: '800' },
   modalHeader: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingBottom: 13, marginBottom: 16 },
   modalTitle: { fontSize: 17, fontWeight: '800' },
   detailRow: { gap: 4 },
