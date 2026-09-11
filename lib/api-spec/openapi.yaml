@@ -314,6 +314,76 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PayrollReport"
+  /settings/admin-users:
+    get:
+      operationId: listAdminUsers
+      tags: [admin-users]
+      responses:
+        "200":
+          description: Administrator accounts without passwords
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUser"
+    post:
+      operationId: createAdminUser
+      tags: [admin-users]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserCreate"
+      responses:
+        "201":
+          description: Administrator account created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+  /settings/admin-users/{id}:
+    put:
+      operationId: updateAdminUser
+      tags: [admin-users]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserUpdate"
+      responses:
+        "200":
+          description: Administrator account updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+  /settings/admin-users/{id}/switch-teacher:
+    post:
+      operationId: switchAdminToTeacher
+      tags: [admin-users]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [adminId]
+              properties:
+                adminId: { type: string }
+      responses:
+        "200":
+          description: Linked teacher profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherProfile"
 components:
   parameters:
     TeacherId:
@@ -349,6 +419,40 @@ components:
           type: string
       required:
         - status
+    AdminUser:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        username: { type: string }
+        linkedTeacherId: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+      required: [id, name, username]
+    AdminUserCreate:
+      type: object
+      required: [adminId, name, username, password]
+      properties:
+        adminId: { type: string }
+        name: { type: string }
+        username: { type: string }
+        password: { type: string }
+        linkedTeacherId: { type: [string, "null"] }
+    AdminUserUpdate:
+      type: object
+      required: [adminId]
+      properties:
+        adminId: { type: string }
+        name: { type: string }
+        password: { type: string }
+        linkedTeacherId: { type: [string, "null"] }
+    TeacherProfile:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        username: { type: string }
+        permissions: { type: object, additionalProperties: true }
+      required: [id, name, username]
     TeacherAttendanceSettings:
       type: object
       properties:

@@ -110,7 +110,8 @@ export const enrollTeacherFaceBodyFaceSamplesBase64Max = 5;
 export const EnrollTeacherFaceBody = zod.object({
   "teacherId": zod.string(),
   "faceImageBase64": zod.string().describe('Camera selfie used to create the private teacher face template'),
-  "faceSamplesBase64": zod.array(zod.string()).min(1).max(enrollTeacherFaceBodyFaceSamplesBase64Max).optional().describe('Short burst of independent camera samples used to create a more reliable private template')
+  "faceSamplesBase64": zod.array(zod.string()).min(1).max(enrollTeacherFaceBodyFaceSamplesBase64Max).optional().describe('Short burst of independent camera samples used to create a more reliable private template'),
+  "replaceExisting": zod.boolean().optional().describe('Replace the teacher\'s existing template after an explicit re-enrollment')
 })
 
 export const EnrollTeacherFaceResponse = zod.object({
@@ -363,6 +364,69 @@ export const CalculateTeacherPayrollResponse = zod.object({
   "result": zod.array(zod.object({
 
 }).passthrough()).optional()
+})
+
+
+export const ListAdminUsersResponseItem = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "linkedTeacherId": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})
+export const ListAdminUsersResponse = zod.array(ListAdminUsersResponseItem)
+
+
+export const CreateAdminUserBody = zod.object({
+  "adminId": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "password": zod.string(),
+  "linkedTeacherId": zod.string().nullish()
+})
+
+export const CreateAdminUserResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "linkedTeacherId": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})
+
+
+export const UpdateAdminUserParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateAdminUserBody = zod.object({
+  "adminId": zod.string(),
+  "name": zod.string().optional(),
+  "password": zod.string().optional(),
+  "linkedTeacherId": zod.string().nullish()
+})
+
+export const UpdateAdminUserResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "linkedTeacherId": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+})
+
+
+export const SwitchAdminToTeacherParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const SwitchAdminToTeacherBody = zod.object({
+  "adminId": zod.string()
+})
+
+export const SwitchAdminToTeacherResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "permissions": zod.record(zod.string(), zod.unknown()).optional()
 })
 
 

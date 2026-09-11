@@ -6,6 +6,7 @@ const TEACHER_EDIT_KEY = "allow_teacher_edit";
 const CLASS_ABSENT_LIMITS_KEY = "class_absent_limits";
 const DOCUMENT_BRANDING_KEY = "document_branding";
 const ADMIN_CREDENTIALS_KEY = "admin_credentials";
+const ADMIN_USERS_KEY = "admin_users";
 
 const DEFAULT_ADMIN = { username: "admin", password: "admin123" };
 
@@ -14,6 +15,52 @@ async function getAdminCredentials(): Promise<{ username: string; password: stri
   if (!setting?.value) return { ...DEFAULT_ADMIN };
   const v = setting.value as Record<string, string>;
   return { username: v.username ?? DEFAULT_ADMIN.username, password: v.password ?? DEFAULT_ADMIN.password };
+}
+
+interface AdminUserRecord {
+  id: string;
+  name: string;
+  username: string;
+  password: string;
+  linkedTeacherId: string | null;
+  createdAt: string;
+}
+
+async function getAdminUsers(): Promise<AdminUserRecord[]> {
+  const setting = await getAdapter().appSettings.get(ADMIN_USERS_KEY);
+  if (Array.isArray(setting?.value) && setting.value.length > 0) {
+    return setting.value.map((item: any) => ({
+      id: String(item.id),
+      name: String(item.name ?? "Administrator"),
+      username: String(item.username ?? ""),
+      password: String(item.password ?? ""),
+      linkedTeacherId: item.linkedTeacherId ? String(item.linkedTeacherId) : null,
+      createdAt: String(item.createdAt ?? new Date().toISOString()),
+    }));
+  }
+  const legacy = await getAdminCredentials();
+  return [{
+    id: "admin",
+    name: "Administrator",
+    username: legacy.username,
+    password: legacy.password,
+    linkedTeacherId: null,
+    createdAt: new Date().toISOString(),
+  }];
+}
+
+async function saveAdminUsers(users: AdminUserRecord[]): Promise<void> {
+  await getAdapter().appSettings.set(ADMIN_USERS_KEY, users);
+}
+
+function safeAdminUser(user: AdminUserRecord) {
+  const { password: _password, ...safe } = user;
+  return safe;
+}
+
+function validateAdminId(adminId: unknown, users: AdminUserRecord[]): AdminUserRecord | null {
+  const match = users.find((user) => user.id === String(adminId ?? ""));
+  return match ?? null;
 }
 
 const EMPTY_DOCUMENT_BRANDING = {
@@ -44,26 +91,30 @@ router.post("/settings/admin-credentials/verify", async (req, res) => {
     res.status(400).json({ error: "username and password are required" });
     return;
   }
-  const creds = await getAdminCredentials();
-  const valid = username === creds.username && password === creds.password;
-  res.json({ valid });
+  const users = await getAdminUsers();
+  const user = users.find((candidate) =>
+    candidate.username.trim().toLowerCase() === String(username).trim().toLowerCase()
+      && candidate.password === password
+  );
+  res.json({ valid: Boolean(user), admin: user ? safeAdminUser(user) : undefined });
 });
 
 /** GET /api/settings/admin-credentials → { username } */
 router.get("/settings/admin-credentials", async (_req, res) => {
-  const creds = await getAdminCredentials();
-  res.json({ username: creds.username });
+  const users = await getAdminUsers();
+  res.json({ username: users[0]?.username ?? DEFAULT_ADMIN.username });
 });
 
 /** PUT /api/settings/admin-credentials  { currentPassword, newUsername?, newPassword? } */
 router.put("/settings/admin-credentials", async (req, res) => {
-  const { currentPassword, newUsername, newPassword } = req.body ?? {};
+  const { adminId, currentPassword, newUsername, newPassword } = req.body ?? {};
   if (!currentPassword) {
     res.status(400).json({ error: "currentPassword is required" });
     return;
   }
-  const creds = await getAdminCredentials();
-  if (currentPassword !== creds.password) {
+  const users = await getAdminUsers();
+  const account = validateAdminId(adminId ?? "admin", users) ?? users[0];
+  if (!account || currentPassword !== account.password) {
     res.status(403).json({ error: "Current password is incorrect" });
     return;
   }
@@ -76,11 +127,132 @@ router.put("/settings/admin-credentials", async (req, res) => {
     return;
   }
   const updated = {
-    username: newUsername?.trim() ?? creds.username,
-    password: newPassword ?? creds.password,
+    username: newUsername?.trim() ?? account.username,
+    password: newPassword ?? account.password,
   };
-  await getAdapter().appSettings.set(ADMIN_CREDENTIALS_KEY, updated);
+  const duplicate = users.some((candidate) =>
+    candidate.id !== account.id && candidate.username.toLowerCase() === updated.username.toLowerCase()
+  );
+  if (duplicate) {
+    res.status(409).json({ error: "That username is already in use" });
+    return;
+  }
+  const updatedUsers = users.map((candidate) =>
+    candidate.id === account.id ? { ...candidate, ...updated } : candidate
+  );
+  await saveAdminUsers(updatedUsers);
+  // Keep the legacy setting in sync for existing installations.
+  if (account.id === "admin") await getAdapter().appSettings.set(ADMIN_CREDENTIALS_KEY, updated);
   res.json({ username: updated.username });
+});
+
+// ─── Admin accounts and admin/teacher linking ─────────────────────────────────
+
+router.get("/settings/admin-users", async (_req, res) => {
+  const users = await getAdminUsers();
+  res.json(users.map(safeAdminUser));
+});
+
+router.post("/settings/admin-users", async (req, res) => {
+  const { adminId, name, username, password, linkedTeacherId } = req.body ?? {};
+  const users = await getAdminUsers();
+  if (!validateAdminId(adminId, users)) {
+    res.status(403).json({ error: "Only an administrator can add another administrator" });
+    return;
+  }
+  if (typeof name !== "string" || name.trim().length < 2) {
+    res.status(400).json({ error: "Name must be at least 2 characters" });
+    return;
+  }
+  if (typeof username !== "string" || username.trim().length < 3) {
+    res.status(400).json({ error: "Username must be at least 3 characters" });
+    return;
+  }
+  if (typeof password !== "string" || password.length < 6) {
+    res.status(400).json({ error: "Password must be at least 6 characters" });
+    return;
+  }
+  const normalizedUsername = username.trim().toLowerCase();
+  if (users.some((candidate) => candidate.username.toLowerCase() === normalizedUsername)) {
+    res.status(409).json({ error: "That username is already in use" });
+    return;
+  }
+  let teacherId: string | null = linkedTeacherId ? String(linkedTeacherId) : null;
+  if (teacherId) {
+    const teacher = (await getAdapter().teachers.list()).find((item: any) => item.id === teacherId);
+    if (!teacher) {
+      res.status(400).json({ error: "Linked teacher was not found" });
+      return;
+    }
+  }
+  const account: AdminUserRecord = {
+    id: `admin-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    name: name.trim(),
+    username: username.trim(),
+    password,
+    linkedTeacherId: teacherId,
+    createdAt: new Date().toISOString(),
+  };
+  await saveAdminUsers([...users, account]);
+  res.status(201).json(safeAdminUser(account));
+});
+
+router.put("/settings/admin-users/:id", async (req, res) => {
+  const { adminId, name, password, linkedTeacherId } = req.body ?? {};
+  const users = await getAdminUsers();
+  if (!validateAdminId(adminId, users)) {
+    res.status(403).json({ error: "Only an administrator can update administrator accounts" });
+    return;
+  }
+  const account = users.find((candidate) => candidate.id === req.params.id);
+  if (!account) {
+    res.status(404).json({ error: "Administrator not found" });
+    return;
+  }
+  if (name !== undefined && (typeof name !== "string" || name.trim().length < 2)) {
+    res.status(400).json({ error: "Name must be at least 2 characters" });
+    return;
+  }
+  if (password !== undefined && (typeof password !== "string" || password.length < 6)) {
+    res.status(400).json({ error: "Password must be at least 6 characters" });
+    return;
+  }
+  let teacherId: string | null = linkedTeacherId ? String(linkedTeacherId) : null;
+  if (teacherId) {
+    const teacher = (await getAdapter().teachers.list()).find((item: any) => item.id === teacherId);
+    if (!teacher) {
+      res.status(400).json({ error: "Linked teacher was not found" });
+      return;
+    }
+  }
+  const updated: AdminUserRecord = {
+    ...account,
+    ...(name !== undefined ? { name: name.trim() } : {}),
+    ...(password !== undefined ? { password } : {}),
+    linkedTeacherId: teacherId,
+  };
+  await saveAdminUsers(users.map((candidate) => candidate.id === account.id ? updated : candidate));
+  res.json(safeAdminUser(updated));
+});
+
+router.post("/settings/admin-users/:id/switch-teacher", async (req, res) => {
+  const users = await getAdminUsers();
+  const account = validateAdminId(req.body?.adminId, users);
+  if (!account || account.id !== req.params.id) {
+    res.status(403).json({ error: "Only the signed-in administrator can switch to their linked teacher panel" });
+    return;
+  }
+  if (!account.linkedTeacherId) {
+    res.status(400).json({ error: "This administrator is not linked to a teacher profile" });
+    return;
+  }
+  const teacher = (await getAdapter().teachers.list()).find((item: any) => item.id === account.linkedTeacherId);
+  if (!teacher) {
+    res.status(404).json({ error: "The linked teacher profile was not found" });
+    return;
+  }
+  const { password: _password, ...safeTeacher } = teacher;
+  res.json(safeTeacher);
 });
 
 // ─── Document branding ────────────────────────────────────────────────────────

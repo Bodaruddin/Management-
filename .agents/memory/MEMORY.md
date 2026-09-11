@@ -1,2 +1,3 @@
 - [Android APK builds](android-build.md) — native APK output needs a Java/Android toolchain or a supported remote build service.
 - [Orval Zod generation](orval-zod-compatibility.md) — generated Zod output must stay compatible with the workspace’s Zod major and avoid duplicate barrel exports.
+- [Database library build cache](db-build-cache.md) — API typechecks can use stale database declarations until the database package is force-rebuilt.

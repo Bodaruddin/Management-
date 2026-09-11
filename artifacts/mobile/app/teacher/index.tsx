@@ -221,7 +221,7 @@ const EMPTY_STUDENT = {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function TeacherDashboard() {
   const insets = useSafeAreaInsets();
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, logout, switchToAdmin } = useAuth();
   const { students, exams, classes, sections, attendanceRecords, alumni, addStudent, addSection, updateSection, deleteSection } = useApp();
   const signingOutRef = useRef(false);
 
@@ -877,6 +877,24 @@ export default function TeacherDashboard() {
               <Text style={po.roleTxt}>Teacher</Text>
             </View>
             <Text style={po.username}>@{user.username}</Text>
+            {user.isAdminTeacher && (
+              <TouchableOpacity
+                style={po.switchBtn}
+                activeOpacity={0.85}
+                onPress={async () => {
+                  const result = await switchToAdmin();
+                  if (!result.success) {
+                    Alert.alert('Switch unavailable', result.error ?? 'Could not return to the admin panel.');
+                    return;
+                  }
+                  setShowProfile(false);
+                  router.replace('/(tabs)');
+                }}
+              >
+                <Feather name="repeat" size={17} color="#fff" />
+                <Text style={po.switchTxt}>Back to Admin Panel</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={po.signOutBtn} activeOpacity={0.85}
               onPress={async () => {
@@ -1693,6 +1711,13 @@ const po = StyleSheet.create({
     shadowOpacity: 0.35, shadowRadius: 12, elevation: 7,
   },
   signOutTxt: { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: 0.2 },
+  switchBtn: {
+    width: '100%', flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'center', gap: 10,
+    backgroundColor: '#0F766E', borderRadius: 18, paddingVertical: 15,
+    marginBottom: 10,
+  },
+  switchTxt: { fontSize: 15, fontWeight: '800', color: '#fff' },
   cancelBtn:  { marginTop: 18, paddingVertical: 8 },
   cancelTxt:  { fontSize: 15, color: '#9CA3AF', fontWeight: '500' },
 });

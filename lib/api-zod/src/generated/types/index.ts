@@ -8,6 +8,9 @@
 
 export * from './adminAction';
 export * from './adminIdParameter';
+export * from './adminUser';
+export * from './adminUserCreate';
+export * from './adminUserUpdate';
 export * from './deleteTeacherHolidayParams';
 export * from './deleteTeacherLeaveParams';
 export * from './getTeacherFaceStatusParams';
@@ -19,6 +22,7 @@ export * from './payrollCalculate';
 export * from './payrollReport';
 export * from './payrollReportResultItem';
 export * from './statusParameter';
+export * from './switchAdminToTeacherBody';
 export * from './teacherAttendanceRecord';
 export * from './teacherAttendanceRecordStatus';
 export * from './teacherAttendanceSettings';
@@ -35,3 +39,5 @@ export * from './teacherLeave';
 export * from './teacherLeaveCreate';
 export * from './teacherLeaveStatus';
 export * from './teacherLeaveUpdate';
+export * from './teacherProfile';
+export * from './teacherProfilePermissions';

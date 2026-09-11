@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Platform, Linking, Modal, Animated, Dimensions, TextInput, Image,
+  Alert, Platform, Linking, Modal, Animated, Dimensions, TextInput, Image, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Rect as SvgRect } from 'react-native-svg';
@@ -836,7 +836,10 @@ const ai = StyleSheet.create({
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function AdminDashboard() {
-  const { user, isLoading, logout, changeAdminCredentials } = useAuth();
+  const {
+    user, isLoading, logout, changeAdminCredentials, listAdminUsers,
+    createAdminUser, updateAdminUser, switchToTeacher,
+  } = useAuth();
   const { students, teachers, classes, feeRecords, expenses, attendanceRecords, alumni, documentBranding, updateDocumentBranding } = useApp();
   const insets = useSafeAreaInsets();
   const dbInfo = useDbStatus();
@@ -859,6 +862,16 @@ export default function AdminDashboard() {
   const [brandingModal, setBrandingModal] = useState(false);
   const [showMonthBirthdays, setShowMonthBirthdays] = useState(false);
   const [attendanceChoiceModal, setAttendanceChoiceModal] = useState(false);
+  const [adminUsersModal, setAdminUsersModal] = useState(false);
+  const [adminUsers, setAdminUsers] = useState<Array<{
+    id: string; name: string; username: string; linkedTeacherId?: string | null;
+  }>>([]);
+  const [adminForm, setAdminForm] = useState({
+    name: '', username: '', password: '', linkedTeacherId: null as string | null,
+  });
+  const [editingAdminId, setEditingAdminId] = useState<string | null>(null);
+  const [adminError, setAdminError] = useState('');
+  const [adminSaving, setAdminSaving] = useState(false);
 
   useEffect(() => {
     if (isLoading) return;
@@ -1074,6 +1087,81 @@ export default function AdminDashboard() {
     setCredSaving(false);
     if (!result.success) { setCredError(result.error ?? 'Update failed.'); return; }
     setCredSuccess(true);
+  };
+
+  const openAdminManagement = async () => {
+    setLogoutModal(false);
+    setAdminError('');
+    setAdminForm({ name: '', username: '', password: '', linkedTeacherId: null });
+    setEditingAdminId(null);
+    setAdminUsersModal(true);
+    try {
+      setAdminUsers(await listAdminUsers());
+    } catch (error: any) {
+      setAdminError(error?.message ?? 'Could not load administrator accounts.');
+    }
+  };
+
+  const editAdmin = (account: typeof adminUsers[number]) => {
+    setEditingAdminId(account.id);
+    setAdminForm({
+      name: account.name,
+      username: account.username,
+      password: '',
+      linkedTeacherId: account.linkedTeacherId ?? null,
+    });
+    setAdminError('');
+  };
+
+  const saveAdmin = async () => {
+    setAdminError('');
+    if (adminForm.name.trim().length < 2) {
+      setAdminError('Enter an administrator name.');
+      return;
+    }
+    if (!editingAdminId && adminForm.username.trim().length < 3) {
+      setAdminError('Username must be at least 3 characters.');
+      return;
+    }
+    if (!editingAdminId && adminForm.password.length < 6) {
+      setAdminError('Password must be at least 6 characters.');
+      return;
+    }
+    if (editingAdminId && adminForm.password.length > 0 && adminForm.password.length < 6) {
+      setAdminError('New password must be at least 6 characters.');
+      return;
+    }
+    setAdminSaving(true);
+    const result = editingAdminId
+      ? await updateAdminUser(editingAdminId, {
+        name: adminForm.name.trim(),
+        ...(adminForm.password ? { password: adminForm.password } : {}),
+        linkedTeacherId: adminForm.linkedTeacherId,
+      })
+      : await createAdminUser({
+        name: adminForm.name.trim(),
+        username: adminForm.username.trim(),
+        password: adminForm.password,
+        linkedTeacherId: adminForm.linkedTeacherId,
+      });
+    setAdminSaving(false);
+    if (!result.success) {
+      setAdminError(result.error ?? 'Could not save administrator.');
+      return;
+    }
+    setAdminForm({ name: '', username: '', password: '', linkedTeacherId: null });
+    setEditingAdminId(null);
+    try { setAdminUsers(await listAdminUsers()); } catch { /* saved successfully */ }
+  };
+
+  const switchAdminToTeacher = async () => {
+    const result = await switchToTeacher();
+    if (!result.success) {
+      Alert.alert('Switch unavailable', result.error ?? 'Link this admin to a teacher profile first.');
+      return;
+    }
+    setLogoutModal(false);
+    router.replace('/teacher');
   };
 
   // Throws on real errors so the caller's try/catch can surface them without
@@ -1515,6 +1603,33 @@ export default function AdminDashboard() {
               <Feather name="chevron-right" size={16} color="#94A3B8" />
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={lm.adminBtn}
+              onPress={openAdminManagement}
+              activeOpacity={0.85}
+            >
+              <View style={lm.adminBtnIcon}>
+                <Feather name="shield" size={18} color="#2563EB" />
+              </View>
+              <Text style={lm.adminBtnTxt}>Administrator Accounts</Text>
+              <Feather name="chevron-right" size={16} color="#94A3B8" />
+            </TouchableOpacity>
+
+            {user?.linkedTeacherId ? (
+              <TouchableOpacity
+                style={lm.switchBtn}
+                onPress={switchAdminToTeacher}
+                activeOpacity={0.85}
+              >
+                <Feather name="repeat" size={18} color="#fff" />
+                <Text style={lm.switchTxt}>Switch to Teacher Panel</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={lm.switchHint}>
+                Link this admin to a teacher profile in Administrator Accounts to enable panel switching.
+              </Text>
+            )}
+
             <TouchableOpacity style={lm.logoutBtn} onPress={doLogout} activeOpacity={0.85}>
               <Feather name="log-out" size={18} color="#fff" />
               <Text style={lm.logoutTxt}>Sign Out</Text>
@@ -1522,6 +1637,138 @@ export default function AdminDashboard() {
             <TouchableOpacity style={lm.cancelBtn} onPress={() => setLogoutModal(false)} activeOpacity={0.8}>
               <Text style={lm.cancelTxt}>Cancel</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Administrator Accounts Modal ── */}
+      <Modal visible={adminUsersModal} animationType="slide" transparent onRequestClose={() => setAdminUsersModal(false)}>
+        <View style={cm.overlay}>
+          <TouchableOpacity style={{ flex: 1 }} onPress={() => setAdminUsersModal(false)} activeOpacity={1} />
+          <View style={[cm.sheet, { maxHeight: '88%' }]}>
+            <View style={cm.handle} />
+            <View style={cm.header}>
+              <View style={cm.iconWrap}>
+                <Feather name="shield" size={20} color="#2563EB" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={cm.title}>Administrator Accounts</Text>
+                <Text style={{ color: '#64748B', fontSize: 12, marginTop: 3 }}>
+                  Add admins and link an admin to their teacher profile.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setAdminUsersModal(false)} style={cm.closeBtn} activeOpacity={0.7}>
+                <Feather name="x" size={18} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 20 }}>
+              <View style={{ paddingHorizontal: 20 }}>
+                {adminError ? (
+                  <View style={{ backgroundColor: '#FEF2F2', borderRadius: 10, padding: 11, marginBottom: 12 }}>
+                    <Text style={{ color: '#B91C1C', fontSize: 13 }}>{adminError}</Text>
+                  </View>
+                ) : null}
+
+                <Text style={cm.sectionLabel}>{editingAdminId ? 'EDIT ADMINISTRATOR' : 'ADD ADMINISTRATOR'}</Text>
+                <View style={cm.inputWrap}>
+                  <Feather name="user" size={15} color="#94A3B8" style={cm.inputIcon} />
+                  <TextInput
+                    style={cm.input}
+                    placeholder="Full name"
+                    placeholderTextColor="#94A3B8"
+                    value={adminForm.name}
+                    onChangeText={v => setAdminForm(f => ({ ...f, name: v }))}
+                    editable={!adminSaving}
+                  />
+                </View>
+                {!editingAdminId && (
+                  <>
+                    <Text style={[cm.sectionLabel, { marginTop: 14 }]}>USERNAME</Text>
+                    <View style={cm.inputWrap}>
+                      <Feather name="at-sign" size={15} color="#94A3B8" style={cm.inputIcon} />
+                      <TextInput
+                        style={cm.input}
+                        placeholder="Login username"
+                        placeholderTextColor="#94A3B8"
+                        autoCapitalize="none"
+                        value={adminForm.username}
+                        onChangeText={v => setAdminForm(f => ({ ...f, username: v }))}
+                        editable={!adminSaving}
+                      />
+                    </View>
+                  </>
+                )}
+                <Text style={[cm.sectionLabel, { marginTop: 14 }]}>
+                  PASSWORD {editingAdminId ? <Text style={cm.optional}>(optional)</Text> : null}
+                </Text>
+                <View style={cm.inputWrap}>
+                  <Feather name="key" size={15} color="#94A3B8" style={cm.inputIcon} />
+                  <TextInput
+                    style={cm.input}
+                    placeholder={editingAdminId ? 'Leave blank to keep current' : 'At least 6 characters'}
+                    placeholderTextColor="#94A3B8"
+                    secureTextEntry
+                    value={adminForm.password}
+                    onChangeText={v => setAdminForm(f => ({ ...f, password: v }))}
+                    editable={!adminSaving}
+                  />
+                </View>
+
+                <Text style={[cm.sectionLabel, { marginTop: 16 }]}>LINKED TEACHER PROFILE</Text>
+                <Text style={{ color: '#64748B', fontSize: 12, lineHeight: 17, marginBottom: 9 }}>
+                  Only the linked admin can switch to this teacher panel without signing in again.
+                </Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+                  <TouchableOpacity
+                    onPress={() => setAdminForm(f => ({ ...f, linkedTeacherId: null }))}
+                    style={{
+                      paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10,
+                      backgroundColor: !adminForm.linkedTeacherId ? '#2563EB' : '#F1F5F9',
+                    }}
+                  >
+                    <Text style={{ color: !adminForm.linkedTeacherId ? '#fff' : '#475569', fontWeight: '700', fontSize: 12 }}>None</Text>
+                  </TouchableOpacity>
+                  {teachers.map(teacher => (
+                    <TouchableOpacity
+                      key={teacher.id}
+                      onPress={() => setAdminForm(f => ({ ...f, linkedTeacherId: teacher.id }))}
+                      style={{
+                        paddingHorizontal: 12, paddingVertical: 9, borderRadius: 10,
+                        backgroundColor: adminForm.linkedTeacherId === teacher.id ? '#2563EB' : '#F1F5F9',
+                      }}
+                    >
+                      <Text style={{ color: adminForm.linkedTeacherId === teacher.id ? '#fff' : '#475569', fontWeight: '700', fontSize: 12 }}>
+                        {teacher.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <TouchableOpacity
+                  style={[cm.doneBtn, { backgroundColor: '#2563EB', marginTop: 16 }]}
+                  onPress={saveAdmin}
+                  disabled={adminSaving}
+                  activeOpacity={0.85}
+                >
+                  {adminSaving ? <ActivityIndicator color="#fff" /> : <Text style={cm.doneBtnTxt}>{editingAdminId ? 'Save Changes' : 'Add Administrator'}</Text>}
+                </TouchableOpacity>
+
+                <Text style={[cm.sectionLabel, { marginTop: 24 }]}>CURRENT ADMINISTRATORS</Text>
+                {adminUsers.map(account => (
+                  <View key={account.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
+                    <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
+                      <Feather name="shield" size={15} color="#2563EB" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: '#0F172A', fontWeight: '700', fontSize: 14 }}>{account.name}</Text>
+                      <Text style={{ color: '#64748B', fontSize: 12 }}>@{account.username}{account.linkedTeacherId ? ' · teacher linked' : ''}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => editAdmin(account)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Feather name="edit-2" size={16} color="#2563EB" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -2226,6 +2473,27 @@ const lm = StyleSheet.create({
     backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center',
   },
   credBtnTxt: { flex: 1, color: '#6D28D9', fontSize: 15, fontWeight: '700' },
+  adminBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#EFF6FF', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16,
+    width: '100%', marginBottom: 10,
+    borderWidth: 1.5, borderColor: '#BFDBFE',
+  },
+  adminBtnIcon: {
+    width: 36, height: 36, borderRadius: 11,
+    backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center',
+  },
+  adminBtnTxt: { flex: 1, color: '#1D4ED8', fontSize: 15, fontWeight: '700' },
+  switchBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#0F766E', borderRadius: 16, paddingVertical: 14, paddingHorizontal: 16,
+    width: '100%', justifyContent: 'center', marginBottom: 10,
+  },
+  switchTxt: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  switchHint: {
+    width: '100%', color: '#64748B', fontSize: 12, lineHeight: 17,
+    textAlign: 'center', marginBottom: 12, paddingHorizontal: 8,
+  },
   cancelBtn: { paddingVertical: 12 },
   cancelTxt: { color: '#64748B', fontSize: 15, fontWeight: '600' },
 });

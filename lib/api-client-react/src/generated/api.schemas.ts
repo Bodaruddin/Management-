@@ -9,6 +9,41 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface AdminUser {
+  id: string;
+  name: string;
+  username: string;
+  /** @nullable */
+  linkedTeacherId?: string | null;
+  createdAt?: string;
+}
+
+export interface AdminUserCreate {
+  adminId: string;
+  name: string;
+  username: string;
+  password: string;
+  /** @nullable */
+  linkedTeacherId?: string | null;
+}
+
+export interface AdminUserUpdate {
+  adminId: string;
+  name?: string;
+  password?: string;
+  /** @nullable */
+  linkedTeacherId?: string | null;
+}
+
+export type TeacherProfilePermissions = { [key: string]: unknown };
+
+export interface TeacherProfile {
+  id: string;
+  name: string;
+  username: string;
+  permissions?: TeacherProfilePermissions;
+}
+
 export type TeacherAttendanceSettingsDeductionType = typeof TeacherAttendanceSettingsDeductionType[keyof typeof TeacherAttendanceSettingsDeductionType];
 
 
@@ -89,6 +124,8 @@ export interface TeacherFaceEnroll {
      * @maxItems 5
      */
   faceSamplesBase64?: string[];
+  /** Replace the teacher's existing template after an explicit re-enrollment */
+  replaceExisting?: boolean;
 }
 
 export interface TeacherCheckIn {
@@ -219,5 +256,9 @@ teacherId: string;
 
 export type DeleteTeacherHolidayParams = {
 adminId: AdminIdParameter;
+};
+
+export type SwitchAdminToTeacherBody = {
+  adminId: string;
 };
 

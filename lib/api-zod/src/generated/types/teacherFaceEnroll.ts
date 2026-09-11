@@ -16,4 +16,6 @@ export interface TeacherFaceEnroll {
      * @maxItems 5
      */
   faceSamplesBase64?: string[];
+  /** Replace the teacher's existing template after an explicit re-enrollment */
+  replaceExisting?: boolean;
 }
