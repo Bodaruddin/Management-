@@ -44,11 +44,11 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
+    "owner": "momrooj01s-team",
     "extra": {
       "eas": {
-        "projectId": "0d5c60ed-81ba-49fe-9b64-185d658d9c05"
+        "projectId": "d4f8f33a-30dc-4535-a596-c574f491080e"
       }
-    },
-    "owner": "rabbuls-team1"
+    }
   }
 }

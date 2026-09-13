@@ -82,11 +82,11 @@ function admitSignatureHtml(
 ): string {
   const signature =
     kind === "principal" ? principalSignatureHtml(branding, 112, 34) : "";
-  return `<div style="text-align:center;flex:1">
-    <div style="height:46px;margin:0 10px 2px;display:flex;align-items:flex-end;justify-content:center;border-bottom:1.5px solid ${color};overflow:hidden">
+  return `<div style="text-align:center;flex:1;min-width:0">
+    <div style="height:48px;margin:0 10px 2px;display:flex;align-items:flex-end;justify-content:center;border-bottom:1.5px solid ${color};overflow:hidden">
       ${signature}
     </div>
-    <div style="font-size:11px;color:${color};font-weight:700;margin-top:6px">${label}</div>
+    <div style="font-size:10px;color:${color};font-weight:700;margin-top:5px;line-height:1.2">${label}</div>
   </div>`;
 }
 
@@ -187,19 +187,30 @@ function buildSchedule(exam: Exam, className?: string) {
     ? getExamScheduleForClass(exam, className)
     : exam.subjectSchedule;
 
-  return subjects.map((subject) => {
-    const configured = configuredSchedule?.find(
-      (schedule) => schedule.subject === subject,
-    );
-    const legacyTime = configured?.time?.split(/\s+[–—-]\s+/) ?? [];
-    return {
-      subject,
-      date: configured?.date || exam.date || "—",
-      startTime: configured?.startTime || legacyTime[0] || "—",
-      endTime: configured?.endTime || legacyTime[1] || "—",
-      maxMarks: configured?.maxMarks ?? exam.maxMarks,
-    };
-  });
+  return subjects
+    .map((subject, originalIndex) => {
+      const configured = configuredSchedule?.find(
+        (schedule) => schedule.subject === subject,
+      );
+      const legacyTime = configured?.time?.split(/\s+[–—-]\s+/) ?? [];
+      return {
+        subject,
+        date: configured?.date || exam.date || "—",
+        startTime: configured?.startTime || legacyTime[0] || "—",
+        endTime: configured?.endTime || legacyTime[1] || "—",
+        maxMarks: configured?.maxMarks ?? exam.maxMarks,
+        originalIndex,
+      };
+    })
+    .sort((a, b) => {
+      const aTime = parseStudentDate(a.date)?.getTime() ?? Number.POSITIVE_INFINITY;
+      const bTime = parseStudentDate(b.date)?.getTime() ?? Number.POSITIVE_INFINITY;
+      return aTime - bTime || a.originalIndex - b.originalIndex;
+    })
+    .map(({ originalIndex: _originalIndex, ...subject }, index) => ({
+      ...subject,
+      serialNo: index + 1,
+    }));
 }
 
 const INSTRUCTIONS = [
@@ -231,6 +242,7 @@ function scheduleRows(
     .map(
       (s, i) => `
     <tr style="background:${i % 2 === 0 ? evenBg : "#fff"}">
+      <td style="width:42px;padding:7px 8px;border-bottom:1px solid #e2e8f0;font-size:11px;color:#64748B;text-align:center;font-weight:700">${s.serialNo}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#1E293B;font-weight:600">${s.subject}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#374151">${fmtDate(s.date)}</td>
       <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12px;color:#374151">${s.startTime}</td>
@@ -280,6 +292,7 @@ function buildClassicHtml(
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:Arial,'Helvetica Neue',sans-serif;background:#e8edf4}
   .pg{width:210mm;min-height:297mm;background:#fff;margin:0 auto;padding-bottom:20mm}
+  .pg{page-break-inside:avoid;break-inside:avoid}
 </style></head><body><div class="pg">
   <div style="background:linear-gradient(135deg,#1e3a8a 0%,#2563EB 100%);padding:18px 24px;display:flex;align-items:center;gap:16px">
     <div style="width:64px;height:64px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;border:3px solid #F59E0B;overflow:hidden">
@@ -318,7 +331,7 @@ function buildClassicHtml(
     <div style="font-size:12px;font-weight:800;color:#1e3a8a;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;border-bottom:2px solid #BFDBFE;padding-bottom:4px">📅 Examination Schedule</div>
     <table style="width:100%;border-collapse:collapse">
       <thead><tr style="background:#1e3a8a">
-        ${["Subject", "Date", "Start Time", "End Time", "Max Marks"].map((h) => `<th style="padding:9px 10px;color:#fff;font-size:12px;font-weight:700;text-align:left">${h}</th>`).join("")}
+        ${["S.No", "Subject", "Date", "Start Time", "End Time", "Max Marks"].map((h, i) => `<th style="padding:9px 10px;color:#fff;font-size:12px;font-weight:700;text-align:${i === 0 ? "center" : "left"};${i === 0 ? "width:42px;" : ""}">${h}</th>`).join("")}
       </tr></thead>
       <tbody>${scheduleRows(schedule, "#F8FAFF")}</tbody>
     </table>
@@ -404,7 +417,7 @@ function buildModernHtml(
         <div style="color:#fff;font-size:12px;font-weight:800;letter-spacing:0.5px">📅 EXAMINATION SCHEDULE</div>
       </div>
       <table style="width:100%;border-collapse:collapse">
-        <thead><tr style="background:#F5F3FF">${["Subject", "Date", "Start Time", "End Time", "Max Marks"].map((h) => `<th style="padding:9px 12px;color:#6d28d9;font-size:11px;font-weight:800;text-align:left;border-bottom:2px solid #EDE9FE">${h}</th>`).join("")}</tr></thead>
+        <thead><tr style="background:#F5F3FF">${["S.No", "Subject", "Date", "Start Time", "End Time", "Max Marks"].map((h, i) => `<th style="padding:9px 12px;color:#6d28d9;font-size:11px;font-weight:800;text-align:${i === 0 ? "center" : "left"};${i === 0 ? "width:42px;" : ""};border-bottom:2px solid #EDE9FE">${h}</th>`).join("")}</tr></thead>
         <tbody>${scheduleRows(schedule, "#FAFAFA")}</tbody>
       </table>
     </div>
@@ -546,10 +559,10 @@ function buildPremiumHtml(
   @page{size:A4;margin:0}
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Segoe UI',Arial,sans-serif;background:#DFE7F1;color:#10213F}
-  .pg{width:calc(210mm - 16mm);height:calc(297mm - 16mm);background:#fff;margin:8mm auto;position:relative;overflow:hidden;padding-bottom:7mm;box-sizing:border-box}
+  .pg{width:calc(210mm - 16mm);height:calc(297mm - 16mm);background:#fff;margin:8mm auto;position:relative;overflow:hidden;padding:0;box-sizing:border-box;page-break-inside:avoid;break-inside:avoid}
   .inner{position:absolute;inset:0;border:1px solid #D8C28B;pointer-events:none;z-index:10}
   .section{margin:0 40px 20px;border:1px solid #CBD7E5;border-radius:4px;overflow:hidden}
-  @media print{body{background:#fff;margin:0;padding:0}.pg{border:0;overflow:hidden;page-break-after:always;break-after:page}.section{break-inside:avoid}}
+  @media print{body{background:#fff;margin:0;padding:0}.pg{border:0;overflow:hidden;page-break-after:avoid;break-after:avoid}.section{break-inside:avoid;page-break-inside:avoid}tr{break-inside:avoid;page-break-inside:avoid}}
 </style></head><body><div class="pg"><div class="inner"></div>
   <header style="background:#102C55;color:#fff;padding:28px 40px 24px;position:relative">
     <div style="position:absolute;right:36px;top:26px;width:90px;height:90px;border:1px solid rgba(221,195,119,.4);border-radius:50%"></div>
@@ -567,7 +580,7 @@ function buildPremiumHtml(
     </div>
   </header>
   <div style="height:6px;background:#D9BD70"></div>
-  <section style="margin:24px 40px 18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+  <section style="margin:18px 40px 14px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
     ${[
       ["CANDIDATE", student.name],
       ["CLASS / SECTION", student.class],
@@ -582,7 +595,7 @@ function buildPremiumHtml(
       )
       .join("")}
   </section>
-  <section class="section">
+  <section class="section" style="margin-bottom:14px">
     <div style="padding:11px 15px;background:#EDF3F9;border-bottom:1px solid #CBD7E5;display:flex;justify-content:space-between;align-items:center">
       <div style="color:#102C55;font-size:12px;font-weight:800;letter-spacing:1px">CANDIDATE DETAILS</div>
       <div style="font-size:9px;color:#728198;letter-spacing:1.1px">IDENTITY VERIFIED BY SCHOOL</div>
@@ -595,11 +608,11 @@ function buildPremiumHtml(
       <div style="color:#D9BD70;font-size:9px;letter-spacing:1.1px">REPORT 15 MINUTES EARLY</div>
     </div>
     <table style="width:100%;border-collapse:collapse;font-size:10.5px">
-      <thead><tr style="background:#F5F8FB">${["Subject", "Date", "Start", "End", "Marks"].map((h) => `<th style="text-align:left;padding:10px 12px;color:#5E6F87;font-size:9px;letter-spacing:.7px;text-transform:uppercase">${h}</th>`).join("")}</tr></thead>
+      <thead><tr style="background:#F5F8FB">${["S.No", "Subject", "Date", "Start", "End", "Marks"].map((h, i) => `<th style="text-align:${i === 0 ? "center" : "left"};${i === 0 ? "width:42px;" : ""}padding:8px 10px;color:#5E6F87;font-size:9px;letter-spacing:.7px;text-transform:uppercase">${h}</th>`).join("")}</tr></thead>
       <tbody>${scheduleRows(schedule, "#F9FBFD")}</tbody>
     </table>
   </section>
-  <section style="margin:0 40px 20px;padding:14px 16px;border-left:4px solid #D9BD70;background:#F8F5ED">
+  <section style="margin:0 40px 12px;padding:10px 16px;border-left:4px solid #D9BD70;background:#F8F5ED;break-inside:avoid;page-break-inside:avoid">
     <div style="color:#102C55;font-size:11px;font-weight:800;letter-spacing:.8px;margin-bottom:8px">CANDIDATE INSTRUCTIONS</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;column-gap:24px">
       ${INSTRUCTIONS.slice(0, 4)
@@ -610,14 +623,14 @@ function buildPremiumHtml(
         .join("")}
     </div>
   </section>
-  <footer style="padding:5px 40px 0;display:flex;align-items:end;gap:24px">
-    <div style="width:82px;height:82px;border:1px solid #BFCDDD;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#102C55;font-size:9px;font-weight:800;letter-spacing:.5px;background:#F6F9FC">
-      <img src="https://api.qrserver.com/v1/create-qr-code/?size=74x74&color=102c55&bgcolor=f6f9fc&data=${qrData}" width="72" height="72" alt="QR" onerror="this.style.display='none'" />
-      <span style="font-size:8px">QR VERIFY</span>
+  <footer class="admit-footer" style="position:absolute;left:40px;right:40px;bottom:28px;padding:0;display:flex;align-items:flex-end;gap:20px;z-index:2">
+    <div style="width:92px;height:92px;padding:5px;border:1px solid #BFCDDD;border-radius:3px;display:flex;align-items:center;justify-content:center;flex-direction:column;flex:0 0 auto;color:#102C55;font-size:8px;font-weight:800;letter-spacing:.4px;line-height:1;background:#F6F9FC;box-sizing:border-box">
+      <img src="https://api.qrserver.com/v1/create-qr-code/?size=82x82&color=102c55&bgcolor=f6f9fc&data=${qrData}" width="80" height="80" style="display:block;width:80px;height:80px;object-fit:contain;flex:0 0 auto" alt="QR" onerror="this.style.display='none'" />
+      <span style="font-size:8px;margin-top:2px">QR VERIFY</span>
     </div>
-    <div style="flex:1;display:flex;gap:36px">${ADMIT_SIGNATURES.map((s) => admitSignatureHtml(s.label, branding, "#102C55", s.kind)).join("")}</div>
+    <div style="flex:1;display:flex;align-items:flex-end;gap:28px;padding-bottom:2px">${ADMIT_SIGNATURES.map((s) => admitSignatureHtml(s.label, branding, "#102C55", s.kind)).join("")}</div>
   </footer>
-  <div style="margin:22px 40px 0;padding:9px 0 18px;border-top:1px solid #D9BD70;display:flex;justify-content:space-between;color:#8290A3;font-size:9px">
+  <div style="position:absolute;left:40px;right:40px;bottom:8px;padding:7px 0 0;border-top:1px solid #D9BD70;display:flex;justify-content:space-between;color:#8290A3;font-size:8px;z-index:2">
     <span>Issued by the Examination Office · ${admitNo}</span><span>School seal &amp; signature required</span>
   </div>
 </div></body></html>`;
