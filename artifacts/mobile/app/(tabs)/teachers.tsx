@@ -15,6 +15,33 @@ import { printSalarySlip as printSalaryReceipt } from '@/utils/receipt';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+function displayDateFromDate(date: Date): string {
+  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+}
+
+function formatDateInput(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
+
+function parseDisplayDate(value: string): string | null {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+  if (!match) return null;
+  const [, dayText, monthText, yearText] = match;
+  const day = Number(dayText);
+  const month = Number(monthText);
+  const year = Number(yearText);
+  const date = new Date(year, month - 1, day);
+  if (
+    date.getFullYear() !== year
+    || date.getMonth() !== month - 1
+    || date.getDate() !== day
+  ) return null;
+  return `${yearText}-${monthText}-${dayText}`;
+}
+
 const BLANK = {
   name: '', subject: '', mobileNumber: '', salary: '', username: '', password: '',
   permissions: { addStudent: false, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false }, photo: undefined as string | undefined
@@ -36,11 +63,12 @@ export default function TeachersScreen() {
   const [salaryMonth, setSalaryMonth] = useState(MONTH_NAMES[new Date().getMonth()]);
   const [salaryYear, setSalaryYear] = useState(String(new Date().getFullYear()));
   const [salaryAmount, setSalaryAmount] = useState('');
+  const [salaryPaidDate, setSalaryPaidDate] = useState(displayDateFromDate(new Date()));
   const [salaryStatus] = useState<'paid'>('paid');
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Teacher | null>(null);
   const [confirmDeleteSalaryId, setConfirmDeleteSalaryId] = useState<string | null>(null);
-  const [salarySuccess, setSalarySuccess] = useState<{ name: string; month: string; year: string; amount: number; rec: any; teacher: Teacher } | null>(null);
+  const [salarySuccess, setSalarySuccess] = useState<{ name: string; month: string; year: string; amount: number; paidDate: string; rec: any; teacher: Teacher } | null>(null);
 
   const now = new Date();
   const curMonth = MONTH_NAMES[now.getMonth()];
@@ -107,12 +135,18 @@ export default function TeachersScreen() {
     setSalaryMonth(curMonth);
     setSalaryYear(String(curYear));
     setSalaryAmount('');
+    setSalaryPaidDate(displayDateFromDate(new Date()));
     setShowSalaryModal(true);
   };
 
   const handlePaySalary = async () => {
     if (!salaryAmount || Number(salaryAmount) <= 0) { Alert.alert('Validation', 'Enter a valid salary amount'); return; }
     if (!salaryTeacher) return;
+    const paidDate = parseDisplayDate(salaryPaidDate);
+    if (!paidDate) {
+      Alert.alert('Validation', 'Enter a valid payment date in DD/MM/YYYY format, for example 12/09/2026.');
+      return;
+    }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const rec = addSalaryRecord({
       teacherId: salaryTeacher.id,
@@ -121,10 +155,10 @@ export default function TeachersScreen() {
       year: Number(salaryYear) || curYear,
       amount: Number(salaryAmount),
       status: 'paid',
-      paidDate: new Date().toISOString().split('T')[0],
+      paidDate,
     });
     setShowSalaryModal(false);
-    setSalarySuccess({ name: salaryTeacher.name, month: salaryMonth, year: salaryYear, amount: Number(salaryAmount), rec, teacher: salaryTeacher });
+    setSalarySuccess({ name: salaryTeacher.name, month: salaryMonth, year: salaryYear, amount: Number(salaryAmount), paidDate, rec, teacher: salaryTeacher });
   };
 
 
@@ -450,6 +484,19 @@ export default function TeachersScreen() {
                 <TextInput style={[sal_.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border }]} value={salaryYear} onChangeText={setSalaryYear} placeholder="e.g. 2026" placeholderTextColor={colors.mutedForeground} keyboardType="number-pad" />
               </View>
               <View style={{ marginBottom: 16 }}>
+                <Text style={[sal_.label, { color: colors.text }]}>Payment Date *</Text>
+                <TextInput
+                  style={[sal_.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border }]}
+                  value={salaryPaidDate}
+                  onChangeText={value => setSalaryPaidDate(formatDateInput(value))}
+                  placeholder="DD/MM/YYYY"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                />
+                <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 5 }}>Example: 12/09/2026</Text>
+              </View>
+              <View style={{ marginBottom: 16 }}>
                 <Text style={[sal_.label, { color: colors.text }]}>Salary Amount (₹) *</Text>
                 <TextInput style={[sal_.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border }]} value={salaryAmount} onChangeText={setSalaryAmount} placeholder="Enter amount" placeholderTextColor={colors.mutedForeground} keyboardType="number-pad" />
               </View>
@@ -498,6 +545,7 @@ export default function TeachersScreen() {
         month={salarySuccess?.month ?? ''}
         year={salarySuccess?.year ?? ''}
         amount={salarySuccess?.amount ?? 0}
+        paidDate={salarySuccess?.paidDate ?? ''}
         onDismiss={() => setSalarySuccess(null)}
         onPrint={() => {
           if (salarySuccess) printSalaryReceipt(salarySuccess.rec, salarySuccess.teacher, documentBranding);

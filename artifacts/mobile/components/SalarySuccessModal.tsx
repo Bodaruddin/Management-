@@ -25,8 +25,14 @@ interface Props {
   month: string;
   year: string | number;
   amount: number;
+  paidDate: string;
   onDismiss: () => void;
   onPrint: () => void;
+}
+
+function formatReceiptDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : value || '—';
 }
 
 export default function SalarySuccessModal({
@@ -35,6 +41,7 @@ export default function SalarySuccessModal({
   month,
   year,
   amount,
+  paidDate,
   onDismiss,
   onPrint,
 }: Props) {
@@ -182,7 +189,17 @@ export default function SalarySuccessModal({
                 <Feather name="calendar" size={13} color="#A78BFA" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.infoLabel}>Period</Text>
+                <Text style={styles.infoLabel}>Payment date</Text>
+                <Text style={styles.infoValue}>{formatReceiptDate(paidDate)}</Text>
+              </View>
+            </View>
+            <View style={styles.infoDivider} />
+            <View style={styles.infoRow}>
+              <View style={styles.infoIconBox}>
+                <Feather name="calendar" size={13} color="#60A5FA" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.infoLabel}>Pay period</Text>
                 <Text style={styles.infoValue}>{month} {year}</Text>
               </View>
             </View>
