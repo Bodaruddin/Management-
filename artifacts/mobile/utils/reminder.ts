@@ -88,6 +88,27 @@ export async function sendReminderSMS(student: Student, message: string): Promis
   }
 }
 
+// ─── Call the registered student/guardian number ──────────────────────────────
+export async function callStudent(student: Student): Promise<void> {
+  const phone = student.mobileNumber?.replace(/\D/g, '');
+  if (!phone || phone.length < 7) {
+    Alert.alert('No Mobile Number', `${student.name} does not have a mobile number on record.`);
+    return;
+  }
+
+  try {
+    const url = `tel:${phone}`;
+    const can = await Linking.canOpenURL(url);
+    if (can) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert('Calling Unavailable', 'This device cannot place phone calls.');
+    }
+  } catch {
+    Alert.alert('Calling Unavailable', 'Could not open the phone app on this device.');
+  }
+}
+
 // ─── Share reminder card image via native share sheet / WhatsApp ──────────────
 export async function shareReminderImage(imageUri: string, student: Student): Promise<void> {
   try {

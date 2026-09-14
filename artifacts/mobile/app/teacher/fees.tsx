@@ -12,7 +12,7 @@ import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
 import { useApp, FeeType, Student, getStudentFeeInfo, isActiveStudent, compareStudentRollNumbers } from '@/context/AppContext';
 import { printFeeReceipt, shareReceiptWhatsApp } from '@/utils/receipt';
-import { buildReminderMessage, sendReminderSMS, shareReminderImage } from '@/utils/reminder';
+import { buildReminderMessage, callStudent, sendReminderSMS, shareReminderImage } from '@/utils/reminder';
 import EmptyState from '@/components/EmptyState';
 import ReminderCard from '@/components/ReminderCard';
 
@@ -597,14 +597,28 @@ export default function TeacherFees() {
                       ? <Text style={{ fontSize: 11, color: colors.success, marginTop: 2 }}>📞 {st.mobileNumber}</Text>
                       : <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>No number</Text>}
                   </View>
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#FF980015', borderWidth: 1, borderColor: '#FF9800' }}
-                    onPress={() => { setReminderStudent(st); setReminderMessage(buildReminderMessage(st)); setShowReminderModal(true); }}
-                    activeOpacity={0.8}
-                  >
-                    <Feather name="bell" size={13} color="#FF9800" />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF9800' }}>Remind</Text>
-                  </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: '#10B98115', borderWidth: 1, borderColor: '#10B981' }}
+                      onPress={() => callStudent(st)}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Call ${st.name}`}
+                    >
+                      <Feather name="phone" size={13} color="#10B981" />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#10B981' }}>Call</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 10, backgroundColor: '#FF980015', borderWidth: 1, borderColor: '#FF9800' }}
+                      onPress={() => { setReminderStudent(st); setReminderMessage(buildReminderMessage(st)); setShowReminderModal(true); }}
+                      activeOpacity={0.8}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Send fee reminder to ${st.name}`}
+                    >
+                      <Feather name="bell" size={13} color="#FF9800" />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#FF9800' }}>Remind</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               ))}
           </View>
