@@ -454,7 +454,7 @@ export interface DocumentBranding {
 }
 
 interface AppContextType extends AppState {
-  addStudent: (s: Omit<Student, 'id'>) => void;
+  addStudent: (s: Omit<Student, 'id'>) => Promise<Student>;
   updateStudent: (id: string, s: Partial<Student>) => Promise<void>;
   deleteStudent: (id: string) => void;
   addTeacher: (t: Omit<Teacher, 'id'>) => void;
@@ -998,12 +998,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [isSetupComplete, refreshAllData, user]);
 
   // ── Students ──
-  const addStudent = useCallback((s: Omit<Student, 'id'>) => {
+  const addStudent = useCallback(async (s: Omit<Student, 'id'>): Promise<Student> => {
     const ns: Student = { ...s, id: genId() };
     setState(prev => ({ ...prev, students: [...prev.students, ns] }));
-    apiPost('/students', ns).then(row => {
-      setState(prev => ({ ...prev, students: prev.students.map(x => x.id === ns.id ? mapStudent(row as any) : x) }));
-    }).catch(console.error);
+    try {
+      const row = await apiPost('/students', ns);
+      const saved = mapStudent(row as any);
+      setState(prev => ({
+        ...prev,
+        students: prev.students.map(x => x.id === ns.id ? saved : x),
+      }));
+      return saved;
+    } catch (error) {
+      // Do not leave a fake optimistic student on the dashboard when the API
+      // or database rejected the write.
+      setState(prev => ({ ...prev, students: prev.students.filter(x => x.id !== ns.id) }));
+      throw error;
+    }
   }, []);
 
   const updateStudent = useCallback(async (id: string, s: Partial<Student>) => {

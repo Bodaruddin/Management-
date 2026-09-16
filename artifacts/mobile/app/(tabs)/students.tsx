@@ -216,9 +216,13 @@ export default function StudentsScreen({ teacherMode = false }: { teacherMode?: 
       discountType: annualFeeNum ? form.discountType : undefined,
       discountValue: (annualFeeNum && form.discountValue) ? Number(form.discountValue) : undefined,
     };
-    if (editing) updateStudent(editing.id, studentData);
-    else addStudent(studentData);
-    setShowModal(false);
+    try {
+      if (editing) await updateStudent(editing.id, studentData);
+      else await addStudent(studentData);
+      setShowModal(false);
+    } catch (error: any) {
+      Alert.alert('Save failed', error?.message ?? 'Could not save the student to the database.');
+    }
   };
 
   const handlePickImage = async () => {

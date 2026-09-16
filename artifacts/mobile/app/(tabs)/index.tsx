@@ -994,21 +994,51 @@ export default function AdminDashboard() {
   const attendancePct = todayTotal > 0 ? Math.round((todayPresent / todayTotal) * 100) : 0;
 
   // ── Birthdays ──────────────────────────────────────────────────────────────
+  // An alumni row can refer to the same person as an active student row. Keep
+  // the active student when that happens so the dashboard does not show a
+  // duplicate birthday card with an empty class.
+  const birthdayPeople = useMemo(() => {
+    const people = [...students];
+    const studentIds = new Set(students.map(student => student.id));
+    const studentProfiles = new Set(
+      students.map(student => [
+        student.name.trim().toLowerCase(),
+        student.dateOfBirth.trim(),
+        student.rollNumber.trim(),
+      ].join('|')),
+    );
+
+    alumni.forEach(record => {
+      const person = alumniToStudent(record);
+      const profile = [
+        person.name.trim().toLowerCase(),
+        person.dateOfBirth.trim(),
+        person.rollNumber.trim(),
+      ].join('|');
+      if (studentIds.has(person.id) || studentProfiles.has(profile)) return;
+      people.push(person);
+      studentIds.add(person.id);
+      studentProfiles.add(profile);
+    });
+
+    return people;
+  }, [students, alumni]);
+
   const birthdayStudents = useMemo(() =>
-    [...students, ...alumni.map(alumniToStudent)].filter(s => isBirthdayToday(s.dateOfBirth)),
-    [students, alumni],
+    birthdayPeople.filter(s => isBirthdayToday(s.dateOfBirth)),
+    [birthdayPeople],
   );
   const upcomingBirthdays = useMemo(() =>
-    [...students, ...alumni.map(alumniToStudent)]
+    birthdayPeople
       .filter(s => (() => { const d = daysUntilBirthday(s.dateOfBirth); return d > 0 && d <= 30; })())
       .sort((a, b) => daysUntilBirthday(a.dateOfBirth) - daysUntilBirthday(b.dateOfBirth))
       .slice(0, 5),
-    [students, alumni],
+    [birthdayPeople],
   );
   const monthBirthdays = useMemo(() => {
     const month = now.getMonth() + 1;
     const today = now.getDate();
-    return [...students, ...alumni.map(alumniToStudent)]
+    return birthdayPeople
       .filter(s => {
         const mmdd = extractMMDD(s.dateOfBirth);
         if (!mmdd) return false;
@@ -1021,7 +1051,7 @@ export default function AdminDashboard() {
         const db = Number(extractMMDD(b.dateOfBirth)?.split('-')[1] ?? 99);
         return da - db;
       });
-  }, [students, alumni, now.getMonth(), now.getDate()]);
+  }, [birthdayPeople, now.getMonth(), now.getDate()]);
   // ── Recent activity (fees + expenses, newest first) ────────────────────────
   const recentActivity = useMemo(() => {
     const feeItems = visibleFeeRecords.map(f => ({

@@ -238,8 +238,12 @@ export default function TeacherMarks() {
               studentId: s.id,
               studentName: s.name,
               rollNumber: s.rollNumber,
+              // Empty cells are displayed with a `0` placeholder in the form.
+              // Treat that placeholder as an actual zero when submitting the
+              // subject, otherwise the API correctly considers the subject
+              // incomplete and keeps its status as Draft.
               mark: (marksData[s.id]?.[sub] ?? '').trim() === ''
-                ? null
+                ? 0
                 : Number(marksData[s.id]?.[sub]),
             })),
           });

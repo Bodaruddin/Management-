@@ -389,27 +389,31 @@ export default function TeacherDashboard() {
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const annualFeeNum = studentForm.annualFee ? Number(studentForm.annualFee) : undefined;
-    addStudent({
-      name:         studentForm.name.trim(),
-      fatherName:   studentForm.fatherName.trim(),
-      motherName:   studentForm.motherName.trim(),
-      mobileNumber: studentForm.mobileNumber.trim(),
-      class:        studentForm.class,
-      section:      studentForm.section || undefined,
-      admissionNo:  studentForm.admissionNo || undefined,
-      rollNumber:   studentForm.rollNumber.trim(),
-      dateOfBirth:  studentForm.dateOfBirth.trim() || `${String(now.getDate()).padStart(2,'0')}-${String(now.getMonth()+1).padStart(2,'0')}-${now.getFullYear()}`,
-      address:      studentForm.address || undefined,
-      photo:        studentForm.photo || undefined,
-      gender:       studentForm.gender || undefined,
-      caste:        studentForm.caste || undefined,
-      annualFee:    annualFeeNum,
-      discountType: annualFeeNum ? studentForm.discountType : undefined,
-      discountValue: (annualFeeNum && studentForm.discountValue) ? Number(studentForm.discountValue) : undefined,
-    });
-    setStudentForm({ ...EMPTY_STUDENT, admissionNo: genAdmissionNo(students.length + 2) });
-    setShowAddStudent(false);
-    setShowStudentSuccess(true);
+    try {
+      await addStudent({
+        name:         studentForm.name.trim(),
+        fatherName:   studentForm.fatherName.trim(),
+        motherName:   studentForm.motherName.trim(),
+        mobileNumber: studentForm.mobileNumber.trim(),
+        class:        studentForm.class,
+        section:      studentForm.section || undefined,
+        admissionNo:  studentForm.admissionNo || undefined,
+        rollNumber:   studentForm.rollNumber.trim(),
+        dateOfBirth:  studentForm.dateOfBirth.trim() || `${String(now.getDate()).padStart(2,'0')}-${String(now.getMonth()+1).padStart(2,'0')}-${now.getFullYear()}`,
+        address:      studentForm.address || undefined,
+        photo:        studentForm.photo || undefined,
+        gender:       studentForm.gender || undefined,
+        caste:        studentForm.caste || undefined,
+        annualFee:    annualFeeNum,
+        discountType: annualFeeNum ? studentForm.discountType : undefined,
+        discountValue: (annualFeeNum && studentForm.discountValue) ? Number(studentForm.discountValue) : undefined,
+      });
+      setStudentForm({ ...EMPTY_STUDENT, admissionNo: genAdmissionNo(students.length + 2) });
+      setShowAddStudent(false);
+      setShowStudentSuccess(true);
+    } catch (error: any) {
+      Alert.alert('Save failed', error?.message ?? 'Could not save the student to the database.');
+    }
   };
 
 
