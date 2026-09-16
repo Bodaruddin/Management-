@@ -18,6 +18,7 @@ import ReminderCard from '@/components/ReminderCard';
 
 type Tab = 'overview' | 'salary' | 'fees' | 'feeTypes' | 'expenses';
 type Period = 'today' | 'week' | 'month' | 'year' | 'all';
+type FeeReportPeriod = 'month' | 'year' | 'custom';
 type OverviewFilter = 'fee' | 'teacher';
 
 const EXPENSE_CATEGORIES = ['Supplies', 'Utilities', 'Salaries', 'Maintenance', 'Events', 'Other'];
@@ -131,6 +132,13 @@ export default function FinanceScreen() {
   const [collectPaymentMethod, setCollectPaymentMethod] = useState('Cash');
   const [feeSearch, setFeeSearch] = useState('');
   const [feeClassFilter, setFeeClassFilter] = useState('All');
+  const [showFeeReport, setShowFeeReport] = useState(false);
+  const [feeReportPeriod, setFeeReportPeriod] = useState<FeeReportPeriod>('month');
+  const [feeReportMonth, setFeeReportMonth] = useState(new Date().getMonth() + 1);
+  const [feeReportYear, setFeeReportYear] = useState(new Date().getFullYear());
+  const [feeReportClass, setFeeReportClass] = useState('All');
+  const [feeReportStart, setFeeReportStart] = useState(new Date().toISOString().split('T')[0]);
+  const [feeReportEnd, setFeeReportEnd] = useState(new Date().toISOString().split('T')[0]);
 
   // ── Fee Reminder state ──
   const viewShotRef = useRef<any>(null);
@@ -163,6 +171,16 @@ export default function FinanceScreen() {
   const yearStr = `${now.getFullYear()}`;
   const weekStart = new Date(now); weekStart.setDate(now.getDate() - 6);
   const weekStartStr = weekStart.toISOString().split('T')[0];
+
+  const openFeeReport = () => {
+    setFeeReportPeriod('month');
+    setFeeReportMonth(now.getMonth() + 1);
+    setFeeReportYear(now.getFullYear());
+    setFeeReportClass('All');
+    setFeeReportStart(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
+    setFeeReportEnd(todayStr);
+    setShowFeeReport(true);
+  };
 
   // ── Period-filtered records ───────────────────────────────────────────────
   const periodFees = useMemo(() => {
@@ -294,6 +312,72 @@ export default function FinanceScreen() {
     const matchClass  = feeClassFilter === 'All' || s.class === feeClassFilter;
     return matchSearch && matchClass;
   }), [activeStudents, feeSearch, feeClassFilter]);
+
+  const feeReportYears = useMemo(() => {
+    const years = new Set<number>([now.getFullYear()]);
+    feeRecords.forEach(record => {
+      const year = Number(record.date.slice(0, 4));
+      if (Number.isFinite(year) && year > 1900) years.add(year);
+    });
+    return Array.from(years).sort((a, b) => a - b);
+  }, [feeRecords, now.getFullYear()]);
+
+  const feeReportRange = useMemo(() => {
+    if (feeReportPeriod === 'custom') {
+      return { start: feeReportStart.trim(), end: feeReportEnd.trim() };
+    }
+    if (feeReportPeriod === 'year') {
+      return {
+        start: `${feeReportYear}-01-01`,
+        end: `${feeReportYear}-12-31`,
+      };
+    }
+    const month = String(feeReportMonth).padStart(2, '0');
+    const lastDay = new Date(feeReportYear, feeReportMonth, 0).getDate();
+    return {
+      start: `${feeReportYear}-${month}-01`,
+      end: `${feeReportYear}-${month}-${String(lastDay).padStart(2, '0')}`,
+    };
+  }, [feeReportPeriod, feeReportStart, feeReportEnd, feeReportYear, feeReportMonth]);
+
+  const feeReportRangeValid =
+    /^\d{4}-\d{2}-\d{2}$/.test(feeReportRange.start)
+    && /^\d{4}-\d{2}-\d{2}$/.test(feeReportRange.end)
+    && feeReportRange.start <= feeReportRange.end;
+
+  const feeReportRows = useMemo(() => {
+    const reportFees = feeReportRangeValid
+      ? feeRecords.filter(record => record.date >= feeReportRange.start && record.date <= feeReportRange.end)
+      : [];
+    return activeStudents
+      .filter(student => feeReportClass === 'All' || student.class === feeReportClass)
+      .map(student => {
+        const feeInfo = getStudentFeeInfo(student, feeRecords);
+        const received = reportFees
+          .filter(record => record.studentId === student.id)
+          .reduce((sum, record) => sum + record.amount, 0);
+        return {
+          student,
+          received,
+          outstanding: feeInfo.remaining,
+          payable: feeInfo.finalPayable,
+        };
+      })
+      .sort((a, b) => a.student.class.localeCompare(b.student.class) || a.student.name.localeCompare(b.student.name));
+  }, [activeStudents, feeRecords, feeReportClass, feeReportRange, feeReportRangeValid]);
+
+  const feeReportReceived = useMemo(
+    () => feeReportRows.reduce((sum, row) => sum + row.received, 0),
+    [feeReportRows],
+  );
+  const feeReportOutstanding = useMemo(
+    () => feeReportRows.reduce((sum, row) => sum + row.outstanding, 0),
+    [feeReportRows],
+  );
+  const feeReportPayable = useMemo(
+    () => feeReportRows.reduce((sum, row) => sum + row.payable, 0),
+    [feeReportRows],
+  );
 
   // ── Collect fee handlers ──────────────────────────────────────────────────
   const openCollect = (student: Student) => {
@@ -494,6 +578,22 @@ export default function FinanceScreen() {
               );
             })}
           </View>
+          <View style={{ paddingHorizontal: 16, paddingBottom: 4 }}>
+            <TouchableOpacity
+              style={[s.reportShortcut, { borderColor: colors.primary + '45', backgroundColor: colors.primary + '0D' }]}
+              onPress={openFeeReport}
+              activeOpacity={0.8}
+            >
+              <View style={[s.reportShortcutIcon, { backgroundColor: colors.primary + '18' }]}>
+                <Feather name="file-text" size={17} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.reportShortcutTitle, { color: colors.text }]}>Student Fee Report</Text>
+                <Text style={[s.reportShortcutSub, { color: colors.mutedForeground }]}>Month, year, custom dates and class-wise balances</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
 
           {/* ── Bar Chart ────────────────────────────────────────────────── */}
           <View style={s.section}>
@@ -680,6 +780,20 @@ export default function FinanceScreen() {
           contentContainerStyle={{ padding: 16, paddingBottom: botPad, flexGrow: 1 }}
           ListHeaderComponent={() => (
             <View style={{ marginBottom: 12 }}>
+              <TouchableOpacity
+                style={[s.reportShortcut, { borderColor: colors.primary + '45', backgroundColor: colors.primary + '0D', marginBottom: 12 }]}
+                onPress={openFeeReport}
+                activeOpacity={0.8}
+              >
+                <View style={[s.reportShortcutIcon, { backgroundColor: colors.primary + '18' }]}>
+                  <Feather name="file-text" size={17} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.reportShortcutTitle, { color: colors.text }]}>Open Fee Report</Text>
+                  <Text style={[s.reportShortcutSub, { color: colors.mutedForeground }]}>See received and outstanding fees for every student</Text>
+                </View>
+                <Feather name="chevron-right" size={18} color={colors.primary} />
+              </TouchableOpacity>
               <View style={[fc.searchBar, { backgroundColor: '#fff', borderColor: '#E2E8F0' }]}>
                 <Feather name="search" size={16} color={colors.mutedForeground} />
                 <TextInput
@@ -853,6 +967,209 @@ export default function FinanceScreen() {
       {/* ════════════════════════════════════════════════════════════════════
           ALL MODALS (unchanged)
          ════════════════════════════════════════════════════════════════════ */}
+
+      {/* Student fee report */}
+      <Modal visible={showFeeReport} animationType="slide" transparent>
+        <View style={reportModal.overlay}>
+          <View style={[reportModal.sheet, { backgroundColor: colors.card }]}>
+            <View style={[reportModal.header, { borderBottomColor: colors.border }]}>
+              <View>
+                <Text style={[reportModal.title, { color: colors.text }]}>Student Fee Report</Text>
+                <Text style={[reportModal.subtitle, { color: colors.mutedForeground }]}>
+                  Received in the selected period · outstanding annual balance
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowFeeReport(false)} accessibilityLabel="Close fee report">
+                <Feather name="x" size={24} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }} showsVerticalScrollIndicator={false}>
+              <Text style={[reportModal.label, { color: colors.text }]}>Report period</Text>
+              <View style={reportModal.segmentRow}>
+                {([
+                  ['month', 'Month'],
+                  ['year', 'Year'],
+                  ['custom', 'Custom'],
+                ] as const).map(([key, label]) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[
+                      reportModal.segment,
+                      { borderColor: colors.border, backgroundColor: colors.muted },
+                      feeReportPeriod === key && { borderColor: colors.primary, backgroundColor: colors.primary },
+                    ]}
+                    onPress={() => setFeeReportPeriod(key)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ color: feeReportPeriod === key ? '#fff' : colors.mutedForeground, fontSize: 13, fontWeight: '700' }}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {feeReportPeriod === 'month' && (
+                <>
+                  <Text style={[reportModal.label, { color: colors.text, marginTop: 16 }]}>Month</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                    {MONTHS.map((month, index) => {
+                      const monthNumber = index + 1;
+                      const selected = feeReportMonth === monthNumber;
+                      return (
+                        <TouchableOpacity
+                          key={month}
+                          style={[
+                            reportModal.monthPill,
+                            { borderColor: colors.border, backgroundColor: colors.muted },
+                            selected && { borderColor: colors.primary, backgroundColor: colors.primary },
+                          ]}
+                          onPress={() => setFeeReportMonth(monthNumber)}
+                        >
+                          <Text style={{ color: selected ? '#fff' : colors.text, fontSize: 12, fontWeight: '700' }}>
+                            {month.slice(0, 3)}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              )}
+
+              {(feeReportPeriod === 'month' || feeReportPeriod === 'year') && (
+                <>
+                  <Text style={[reportModal.label, { color: colors.text, marginTop: 16 }]}>Year</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                    {feeReportYears.map(year => {
+                      const selected = feeReportYear === year;
+                      return (
+                        <TouchableOpacity
+                          key={year}
+                          style={[
+                            reportModal.monthPill,
+                            { borderColor: colors.border, backgroundColor: colors.muted },
+                            selected && { borderColor: colors.primary, backgroundColor: colors.primary },
+                          ]}
+                          onPress={() => setFeeReportYear(year)}
+                        >
+                          <Text style={{ color: selected ? '#fff' : colors.text, fontSize: 12, fontWeight: '700' }}>{year}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              )}
+
+              {feeReportPeriod === 'custom' && (
+                <View style={{ gap: 10, marginTop: 16 }}>
+                  <Text style={[reportModal.label, { color: colors.text }]}>Custom date range</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[reportModal.inputLabel, { color: colors.mutedForeground }]}>From</Text>
+                      <TextInput
+                        style={[reportModal.dateInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.muted }]}
+                        value={feeReportStart}
+                        onChangeText={setFeeReportStart}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor={colors.mutedForeground}
+                        keyboardType="numbers-and-punctuation"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[reportModal.inputLabel, { color: colors.mutedForeground }]}>To</Text>
+                      <TextInput
+                        style={[reportModal.dateInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.muted }]}
+                        value={feeReportEnd}
+                        onChangeText={setFeeReportEnd}
+                        placeholder="YYYY-MM-DD"
+                        placeholderTextColor={colors.mutedForeground}
+                        keyboardType="numbers-and-punctuation"
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              <Text style={[reportModal.label, { color: colors.text, marginTop: 16 }]}>Class</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {uniqueClasses.map(cls => {
+                  const selected = feeReportClass === cls;
+                  return (
+                    <TouchableOpacity
+                      key={cls}
+                      style={[
+                        reportModal.monthPill,
+                        { borderColor: colors.border, backgroundColor: colors.muted },
+                        selected && { borderColor: colors.primary, backgroundColor: colors.primary },
+                      ]}
+                      onPress={() => setFeeReportClass(cls)}
+                    >
+                      <Text style={{ color: selected ? '#fff' : colors.text, fontSize: 12, fontWeight: '700' }}>{cls}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {!feeReportRangeValid && (
+                <Text style={[reportModal.error, { color: colors.destructive }]}>
+                  Enter dates as YYYY-MM-DD and make sure the start date is not after the end date.
+                </Text>
+              )}
+
+              <View style={reportModal.summaryGrid}>
+                {[
+                  { label: 'Received', value: feeReportReceived, color: colors.success, icon: 'arrow-down-circle' },
+                  { label: 'Outstanding', value: feeReportOutstanding, color: colors.destructive, icon: 'alert-circle' },
+                  { label: 'Annual payable', value: feeReportPayable, color: colors.primary, icon: 'credit-card' },
+                  { label: 'Students', value: feeReportRows.length, color: colors.text, icon: 'users' },
+                ].map(item => (
+                  <View key={item.label} style={[reportModal.summaryCard, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                    <Feather name={item.icon as any} size={15} color={item.color} />
+                    <Text style={[reportModal.summaryLabel, { color: colors.mutedForeground }]}>{item.label}</Text>
+                    <Text style={[reportModal.summaryValue, { color: item.color }]}>
+                      {item.label === 'Students' ? item.value : fmt(item.value)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={reportModal.resultsHeader}>
+                <View>
+                  <Text style={[reportModal.resultsTitle, { color: colors.text }]}>Student balances</Text>
+                  <Text style={[reportModal.resultsSub, { color: colors.mutedForeground }]}>
+                    {feeReportRange.start} to {feeReportRange.end} · {feeReportRows.length} student{feeReportRows.length === 1 ? '' : 's'}
+                  </Text>
+                </View>
+              </View>
+
+              {feeReportRows.length === 0 ? (
+                <Text style={[s.emptyMsg, { paddingVertical: 20 }]}>
+                  {feeReportRangeValid ? 'No active students match this class.' : 'Choose a valid date range.'}
+                </Text>
+              ) : (
+                feeReportRows.map(row => (
+                  <View key={row.student.id} style={[reportModal.studentRow, { borderColor: colors.border }]}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[reportModal.studentName, { color: colors.text }]} numberOfLines={1}>{row.student.name}</Text>
+                      <Text style={[reportModal.studentMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                        {row.student.class} · Roll {row.student.rollNumber || '—'}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
+                      <Text style={[reportModal.received, { color: colors.success }]}>+{fmt(row.received)}</Text>
+                      <Text style={[reportModal.left, { color: row.outstanding > 0 ? colors.destructive : colors.success }]}>
+                        Left {fmt(row.outstanding)}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Overview Filter Picker */}
       <Modal visible={!!filterPicker} animationType="slide" transparent>
@@ -1360,6 +1677,10 @@ const s = StyleSheet.create({
   filterRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   filterPill: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
   filterPillText: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.88)' },
+  reportShortcut: { flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 1, borderRadius: 15, padding: 12 },
+  reportShortcutIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  reportShortcutTitle: { fontSize: 13, fontWeight: '800' },
+  reportShortcutSub: { fontSize: 11, marginTop: 2 },
 
   // Tab bar
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
@@ -1501,6 +1822,33 @@ const mo = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15 },
   footer: { flexDirection: 'row', gap: 12, padding: 20, borderTopWidth: 1 },
   btn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 14 },
+});
+
+const reportModal = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { maxHeight: '94%', borderTopLeftRadius: 22, borderTopRightRadius: 22 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 18, borderBottomWidth: 1 },
+  title: { fontSize: 19, fontWeight: '800' },
+  subtitle: { fontSize: 11, marginTop: 3 },
+  label: { fontSize: 13, fontWeight: '800', marginBottom: 8 },
+  segmentRow: { flexDirection: 'row', gap: 8 },
+  segment: { flex: 1, alignItems: 'center', borderWidth: 1, borderRadius: 12, paddingVertical: 10 },
+  monthPill: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 12, paddingVertical: 8 },
+  inputLabel: { fontSize: 11, fontWeight: '700', marginBottom: 5 },
+  dateInput: { borderWidth: 1, borderRadius: 11, paddingHorizontal: 10, paddingVertical: 10, fontSize: 13 },
+  error: { fontSize: 12, fontWeight: '600', marginTop: 12, lineHeight: 17 },
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, marginTop: 18 },
+  summaryCard: { width: '48%', minHeight: 84, borderWidth: 1, borderRadius: 14, padding: 11 },
+  summaryLabel: { fontSize: 10, fontWeight: '700', marginTop: 8 },
+  summaryValue: { fontSize: 17, fontWeight: '800', marginTop: 2 },
+  resultsHeader: { marginTop: 20, marginBottom: 8 },
+  resultsTitle: { fontSize: 15, fontWeight: '800' },
+  resultsSub: { fontSize: 11, marginTop: 3 },
+  studentRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, paddingVertical: 12 },
+  studentName: { fontSize: 13, fontWeight: '800' },
+  studentMeta: { fontSize: 11, marginTop: 3 },
+  received: { fontSize: 13, fontWeight: '800' },
+  left: { fontSize: 11, fontWeight: '700', marginTop: 3 },
 });
 
 const picker = StyleSheet.create({
