@@ -312,6 +312,16 @@ export default function FinanceScreen() {
     const matchClass  = feeClassFilter === 'All' || s.class === feeClassFilter;
     return matchSearch && matchClass;
   }), [activeStudents, feeSearch, feeClassFilter]);
+  // Alumni are kept in the students response with a graduated status after
+  // an alumni import. They should not appear in the current fee report.
+  const feeReportStudents = useMemo(
+    () => students.filter(student => student.status !== 'graduated'),
+    [students],
+  );
+  const feeReportClasses = useMemo(
+    () => ['All', ...Array.from(new Set(feeReportStudents.map(s => s.class))).sort()],
+    [feeReportStudents],
+  );
 
   const feeReportYears = useMemo(() => {
     const years = new Set<number>([now.getFullYear()]);
@@ -349,7 +359,7 @@ export default function FinanceScreen() {
     const reportFees = feeReportRangeValid
       ? feeRecords.filter(record => record.date >= feeReportRange.start && record.date <= feeReportRange.end)
       : [];
-    return activeStudents
+    return feeReportStudents
       .filter(student => feeReportClass === 'All' || student.class === feeReportClass)
       .map(student => {
         const feeInfo = getStudentFeeInfo(student, feeRecords);
@@ -364,7 +374,7 @@ export default function FinanceScreen() {
         };
       })
       .sort((a, b) => a.student.class.localeCompare(b.student.class) || a.student.name.localeCompare(b.student.name));
-  }, [activeStudents, feeRecords, feeReportClass, feeReportRange, feeReportRangeValid]);
+  }, [feeReportStudents, feeRecords, feeReportClass, feeReportRange, feeReportRangeValid]);
 
   const feeReportReceived = useMemo(
     () => feeReportRows.reduce((sum, row) => sum + row.received, 0),
@@ -1094,7 +1104,7 @@ export default function FinanceScreen() {
 
               <Text style={[reportModal.label, { color: colors.text, marginTop: 16 }]}>Class</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                {uniqueClasses.map(cls => {
+                {feeReportClasses.map(cls => {
                   const selected = feeReportClass === cls;
                   return (
                     <TouchableOpacity
@@ -1146,7 +1156,7 @@ export default function FinanceScreen() {
 
               {feeReportRows.length === 0 ? (
                 <Text style={[s.emptyMsg, { paddingVertical: 20 }]}>
-                  {feeReportRangeValid ? 'No active students match this class.' : 'Choose a valid date range.'}
+                  {feeReportRangeValid ? 'No students match this class.' : 'Choose a valid date range.'}
                 </Text>
               ) : (
                 feeReportRows.map(row => (
