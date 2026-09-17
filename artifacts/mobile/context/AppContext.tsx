@@ -402,19 +402,23 @@ export interface Alumni {
 }
 
 export function alumniToStudent(alumni: Alumni): Student {
+  const raw = alumni as Alumni & Record<string, unknown>;
+  const className = String(raw.class ?? '').trim()
+    || String(raw.passOutClass ?? raw.pass_out_class ?? '').trim();
+  const name = String(raw.name ?? raw.studentName ?? raw.student_name ?? '').trim();
   return {
-    id: alumni.studentId ?? alumni.id,
-    name: alumni.name,
-    fatherName: alumni.fatherName ?? '',
+    id: String(raw.studentId ?? raw.student_id ?? raw.id),
+    name,
+    fatherName: String(raw.fatherName ?? raw.father_name ?? ''),
     motherName: '',
-    mobileNumber: alumni.mobileNumber ?? '',
-    class: alumni.class ?? alumni.passOutClass ?? '',
-    section: alumni.section,
-    admissionNo: alumni.admissionNo,
-    rollNumber: alumni.rollNumber ?? '',
-    dateOfBirth: alumni.dateOfBirth ?? '',
-    address: alumni.address,
-    photo: alumni.photo,
+    mobileNumber: String(raw.mobileNumber ?? raw.mobile_number ?? ''),
+    class: className,
+    section: raw.section as string | undefined,
+    admissionNo: (raw.admissionNo ?? raw.admission_no) as string | undefined,
+    rollNumber: String(raw.rollNumber ?? raw.roll_number ?? ''),
+    dateOfBirth: String(raw.dateOfBirth ?? raw.date_of_birth ?? ''),
+    address: raw.address as string | undefined,
+    photo: raw.photo as string | undefined,
     status: 'graduated',
   };
 }
