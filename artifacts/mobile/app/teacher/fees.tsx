@@ -10,7 +10,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAuth } from '@/context/AuthContext';
-import { useApp, FeeType, Student, getStudentFeeInfo, isActiveStudent, compareStudentRollNumbers } from '@/context/AppContext';
+import { useApp, FeeType, Student, getStudentFeeInfo, compareStudentRollNumbers } from '@/context/AppContext';
 import { printFeeReceipt, shareReceiptWhatsApp } from '@/utils/receipt';
 import { buildReminderMessage, callStudent, sendReminderSMS, shareReminderImage } from '@/utils/reminder';
 import EmptyState from '@/components/EmptyState';
@@ -74,9 +74,13 @@ export default function TeacherFees() {
   const collectUniqueClasses = useMemo(() =>
     ['All', ...Array.from(new Set(collectableStudents.map(s => s.class))).sort()],
     [collectableStudents]);
+  const remindableStudents = useMemo(
+    () => students.filter(s => s.status !== 'graduated'),
+    [students],
+  );
   const reminderUniqueClasses = useMemo(() =>
-    ['All', ...Array.from(new Set(students.filter(isActiveStudent).map(s => s.class))).sort()],
-    [students]);
+    ['All', ...Array.from(new Set(remindableStudents.map(s => s.class))).sort()],
+    [remindableStudents]);
 
   const filteredStudents = useMemo(() => collectableStudents
     .filter(s => {
@@ -88,16 +92,15 @@ export default function TeacherFees() {
       ? a.class.localeCompare(b.class, undefined, { numeric: true, sensitivity: 'base' }) || compareStudentRollNumbers(a, b)
       : compareStudentRollNumbers(a, b)), [collectableStudents, studentSearch, classFilter]);
 
-  const filteredReminderStudents = useMemo(() => students
+  const filteredReminderStudents = useMemo(() => remindableStudents
     .filter(s => {
-      if (!isActiveStudent(s)) return false;
       const matchSearch = reminderSearch === '' || s.name.toLowerCase().includes(reminderSearch.toLowerCase());
       const matchClass  = reminderClassFilter === 'All' || s.class === reminderClassFilter;
       return matchSearch && matchClass;
     })
     .sort((a, b) => reminderClassFilter === 'All'
       ? a.class.localeCompare(b.class, undefined, { numeric: true, sensitivity: 'base' }) || compareStudentRollNumbers(a, b)
-      : compareStudentRollNumbers(a, b)), [students, reminderSearch, reminderClassFilter]);
+      : compareStudentRollNumbers(a, b)), [remindableStudents, reminderSearch, reminderClassFilter]);
 
   const myCollectionsToday = useMemo(() =>
     feeRecords
