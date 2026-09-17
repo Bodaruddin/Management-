@@ -11,7 +11,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/context/AuthContext';
-import { useApp, Student, alumniToStudent, isGraduatedStudent } from '@/context/AppContext';
+import { useApp, Student, alumniToStudent, isGraduatedStudent, isActiveStudent } from '@/context/AppContext';
 import { SCHOOL_INFO } from '@/constants/schoolInfo';
 import { daysUntilBirthday, isBirthdayToday, extractMMDD } from '@/utils/dateUtils';
 import { sendBirthdayCardWhatsApp, sendReminderWhatsApp } from '@/utils/reminder';
@@ -994,34 +994,47 @@ export default function AdminDashboard() {
   const attendancePct = todayTotal > 0 ? Math.round((todayPresent / todayTotal) * 100) : 0;
 
   // ── Birthdays ──────────────────────────────────────────────────────────────
-  // An alumni row can refer to the same person as an active student row. Keep
-  // the active student when that happens so the dashboard does not show a
-  // duplicate birthday card with an empty class.
+  // An alumni row can refer to the same person as an active student row. Merge
+  // matching people and prefer the record with a class so a stale alumni row
+  // cannot hide the active student's class on the birthday card.
   const birthdayPeople = useMemo(() => {
-    const people = [...students];
-    const studentIds = new Set(students.map(student => student.id));
-    const studentProfiles = new Set(
-      students.map(student => [
-        student.name.trim().toLowerCase(),
-        student.dateOfBirth.trim(),
-        student.rollNumber.trim(),
-      ].join('|')),
-    );
+    const people: Array<{ person: Student; source: 'student' | 'alumni' }> = [];
+    const normalizeName = (name: string) => String(name ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const normalizeRoll = (rollNumber: string) => {
+      const value = String(rollNumber ?? '').trim();
+      return /^\d+$/.test(value) ? String(Number(value)) : value.toLowerCase();
+    };
+    const sameBirthdayPerson = (a: Student, b: Student) => {
+      if (a.id && b.id && a.id === b.id) return true;
+      if (normalizeName(a.name) !== normalizeName(b.name)) return false;
 
-    alumni.forEach(record => {
-      const person = alumniToStudent(record);
-      const profile = [
-        person.name.trim().toLowerCase(),
-        person.dateOfBirth.trim(),
-        person.rollNumber.trim(),
-      ].join('|');
-      if (studentIds.has(person.id) || studentProfiles.has(profile)) return;
-      people.push(person);
-      studentIds.add(person.id);
-      studentProfiles.add(profile);
-    });
+      const aRoll = normalizeRoll(a.rollNumber);
+      const bRoll = normalizeRoll(b.rollNumber);
+      const aBirthday = extractMMDD(a.dateOfBirth);
+      const bBirthday = extractMMDD(b.dateOfBirth);
+      return (aRoll !== '' && bRoll !== '' && aRoll === bRoll)
+        || (!!aBirthday && !!bBirthday && aBirthday === bBirthday);
+    };
+    const rank = (person: Student, source: 'student' | 'alumni') =>
+      (String(person.class ?? '').trim() ? 100 : 0)
+      + (isActiveStudent(person) ? 20 : 0)
+      + (source === 'student' ? 10 : 0);
 
-    return people;
+    const addPerson = (person: Student, source: 'student' | 'alumni') => {
+      const existingIndex = people.findIndex(entry => sameBirthdayPerson(entry.person, person));
+      if (existingIndex === -1) {
+        people.push({ person, source });
+        return;
+      }
+      const existing = people[existingIndex];
+      if (rank(person, source) > rank(existing.person, existing.source)) {
+        people[existingIndex] = { person, source };
+      }
+    };
+
+    students.forEach(student => addPerson(student, 'student'));
+    alumni.forEach(record => addPerson(alumniToStudent(record), 'alumni'));
+    return people.map(entry => entry.person);
   }, [students, alumni]);
 
   const birthdayStudents = useMemo(() =>
