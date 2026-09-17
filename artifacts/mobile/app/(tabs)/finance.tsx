@@ -369,6 +369,7 @@ export default function FinanceScreen() {
         return {
           student,
           received,
+          totalPaid: feeInfo.totalPaid,
           outstanding: feeInfo.remaining,
           payable: feeInfo.finalPayable,
         };
@@ -1149,7 +1150,7 @@ export default function FinanceScreen() {
                 <View>
                   <Text style={[reportModal.resultsTitle, { color: colors.text }]}>Student balances</Text>
                   <Text style={[reportModal.resultsSub, { color: colors.mutedForeground }]}>
-                    {feeReportRange.start} to {feeReportRange.end} · {feeReportRows.length} student{feeReportRows.length === 1 ? '' : 's'}
+                    Total paid · {feeReportRange.start} to {feeReportRange.end} · {feeReportRows.length} student{feeReportRows.length === 1 ? '' : 's'}
                   </Text>
                 </View>
               </View>
@@ -1168,7 +1169,10 @@ export default function FinanceScreen() {
                       </Text>
                     </View>
                     <View style={{ alignItems: 'flex-end', marginLeft: 12 }}>
-                      <Text style={[reportModal.received, { color: colors.success }]}>+{fmt(row.received)}</Text>
+                      <Text style={[reportModal.received, { color: colors.success }]}>Paid {fmt(row.totalPaid)}</Text>
+                      <Text style={[reportModal.periodReceived, { color: colors.mutedForeground }]}>
+                        Period +{fmt(row.received)}
+                      </Text>
                       <Text style={[reportModal.left, { color: row.outstanding > 0 ? colors.destructive : colors.success }]}>
                         Left {fmt(row.outstanding)}
                       </Text>
@@ -1858,6 +1862,7 @@ const reportModal = StyleSheet.create({
   studentName: { fontSize: 13, fontWeight: '800' },
   studentMeta: { fontSize: 11, marginTop: 3 },
   received: { fontSize: 13, fontWeight: '800' },
+  periodReceived: { fontSize: 10, fontWeight: '600', marginTop: 2 },
   left: { fontSize: 11, fontWeight: '700', marginTop: 3 },
 });
 
