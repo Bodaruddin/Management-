@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: school-mg-api
+    runtime: node
+    autoDeploy: true
+    healthCheckPath: /
+    disk:
+      name: school-mgmt-connections
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
+    buildCommand: bash ./render-build.sh
+    startCommand: node --enable-source-maps ./artifacts/api-server/dist/index.mjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RENDER_DATABASE_URL
+        sync: false
+      # Mount a Render persistent disk at this path when using the in-app
+      # database manager. Without a disk, use RENDER_DATABASE_URL instead.
+      - key: CONNECTIONS_FILE
+        value: /opt/render/project/src/data/connections.json

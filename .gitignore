@@ -47,3 +47,14 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Local workspace and agent state
+/.agents/
+/.conversation/
+
+# Local database connection store
+/artifacts/api-server/data/
+
+# Generated artifact drafts and local backups
+/artifacts/api-server/.replit-artifact/artifact.toml.new
+/school mag1.zip

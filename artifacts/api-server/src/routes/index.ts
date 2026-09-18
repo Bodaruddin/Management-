@@ -1,8 +1,48 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import bootstrapRouter from "./bootstrap";
+import dbConnectionsRouter from "./dbConnections";
+import studentsRouter from "./students";
+import teachersRouter from "./teachers";
+import classesRouter from "./classes";
+import sectionsRouter from "./sections";
+import subjectsRouter from "./subjects";
+import attendanceRouter from "./attendance";
+import examsRouter from "./exams";
+import examResultsRouter from "./examResults";
+import markSubmissionsRouter from "./markSubmissions";
+import feeTypesRouter from "./feeTypes";
+import feeRecordsRouter from "./feeRecords";
+import expensesRouter from "./expenses";
+import salaryRecordsRouter from "./salaryRecords";
+import promotionsRouter from "./promotions";
+import alumniRouter from "./alumni";
+import inactivationRequestsRouter from "./inactivationRequests";
+import settingsRouter from "./settings";
+import teacherAttendanceRouter from "./teacherAttendance";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(bootstrapRouter);
+router.use(dbConnectionsRouter);
+router.use(studentsRouter);
+router.use(teachersRouter);
+router.use(classesRouter);
+router.use(sectionsRouter);
+router.use(subjectsRouter);
+router.use(attendanceRouter);
+router.use(examsRouter);
+router.use(examResultsRouter);
+router.use(markSubmissionsRouter);
+router.use(feeTypesRouter);
+router.use(feeRecordsRouter);
+router.use(expensesRouter);
+router.use(salaryRecordsRouter);
+router.use(promotionsRouter);
+router.use(alumniRouter);
+router.use(inactivationRequestsRouter);
+router.use(settingsRouter);
+router.use(teacherAttendanceRouter);
 
 export default router;
