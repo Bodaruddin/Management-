@@ -237,7 +237,11 @@ export default function TeachersScreen() {
                     <Text style={[m.title, { color: colors.text }]}>Teacher Details</Text>
                     <TouchableOpacity onPress={() => setDetailTeacher(null)}><Feather name="x" size={24} color={colors.mutedForeground} /></TouchableOpacity>
                   </View>
-                  <ScrollView style={{ padding: 20 }}>
+                  <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ padding: 20, paddingBottom: 140 }}
+                    showsVerticalScrollIndicator={false}
+                  >
                     {/* Info Card */}
                     <View style={[detail.infoCard, { backgroundColor: colors.secondary }]}>
                       <View style={[detail.bigAvatar, { backgroundColor: colors.primary }]}>

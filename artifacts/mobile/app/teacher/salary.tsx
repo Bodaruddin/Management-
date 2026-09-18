@@ -135,7 +135,7 @@ export default function TeacherSalary() {
       <FlatList
         data={myRecords}
         keyExtractor={i => i.id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: botPad, flexGrow: 1 }}
+         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Math.max(botPad, 36), flexGrow: 1 }}
         ListEmptyComponent={<EmptyState icon="credit-card" title="No Salary Records" subtitle="Your salary history will appear here" />}
         renderItem={({ item }) => (
           <View style={[s.histRow, { backgroundColor: colors.card }]}>

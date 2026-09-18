@@ -875,7 +875,11 @@ export default function FinanceScreen() {
                       <Feather name="x" size={24} color={colors.mutedForeground} />
                     </TouchableOpacity>
                   </View>
-                  <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
+                  <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ padding: 18, paddingBottom: 56 }}
+                    showsVerticalScrollIndicator={false}
+                  >
                     <View style={[salaryModal.profile, { backgroundColor: colors.secondary }]}>
                       <View style={[salaryModal.avatar, { backgroundColor: colors.primary }]}>
                         <Text style={salaryModal.avatarText}>{salaryDetailTeacher.name.charAt(0).toUpperCase()}</Text>
@@ -980,7 +984,11 @@ export default function FinanceScreen() {
               </View>
               <TouchableOpacity onPress={() => setEditingSalary(null)}><Feather name="x" size={24} color={colors.mutedForeground} /></TouchableOpacity>
             </View>
-            <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ padding: 18, paddingBottom: 32 }}
+              keyboardShouldPersistTaps="handled"
+            >
               <Text style={[salaryModal.label, { color: colors.text }]}>Salary month</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 18 }}>
                 {MONTHS.map(month => (
