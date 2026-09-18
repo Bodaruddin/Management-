@@ -678,6 +678,8 @@ export function createPgAdapter(db: DB): DataAdapter {
       },
       async update(id, data: any) {
         const setValues: any = {};
+        if (data.month !== undefined) setValues.month = data.month;
+        if (data.year !== undefined) setValues.year = Number(data.year);
         if (data.status !== undefined) setValues.status = data.status;
         if ("paidDate" in data) setValues.paidDate = data.paidDate ?? null;
         if ("receiptNumber" in data) setValues.receiptNumber = data.receiptNumber ?? null;

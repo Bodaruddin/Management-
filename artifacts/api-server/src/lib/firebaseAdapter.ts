@@ -757,6 +757,8 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
         const existing = await ref.get();
         if (!existing.exists) return null;
         const updates = {
+          ...(data.month !== undefined ? { month: data.month } : {}),
+          ...(data.year !== undefined ? { year: Number(data.year) } : {}),
           status: data.status, paidDate: data.paidDate ?? null,
           receiptNumber: data.receiptNumber ?? null, amount: data.amount,
         };

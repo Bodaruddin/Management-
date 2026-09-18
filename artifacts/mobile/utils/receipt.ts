@@ -423,6 +423,32 @@ export async function printSalarySlip(record: SalaryRecord, teacher?: Teacher, b
   await printOrShare(html, `SalarySlip_${record.teacherName.replace(/\s+/g,'_')}_${record.month}_${record.year}`);
 }
 
+// ─── Public: Send a salary receipt message to the teacher's registered number ──
+export async function shareSalaryReceiptWhatsApp(
+  record: SalaryRecord,
+  teacher: Teacher,
+): Promise<void> {
+  const digits = teacher.mobileNumber.replace(/\D/g, '');
+  if (!digits) {
+    Alert.alert('Mobile number missing', 'Add a registered mobile number for this teacher before sharing the receipt.');
+    return;
+  }
+  const phone = digits.length === 10 ? `91${digits}` : digits;
+  const text = [
+    `Salary receipt for ${record.month} ${record.year}`,
+    `Teacher: ${teacher.name}`,
+    `Amount: ₹${record.amount.toLocaleString('en-IN')}`,
+    `Status: ${record.status === 'paid' ? 'Paid' : 'Pending'}`,
+    record.paidDate ? `Paid date: ${formatDate(record.paidDate)}` : '',
+    record.receiptNumber ? `Receipt: ${record.receiptNumber}` : '',
+  ].filter(Boolean).join('\n');
+  try {
+    await Linking.openURL(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`);
+  } catch {
+    Alert.alert('Unable to open WhatsApp', 'Please check that WhatsApp is installed and try again.');
+  }
+}
+
 // ─── Internal: generate PDF and open share sheet / print dialog ───────────────
 async function printOrShare(html: string, filename: string) {
   if (Platform.OS === 'web') {

@@ -10,9 +10,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { useApp, Student, FeeType, SalaryRecord, getStudentFeeInfo, isActiveStudent, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
+import { useApp, Student, Teacher, FeeType, SalaryRecord, getStudentFeeInfo, isActiveStudent, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
-import { printFeeReceipt, shareReceiptWhatsApp } from '@/utils/receipt';
+import { printFeeReceipt, printSalarySlip, shareReceiptWhatsApp, shareSalaryReceiptWhatsApp } from '@/utils/receipt';
 import { buildReminderMessage, sendReminderSMS, shareReminderImage } from '@/utils/reminder';
 import ReminderCard from '@/components/ReminderCard';
 
@@ -110,7 +110,7 @@ export default function FinanceScreen() {
     students, teachers, feeRecords, addFeeRecord, deleteFeeRecord, documentBranding,
     feeTypes, addFeeType, updateFeeType, deleteFeeType,
     expenses, addExpense, deleteExpense,
-    salaryRecords,
+    salaryRecords, updateSalaryRecord, deleteSalaryRecord,
   } = useApp();
 
   const [tab, setTab] = useState<Tab>('overview');
@@ -163,6 +163,17 @@ export default function FinanceScreen() {
 
   // ── Post-collect receipt modal ──
   const [receiptModal, setReceiptModal] = useState<{ record: any; student: Student } | null>(null);
+
+  // ── Salary details/edit state ──
+  const [salaryDetailTeacher, setSalaryDetailTeacher] = useState<Teacher | null>(null);
+  const [editingSalary, setEditingSalary] = useState<SalaryRecord | null>(null);
+  const [salaryEditForm, setSalaryEditForm] = useState({
+    month: MONTHS[new Date().getMonth()],
+    year: String(new Date().getFullYear()),
+    amount: '',
+    paidDate: '',
+    status: 'paid' as SalaryRecord['status'],
+  });
 
   // ── Date helpers ─────────────────────────────────────────────────────────
   const now = new Date();
@@ -257,6 +268,15 @@ export default function FinanceScreen() {
     [periodSalaryRecords],
   );
   const paidSalaryCount = periodSalaryRecords.filter(r => r.status === 'paid').length;
+  const salaryTeacherRows = useMemo(() => {
+    const rows = teachers
+      .map(teacher => ({
+        teacher,
+        records: periodSalaryRecords.filter(record => record.teacherId === teacher.id),
+      }))
+      .filter(row => row.records.length > 0);
+    return rows;
+  }, [teachers, periodSalaryRecords]);
 
   // ── Weekly chart data (always current month) ─────────────────────────────
   const weeklyChartData = useMemo(() => {
@@ -463,6 +483,49 @@ export default function FinanceScreen() {
   };
   const confirmDeleteExpense = (id: string, desc: string) => {
     setConfirmModal({ title: 'Delete Expense', message: `Delete "${desc}"?`, onConfirm: async () => { await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); deleteExpense(id); } });
+  };
+
+  // ── Salary detail/edit handlers ───────────────────────────────────────────
+  const openSalaryDetails = (teacher: Teacher) => {
+    setSalaryDetailTeacher(teacher);
+  };
+
+  const openSalaryEdit = (record: SalaryRecord) => {
+    setEditingSalary(record);
+    setSalaryEditForm({
+      month: record.month,
+      year: String(record.year),
+      amount: String(record.amount),
+      paidDate: record.paidDate ?? '',
+      status: record.status,
+    });
+  };
+
+  const handleSaveSalaryEdit = async () => {
+    if (!editingSalary) return;
+    const amount = Number(salaryEditForm.amount);
+    const year = Number(salaryEditForm.year);
+    if (!MONTHS.includes(salaryEditForm.month) || !Number.isInteger(year) || year < 2000 || year > 2200) {
+      Alert.alert('Validation', 'Choose a valid salary month and year.');
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      Alert.alert('Validation', 'Enter a valid salary amount.');
+      return;
+    }
+    if (salaryEditForm.status === 'paid' && !/^\d{4}-\d{2}-\d{2}$/.test(salaryEditForm.paidDate)) {
+      Alert.alert('Validation', 'Enter the payment date as YYYY-MM-DD.');
+      return;
+    }
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    updateSalaryRecord(editingSalary.id, {
+      month: salaryEditForm.month,
+      year,
+      amount,
+      status: salaryEditForm.status,
+      paidDate: salaryEditForm.status === 'paid' ? salaryEditForm.paidDate : undefined,
+    });
+    setEditingSalary(null);
   };
 
   const botPad = Platform.OS === 'web' ? 84 : insets.bottom + 80;
@@ -690,8 +753,8 @@ export default function FinanceScreen() {
          ══════════════════════════════════════════════════════════════════════ */}
       {tab === 'salary' && (
         <FlatList
-          data={periodSalaryRecords}
-          keyExtractor={item => item.id}
+          data={salaryTeacherRows}
+          keyExtractor={item => item.teacher.id}
           contentContainerStyle={{ padding: 16, paddingBottom: botPad, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={(
@@ -732,54 +795,257 @@ export default function FinanceScreen() {
                 <View>
                   <Text style={[s.sectionTitle, { color: colors.text }]}>Payment History</Text>
                   <Text style={[s.sectionSub, { marginTop: 3 }]}>
-                    {periodSalaryRecords.length ? 'Latest salary payments' : 'No salary payments for this period'}
+                     {salaryTeacherRows.length ? 'Tap a teacher to view complete salary history' : 'No salary payments for this period'}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={[salary.manageBtn, { borderColor: colors.primary + '50', backgroundColor: colors.primary + '0D' }]}
-                  onPress={() => Alert.alert('Manage salary', 'Add or remove salary payments from the Teachers section.')}
-                  activeOpacity={0.8}
-                >
-                  <Feather name="arrow-up-right" size={14} color={colors.primary} />
-                  <Text style={[salary.manageText, { color: colors.primary }]}>Manage</Text>
-                </TouchableOpacity>
+                 <View style={[salary.manageBtn, { borderColor: colors.primary + '50', backgroundColor: colors.primary + '0D' }]}>
+                   <Feather name="users" size={14} color={colors.primary} />
+                   <Text style={[salary.manageText, { color: colors.primary }]}>{salaryTeacherRows.length} teacher{salaryTeacherRows.length === 1 ? '' : 's'}</Text>
+                 </View>
               </View>
             </View>
           )}
-          ListEmptyComponent={<EmptyState icon="briefcase" title="No Salary Payments" subtitle="Salary payments will appear here after they are recorded for teachers." />}
-          renderItem={({ item }) => {
-            const isPaid = item.status === 'paid';
+           ListEmptyComponent={<EmptyState icon="briefcase" title="No Salary Payments" subtitle="Salary payments will appear here after they are recorded for teachers." />}
+           renderItem={({ item }) => {
+             const paid = item.records.filter(record => record.status === 'paid');
+             const pending = item.records.filter(record => record.status === 'pending');
+             const paidTotal = paid.reduce((sum, record) => sum + record.amount, 0);
+             const pendingTotal = pending.reduce((sum, record) => sum + record.amount, 0);
+             const latest = item.records[0];
             return (
-              <View style={salary.recordCard}>
-                <View style={[salary.recordIcon, { backgroundColor: isPaid ? colors.success + '15' : colors.warning + '18' }]}>
-                  <Feather name={isPaid ? 'check' : 'clock'} size={17} color={isPaid ? colors.success : colors.warning} />
-                </View>
+               <TouchableOpacity style={salary.teacherCard} onPress={() => openSalaryDetails(item.teacher)} activeOpacity={0.85}>
+                 <View style={[salary.teacherAvatar, { backgroundColor: colors.primary + '16' }]}>
+                   <Text style={[salary.teacherAvatarText, { color: colors.primary }]}>{item.teacher.name.charAt(0).toUpperCase()}</Text>
+                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[salary.teacherName, { color: colors.text }]} numberOfLines={1}>{item.teacherName || 'Teacher'}</Text>
+                   <Text style={[salary.teacherName, { color: colors.text }]} numberOfLines={1}>{item.teacher.name}</Text>
                   <Text style={[salary.recordMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
-                    {item.month} {item.year} · {isPaid ? `Paid ${item.paidDate ?? '—'}` : 'Payment pending'}
+                     {item.teacher.subject} · {item.records.length} payment{item.records.length === 1 ? '' : 's'}
                   </Text>
-                  {item.receiptNumber ? (
+                   <Text style={[salary.recordMeta, { color: colors.mutedForeground }]} numberOfLines={1}>
+                     Latest: {latest.month} {latest.year} · {paid.length} paid{pending.length ? ` · ${pending.length} pending` : ''}
+                   </Text>
+                   {item.teacher.mobileNumber ? (
                     <Text style={[salary.receipt, { color: colors.mutedForeground }]} numberOfLines={1}>
-                      Receipt {item.receiptNumber}
+                       {item.teacher.mobileNumber}
                     </Text>
                   ) : null}
                 </View>
                 <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
-                  <Text style={[salary.amount, { color: isPaid ? colors.success : colors.warning }]}>
-                    ₹{item.amount.toLocaleString('en-IN')}
+                   <Text style={[salary.amount, { color: colors.success }]}>
+                     ₹{paidTotal.toLocaleString('en-IN')}
                   </Text>
-                  <View style={[salary.statusBadge, { backgroundColor: isPaid ? colors.success + '16' : colors.warning + '18' }]}>
-                    <Text style={{ color: isPaid ? colors.success : colors.warning, fontSize: 10, fontWeight: '800' }}>
-                      {isPaid ? 'PAID' : 'PENDING'}
+                   <Text style={{ color: colors.mutedForeground, fontSize: 10, marginBottom: 5 }}>
+                     paid
+                   </Text>
+                   {pendingTotal > 0 && (
+                     <Text style={{ color: colors.warning, fontSize: 11, fontWeight: '700' }}>
+                       ₹{pendingTotal.toLocaleString('en-IN')} pending
                     </Text>
-                  </View>
+                   )}
+                   <Feather name="chevron-right" size={17} color={colors.mutedForeground} />
                 </View>
-              </View>
+               </TouchableOpacity>
             );
           }}
         />
       )}
+
+      {/* ════ Salary Teacher Details Modal ════ */}
+      <Modal visible={!!salaryDetailTeacher} animationType="slide" transparent>
+        <View style={salaryModal.overlay}>
+          <View style={[salaryModal.sheet, { backgroundColor: colors.card }]}>
+            {salaryDetailTeacher && (() => {
+              const history = salaryRecords
+                .filter(record => record.teacherId === salaryDetailTeacher.id)
+                .sort(compareSalaryRecordsNewestFirst);
+              const paid = history.filter(record => record.status === 'paid');
+              const totalPaid = paid.reduce((sum, record) => sum + record.amount, 0);
+              const totalPending = history
+                .filter(record => record.status === 'pending')
+                .reduce((sum, record) => sum + record.amount, 0);
+              return (
+                <>
+                  <View style={[salaryModal.header, { borderBottomColor: colors.border }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[salaryModal.title, { color: colors.text }]}>Salary Details</Text>
+                      <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 3 }}>Complete payment history</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setSalaryDetailTeacher(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Feather name="x" size={24} color={colors.mutedForeground} />
+                    </TouchableOpacity>
+                  </View>
+                  <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 28 }} showsVerticalScrollIndicator={false}>
+                    <View style={[salaryModal.profile, { backgroundColor: colors.secondary }]}>
+                      <View style={[salaryModal.avatar, { backgroundColor: colors.primary }]}>
+                        <Text style={salaryModal.avatarText}>{salaryDetailTeacher.name.charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[salaryModal.name, { color: colors.text }]}>{salaryDetailTeacher.name}</Text>
+                        <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>{salaryDetailTeacher.subject}</Text>
+                        <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 4 }}>
+                          {salaryDetailTeacher.mobileNumber || 'No registered mobile number'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={salaryModal.stats}>
+                      {[
+                        { label: 'Monthly salary', value: `₹${salaryDetailTeacher.salary.toLocaleString('en-IN')}`, color: colors.text },
+                        { label: 'Total paid', value: `₹${totalPaid.toLocaleString('en-IN')}`, color: colors.success },
+                        { label: 'Pending', value: `₹${totalPending.toLocaleString('en-IN')}`, color: totalPending > 0 ? colors.warning : colors.mutedForeground },
+                      ].map(stat => (
+                        <View key={stat.label} style={[salaryModal.stat, { backgroundColor: colors.muted }]}>
+                          <Text style={{ color: colors.mutedForeground, fontSize: 10, fontWeight: '700' }}>{stat.label}</Text>
+                          <Text style={{ color: stat.color, fontSize: 14, fontWeight: '800', marginTop: 4 }}>{stat.value}</Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    <View style={salaryModal.historyTitle}>
+                      <View>
+                        <Text style={[s.sectionTitle, { color: colors.text }]}>Salary History</Text>
+                        <Text style={[s.sectionSub, { marginTop: 3 }]}>{history.length} record{history.length === 1 ? '' : 's'} across all periods</Text>
+                      </View>
+                    </View>
+                    {history.length === 0 && (
+                      <Text style={{ color: colors.mutedForeground, fontSize: 13, paddingVertical: 12 }}>No salary records yet.</Text>
+                    )}
+                    {history.map(record => {
+                      const isPaid = record.status === 'paid';
+                      return (
+                        <View key={record.id} style={[salaryModal.historyRow, { borderBottomColor: colors.border }]}>
+                          <View style={[salaryModal.historyIcon, { backgroundColor: isPaid ? colors.success + '18' : colors.warning + '18' }]}>
+                            <Feather name={isPaid ? 'check' : 'clock'} size={15} color={isPaid ? colors.success : colors.warning} />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ color: colors.text, fontSize: 14, fontWeight: '700' }}>{record.month} {record.year}</Text>
+                            <Text style={{ color: colors.mutedForeground, fontSize: 11, marginTop: 3 }}>
+                              {isPaid ? `Paid ${record.paidDate ?? '—'}` : 'Payment pending'}
+                            </Text>
+                            {record.receiptNumber && (
+                              <Text style={{ color: colors.mutedForeground, fontSize: 10, marginTop: 2 }}>Receipt {record.receiptNumber}</Text>
+                            )}
+                          </View>
+                          <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                            <Text style={{ color: isPaid ? colors.success : colors.warning, fontSize: 15, fontWeight: '800' }}>
+                              ₹{record.amount.toLocaleString('en-IN')}
+                            </Text>
+                            <View style={{ flexDirection: 'row', gap: 11, alignItems: 'center', marginTop: 8 }}>
+                              {isPaid && (
+                                <>
+                                  <TouchableOpacity onPress={() => printSalarySlip(record, salaryDetailTeacher, documentBranding)} hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }} accessibilityLabel="Download or print salary receipt">
+                                    <Feather name="download" size={15} color={colors.primary} />
+                                  </TouchableOpacity>
+                                  <TouchableOpacity onPress={() => shareSalaryReceiptWhatsApp(record, salaryDetailTeacher)} hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }} accessibilityLabel="Share salary receipt to teacher's mobile">
+                                    <Feather name="message-circle" size={15} color="#25D366" />
+                                  </TouchableOpacity>
+                                </>
+                              )}
+                              <TouchableOpacity onPress={() => openSalaryEdit(record)} hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }} accessibilityLabel="Edit salary record">
+                                <Feather name="edit-2" size={15} color={colors.primary} />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                onPress={() => setConfirmModal({
+                                  title: 'Delete Salary Record',
+                                  message: `Delete ${record.month} ${record.year} salary for ${salaryDetailTeacher.name}?`,
+                                  onConfirm: () => deleteSalaryRecord(record.id),
+                                })}
+                                hitSlop={{ top: 7, bottom: 7, left: 7, right: 7 }}
+                                accessibilityLabel="Delete salary record"
+                              >
+                                <Feather name="trash-2" size={15} color={colors.destructive} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              );
+            })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* ════ Edit Salary Record Modal ════ */}
+      <Modal visible={!!editingSalary} animationType="slide" transparent>
+        <KeyboardAvoidingView style={salaryModal.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[salaryModal.sheet, { backgroundColor: colors.card, maxHeight: '90%' }]}>
+            <View style={[salaryModal.header, { borderBottomColor: colors.border }]}>
+              <View>
+                <Text style={[salaryModal.title, { color: colors.text }]}>Edit Salary Record</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 3 }}>{editingSalary?.teacherName}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setEditingSalary(null)}><Feather name="x" size={24} color={colors.mutedForeground} /></TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 18, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+              <Text style={[salaryModal.label, { color: colors.text }]}>Salary month</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 18 }}>
+                {MONTHS.map(month => (
+                  <TouchableOpacity
+                    key={month}
+                    style={[salaryModal.monthPill, { borderColor: salaryEditForm.month === month ? colors.primary : colors.border, backgroundColor: salaryEditForm.month === month ? colors.primary + '14' : colors.card }]}
+                    onPress={() => setSalaryEditForm(form => ({ ...form, month }))}
+                  >
+                    <Text style={{ color: salaryEditForm.month === month ? colors.primary : colors.text, fontSize: 12, fontWeight: '700' }}>{month.slice(0, 3)}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Text style={[salaryModal.label, { color: colors.text }]}>Year</Text>
+              <TextInput
+                style={[salaryModal.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border }]}
+                value={salaryEditForm.year}
+                onChangeText={year => setSalaryEditForm(form => ({ ...form, year: year.replace(/\D/g, '').slice(0, 4) }))}
+                keyboardType="number-pad"
+                placeholder="YYYY"
+                placeholderTextColor={colors.mutedForeground}
+              />
+              <Text style={[salaryModal.label, { color: colors.text }]}>Amount (₹)</Text>
+              <TextInput
+                style={[salaryModal.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border }]}
+                value={salaryEditForm.amount}
+                onChangeText={amount => setSalaryEditForm(form => ({ ...form, amount: amount.replace(/\D/g, '') }))}
+                keyboardType="number-pad"
+                placeholder="Amount"
+                placeholderTextColor={colors.mutedForeground}
+              />
+              <Text style={[salaryModal.label, { color: colors.text }]}>Payment date</Text>
+              <TextInput
+                style={[salaryModal.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border }]}
+                value={salaryEditForm.paidDate}
+                onChangeText={paidDate => setSalaryEditForm(form => ({ ...form, paidDate }))}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={colors.mutedForeground}
+              />
+              <Text style={[salaryModal.label, { color: colors.text }]}>Status</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 20 }}>
+                {(['paid', 'pending'] as const).map(status => (
+                  <TouchableOpacity
+                    key={status}
+                    style={[salaryModal.statusOption, { borderColor: salaryEditForm.status === status ? (status === 'paid' ? colors.success : colors.warning) : colors.border, backgroundColor: salaryEditForm.status === status ? (status === 'paid' ? colors.success + '12' : colors.warning + '12') : colors.card }]}
+                    onPress={() => setSalaryEditForm(form => ({ ...form, status }))}
+                  >
+                    <Text style={{ color: salaryEditForm.status === status ? (status === 'paid' ? colors.success : colors.warning) : colors.text, fontWeight: '700', fontSize: 13 }}>
+                      {status === 'paid' ? 'Paid' : 'Pending'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+            <View style={[salaryModal.footer, { borderTopColor: colors.border }]}>
+              <TouchableOpacity style={[salaryModal.footerBtn, { borderColor: colors.border }]} onPress={() => setEditingSalary(null)}>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[salaryModal.footerBtn, { flex: 2, backgroundColor: colors.primary }]} onPress={handleSaveSalaryEdit}>
+                <Feather name="check" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '800' }}>Save Changes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* ══════════════════════════════════════════════════════════════════════
           FEE COLLECTION TAB
@@ -1823,6 +2089,43 @@ const salary = StyleSheet.create({
   receipt: { fontSize: 10, marginTop: 3 },
   amount: { fontSize: 15, fontWeight: '800', marginBottom: 5 },
   statusBadge: { borderRadius: 12, paddingHorizontal: 7, paddingVertical: 3 },
+  teacherCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#0C1F4A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 5,
+    elevation: 1,
+  },
+  teacherAvatar: { width: 43, height: 43, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginRight: 11 },
+  teacherAvatarText: { fontSize: 18, fontWeight: '800' },
+});
+
+const salaryModal = StyleSheet.create({
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 22, borderTopRightRadius: 22, maxHeight: '94%', minHeight: '55%' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderBottomWidth: 1 },
+  title: { fontSize: 19, fontWeight: '800' },
+  profile: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 16, gap: 12, marginBottom: 14 },
+  avatar: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: 22, fontWeight: '800' },
+  name: { fontSize: 17, fontWeight: '800' },
+  stats: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  stat: { flex: 1, borderRadius: 12, padding: 10, minHeight: 62 },
+  historyTitle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
+  historyRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 13, borderBottomWidth: 1 },
+  historyIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  label: { fontSize: 13, fontWeight: '700', marginBottom: 8 },
+  input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, marginBottom: 16 },
+  monthPill: { borderWidth: 1, borderRadius: 18, paddingHorizontal: 13, paddingVertical: 9 },
+  statusOption: { flex: 1, borderWidth: 1, borderRadius: 12, alignItems: 'center', paddingVertical: 13 },
+  footer: { flexDirection: 'row', gap: 10, padding: 16, borderTopWidth: 1 },
+  footerBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 14 },
 });
 
 const mo = StyleSheet.create({

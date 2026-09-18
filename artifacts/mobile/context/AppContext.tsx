@@ -402,23 +402,19 @@ export interface Alumni {
 }
 
 export function alumniToStudent(alumni: Alumni): Student {
-  const raw = alumni as Alumni & Record<string, unknown>;
-  const className = String(raw.class ?? '').trim()
-    || String(raw.passOutClass ?? raw.pass_out_class ?? '').trim();
-  const name = String(raw.name ?? raw.studentName ?? raw.student_name ?? '').trim();
   return {
-    id: String(raw.studentId ?? raw.student_id ?? raw.id),
-    name,
-    fatherName: String(raw.fatherName ?? raw.father_name ?? ''),
+    id: alumni.studentId ?? alumni.id,
+    name: alumni.name,
+    fatherName: alumni.fatherName ?? '',
     motherName: '',
-    mobileNumber: String(raw.mobileNumber ?? raw.mobile_number ?? ''),
-    class: className,
-    section: raw.section as string | undefined,
-    admissionNo: (raw.admissionNo ?? raw.admission_no) as string | undefined,
-    rollNumber: String(raw.rollNumber ?? raw.roll_number ?? ''),
-    dateOfBirth: String(raw.dateOfBirth ?? raw.date_of_birth ?? ''),
-    address: raw.address as string | undefined,
-    photo: raw.photo as string | undefined,
+    mobileNumber: alumni.mobileNumber ?? '',
+    class: alumni.class ?? alumni.passOutClass ?? '',
+    section: alumni.section,
+    admissionNo: alumni.admissionNo,
+    rollNumber: alumni.rollNumber ?? '',
+    dateOfBirth: alumni.dateOfBirth ?? '',
+    address: alumni.address,
+    photo: alumni.photo,
     status: 'graduated',
   };
 }
@@ -495,6 +491,7 @@ interface AppContextType extends AppState {
   deleteExpense: (id: string) => void;
   updateSalaryStatus: (teacherId: string, month: string, year: number, status: 'paid' | 'pending') => SalaryRecord;
   addSalaryRecord: (r: Omit<SalaryRecord, 'id'>) => SalaryRecord;
+  updateSalaryRecord: (id: string, changes: Partial<SalaryRecord>) => SalaryRecord | undefined;
   deleteSalaryRecord: (id: string) => void;
   promoteStudent: (studentId: string, toClass: string, promotedBy: string) => void;
   bulkPromoteClass: (fromClass: string, toClass: string, promotedBy: string) => number;
@@ -1365,6 +1362,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return nr;
   }, []);
 
+  const updateSalaryRecord = useCallback((id: string, changes: Partial<SalaryRecord>): SalaryRecord | undefined => {
+    let updated: SalaryRecord | undefined;
+    setState(prev => {
+      const existing = prev.salaryRecords.find(record => record.id === id);
+      if (!existing) return prev;
+      updated = { ...existing, ...changes };
+      apiPut(`/salary-records/${id}`, changes).catch(console.error);
+      return {
+        ...prev,
+        salaryRecords: prev.salaryRecords.map(record => record.id === id ? updated! : record),
+      };
+    });
+    return updated;
+  }, []);
+
   const deleteSalaryRecord = useCallback((id: string) => {
     setState(prev => ({ ...prev, salaryRecords: prev.salaryRecords.filter(x => x.id !== id) }));
     apiDelete(`/salary-records/${id}`).catch(console.error);
@@ -1704,7 +1716,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addFeeRecord, deleteFeeRecord,
       updateFeeRecord,
       addExpense, deleteExpense,
-      updateSalaryStatus, addSalaryRecord, deleteSalaryRecord,
+      updateSalaryStatus, addSalaryRecord, updateSalaryRecord, deleteSalaryRecord,
       promoteStudent, bulkPromoteClass,
       submitInactivationRequest, approveInactivationRequest, rejectInactivationRequest,
       deleteInactivationRequestDocument, deleteInactivationRequest,
