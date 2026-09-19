@@ -222,7 +222,7 @@ export default function TeachersScreen() {
       {/* ════ Teacher Detail Modal ════ */}
       <Modal visible={!!detailTeacher} animationType="slide" transparent>
         <View style={m.overlay}>
-          <View style={[m.sheet, { backgroundColor: colors.card }]}>
+          <View style={[m.sheet, m.detailSheet, { backgroundColor: colors.card }]}>
             {detailTeacher && (() => {
               const sal = getCurrentSalary(detailTeacher.id);
               const salHistory = salaryRecords
@@ -439,6 +439,7 @@ export default function TeachersScreen() {
                 { key: 'manageResults' as const, label: 'Can Manage Results', desc: 'Allow viewing & entering student marks' },
                 { key: 'allowMarkEdit' as const, label: 'Allow Mark Edit', desc: 'Allow editing submitted marks' },
                 { key: 'promoteStudents' as const, label: 'Can Promote Students', desc: 'Allow promoting students to next class' },
+                { key: 'reEnrollFace' as const, label: 'Re-enroll Face Permission', desc: 'Allow one face profile replacement; revokes automatically after success' },
               ]).map(p => (
                 <View key={p.key} style={{ marginBottom: 16, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: colors.muted }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -618,6 +619,7 @@ const sal_ = StyleSheet.create({
 const m = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '95%' },
+  detailSheet: { height: '92%' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
   title: { fontSize: 18, fontWeight: '700' },
   sectionLabel: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
