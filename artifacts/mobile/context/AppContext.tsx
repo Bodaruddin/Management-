@@ -457,7 +457,7 @@ interface AppContextType extends AppState {
   addStudent: (s: Omit<Student, 'id'>) => Promise<Student>;
   updateStudent: (id: string, s: Partial<Student>) => Promise<void>;
   deleteStudent: (id: string) => void;
-  addTeacher: (t: Omit<Teacher, 'id'>) => void;
+  addTeacher: (t: Omit<Teacher, 'id'>) => Promise<Teacher>;
   updateTeacher: (id: string, t: Partial<Teacher>) => void;
   refreshTeachers: () => Promise<void>;
   deleteTeacher: (id: string) => void;
@@ -1029,12 +1029,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // ── Teachers ──
-  const addTeacher = useCallback((t: Omit<Teacher, 'id'>) => {
+  const addTeacher = useCallback(async (t: Omit<Teacher, 'id'>): Promise<Teacher> => {
     const nt: Teacher = { ...t, id: genId() };
     setState(prev => ({ ...prev, teachers: [...prev.teachers, nt] }));
-    apiPost('/teachers', nt).then(row => {
-      setState(prev => ({ ...prev, teachers: prev.teachers.map(x => x.id === nt.id ? mapTeacher(row as any) : x) }));
-    }).catch(console.error);
+    try {
+      const row = await apiPost('/teachers', nt);
+      const saved = mapTeacher(row as any);
+      setState(prev => ({ ...prev, teachers: prev.teachers.map(x => x.id === nt.id ? saved : x) }));
+      return saved;
+    } catch (error) {
+      setState(prev => ({ ...prev, teachers: prev.teachers.filter(x => x.id !== nt.id) }));
+      throw error;
+    }
   }, []);
 
   const updateTeacher = useCallback((id: string, t: Partial<Teacher>) => {

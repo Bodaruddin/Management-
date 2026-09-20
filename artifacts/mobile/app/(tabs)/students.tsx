@@ -148,6 +148,7 @@ export default function StudentsScreen({ teacherMode = false }: { teacherMode?: 
   const [showFeeDetail, setShowFeeDetail] = useState<Student | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Student | null>(null);
   const [showValidationAlert, setShowValidationAlert] = useState(false);
+  const [showStudentSuccess, setShowStudentSuccess] = useState(false);
 
   // Section manager state
   const [newSectionName, setNewSectionName] = useState('');
@@ -220,6 +221,10 @@ export default function StudentsScreen({ teacherMode = false }: { teacherMode?: 
       if (editing) await updateStudent(editing.id, studentData);
       else await addStudent(studentData);
       setShowModal(false);
+      if (!editing) {
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setShowStudentSuccess(true);
+      }
     } catch (error: any) {
       Alert.alert('Save failed', error?.message ?? 'Could not save the student to the database.');
     }
@@ -1015,6 +1020,15 @@ export default function StudentsScreen({ teacherMode = false }: { teacherMode?: 
         title="Validation"
         message="Please fill all required fields (Name, Father Name, Class, Roll Number)"
         onDismiss={() => setShowValidationAlert(false)}
+      />
+      <PremiumAlert
+        visible={showStudentSuccess}
+        variant="success"
+        title="Student added successfully"
+        message={teacherMode
+          ? 'The new student is now available in your school records.'
+          : 'The new student has been added to your school records.'}
+        onDismiss={() => setShowStudentSuccess(false)}
       />
     </View>
   );

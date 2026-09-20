@@ -11,6 +11,7 @@ import { useColors } from '@/hooks/useColors';
 import { useApp, Teacher, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
 import SalarySuccessModal from '@/components/SalarySuccessModal';
+import PremiumAlert from '@/components/PremiumAlert';
 import { printSalarySlip as printSalaryReceipt } from '@/utils/receipt';
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -69,6 +70,7 @@ export default function TeachersScreen() {
   const [confirmDelete, setConfirmDelete] = useState<Teacher | null>(null);
   const [confirmDeleteSalaryId, setConfirmDeleteSalaryId] = useState<string | null>(null);
   const [salarySuccess, setSalarySuccess] = useState<{ name: string; month: string; year: string; amount: number; paidDate: string; rec: any; teacher: Teacher } | null>(null);
+  const [showTeacherSuccess, setShowTeacherSuccess] = useState(false);
 
   const now = new Date();
   const curMonth = MONTH_NAMES[now.getMonth()];
@@ -98,9 +100,18 @@ export default function TeachersScreen() {
     }
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const data = { name: form.name.trim(), subject: form.subject.trim(), mobileNumber: form.mobileNumber.trim(), salary: monthlySalary, username: form.username.trim(), password: form.password, joinDate: editing?.joinDate ?? new Date().toISOString().split('T')[0], permissions: form.permissions, photo: form.photo };
-    if (editing) updateTeacher(editing.id, data);
-    else addTeacher(data);
-    setShowModal(false);
+    try {
+      if (editing) {
+        updateTeacher(editing.id, data);
+      } else {
+        await addTeacher(data);
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setShowTeacherSuccess(true);
+      }
+      setShowModal(false);
+    } catch (error: any) {
+      Alert.alert('Save failed', error?.message ?? 'Could not save the teacher to the database.');
+    }
   };
 
   const handleDelete = (t: Teacher) => {
@@ -556,6 +567,13 @@ export default function TeachersScreen() {
           if (salarySuccess) printSalaryReceipt(salarySuccess.rec, salarySuccess.teacher, documentBranding);
           setSalarySuccess(null);
         }}
+      />
+      <PremiumAlert
+        visible={showTeacherSuccess}
+        variant="success"
+        title="Teacher added successfully"
+        message="The new teacher account is ready in your school records."
+        onDismiss={() => setShowTeacherSuccess(false)}
       />
 
       {/* Month Picker */}
