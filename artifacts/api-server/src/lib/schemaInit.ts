@@ -105,6 +105,19 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at  TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
 
+-- Older databases created app_settings without updated_at. Keep the
+-- idempotent bootstrap compatible with those databases because the current
+-- Drizzle queries select this column on every settings lookup.
+ALTER TABLE app_settings
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+UPDATE app_settings
+SET updated_at = NOW()
+WHERE updated_at IS NULL;
+ALTER TABLE app_settings
+  ALTER COLUMN updated_at SET DEFAULT NOW();
+ALTER TABLE app_settings
+  ALTER COLUMN updated_at SET NOT NULL;
+
 CREATE TABLE IF NOT EXISTS subjects (
   id         TEXT PRIMARY KEY DEFAULT gen_random_uuid(),
   name       TEXT NOT NULL UNIQUE,
