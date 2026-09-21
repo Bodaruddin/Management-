@@ -4,14 +4,17 @@ import {
   getStudentHolidayStatus,
   syncStudentHolidayAttendance,
 } from "../lib/studentHolidayAttendance.js";
+import { logger } from "../lib/logger.js";
 
 const router = Router();
 
 router.get("/attendance", async (_req, res) => {
   const adapter = getAdapter();
-  await syncStudentHolidayAttendance(adapter);
   const rows = await adapter.attendance.list();
   res.json(rows);
+  void syncStudentHolidayAttendance(adapter).catch((error) => {
+    logger.warn({ error }, "Background student holiday attendance sync failed");
+  });
 });
 
 router.post("/attendance", async (req, res) => {

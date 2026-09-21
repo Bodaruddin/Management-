@@ -10,6 +10,7 @@ A mobile-first school administration app for managing students, teachers, attend
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
 - Required secret: `RENDER_DATABASE_URL` — hosted PostgreSQL connection string
+- Supabase deployments may use `SUPABASE_DATABASE_URL` or `SUPABASE_DB_URL` instead
 - Required secret for Expo builds: `EXPO_TOKEN` — stored securely in Replit Secrets
 
 ## Stack

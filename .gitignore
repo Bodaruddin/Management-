@@ -47,3 +47,7 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Runtime database connection state contains encrypted credentials and must not
+# be committed to source control.
+/artifacts/api-server/data/connections.json

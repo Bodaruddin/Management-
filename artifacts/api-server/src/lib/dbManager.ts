@@ -159,7 +159,22 @@ function buildDrizzle(pool: pg.Pool): NodePgDatabase<typeof schema> {
 
 
 function getEnvironmentDatabaseUrl(): string | undefined {
-  return process.env.RENDER_DATABASE_URL ?? process.env.APP_DATABASE_URL ?? process.env.DATABASE_URL;
+  return (
+    process.env.RENDER_DATABASE_URL ??
+    process.env.APP_DATABASE_URL ??
+    process.env.SUPABASE_DATABASE_URL ??
+    process.env.SUPABASE_DB_URL ??
+    process.env.DATABASE_URL
+  );
+}
+
+function isEncryptedValueError(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string } | null;
+  const message = candidate?.message ?? "";
+  return (
+    candidate?.code === "ERR_OSSL_BAD_DECRYPT" ||
+    /bad decrypt|invalid encrypted value/i.test(message)
+  );
 }
 
 async function loadRemoteStore(envUrl: string): Promise<ConnectionsStore | null> {
@@ -238,7 +253,7 @@ export async function initDbManager(): Promise<void> {
   // This survives Render restarts even when its persistent disk is unavailable.
   const remoteStore = envUrl ? await loadRemoteStore(envUrl) : null;
   const store = remoteStore ?? localStore;
-  if (managerStorePool) await await saveStore(store);
+  if (managerStorePool) await saveStore(store);
 
   // An explicit selection is authoritative. Never silently switch a configured
   // Supabase/Firebase connection back to the Render environment database just
@@ -247,11 +262,38 @@ export async function initDbManager(): Promise<void> {
     const conn = store.connections.find((c) => c.id === store.activeId);
     if (!conn) {
       logger.error({ id: store.activeId }, "DB Manager: saved active connection was not found; refusing env fallback");
+      store.activeId = null;
+      await saveStore(store);
       return;
     }
+
+    // The environment connection is a mirror of the configured environment
+    // variable, not an independent credential. Re-encrypt it on startup so a
+    // changed SESSION_SECRET or a stale checked-in connections.json cannot
+    // prevent a valid Supabase/hosted database URL from being used.
+    if (conn.id === "env" && conn.dbType === "postgresql" && envUrl) {
+      const { host, dbName } = parseDisplayInfo(envUrl);
+      const refreshedConn: StoredConnectionPg = {
+        ...conn,
+        encryptedUrl: encrypt(envUrl),
+        host,
+        dbName,
+        updatedAt: new Date().toISOString(),
+      };
+      const connIndex = store.connections.findIndex((candidate) => candidate.id === conn.id);
+      store.connections[connIndex] = refreshedConn;
+      await saveStore(store);
+    }
+
     try {
-      await activateConnectionInternal(conn, store, false);
-      logger.info({ id: conn.id, name: conn.name, dbType: conn.dbType }, "DB Manager: restored saved connection");
+      const activeConn = store.connections.find((candidate) => candidate.id === store.activeId);
+      if (!activeConn) {
+        store.activeId = null;
+        await saveStore(store);
+        return;
+      }
+      await activateConnectionInternal(activeConn, store, false);
+      logger.info({ id: activeConn.id, name: activeConn.name, dbType: activeConn.dbType }, "DB Manager: restored saved connection");
       return;
     } catch (e) {
       logger.error(
@@ -260,6 +302,17 @@ export async function initDbManager(): Promise<void> {
       );
       if (conn.dbType === "postgresql") await destroyPool(conn.id);
       else await destroyFirebase(conn.id);
+      // A connection encrypted with an old SESSION_SECRET cannot ever be
+      // tested or activated. Clear only the selection, retain the record so
+      // the Database Manager can update it with the user's current URL.
+      if (isEncryptedValueError(e)) {
+        store.activeId = null;
+        await saveStore(store);
+        logger.warn(
+          { id: conn.id, name: conn.name },
+          "DB Manager: cleared stale active connection encrypted with a different SESSION_SECRET",
+        );
+      }
       return;
     }
   }

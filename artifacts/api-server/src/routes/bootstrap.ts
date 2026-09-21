@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
+import { logger } from "../lib/logger.js";
 import {
   getStudentHolidaySettings,
   syncStudentHolidayAttendance,
@@ -75,10 +76,9 @@ function withoutDocuments(rows: any[]) {
 router.get("/bootstrap", async (_req, res) => {
   const adapter = getAdapter();
 
-  // Keep the legacy alumni repair, but do it once before the single data load
-  // instead of repeating it while several client requests are in flight.
+  // Keep the legacy alumni repair before the single data load instead of
+  // repeating it while several client requests are in flight.
   await adapter.alumni.syncGraduatedStudents();
-  await syncStudentHolidayAttendance(adapter);
 
   const [
     classes,
@@ -157,6 +157,13 @@ router.get("/bootstrap", async (_req, res) => {
     teacherHolidays,
     teacherAttendanceSettings: readTeacherAttendanceSettings(teacherAttendanceSettingsSetting?.value),
     studentAttendanceHolidaySettings,
+  });
+
+  // Holiday materialization can touch thousands of historical rows. Do not
+  // make the client wait for that maintenance work before it can see the
+  // existing Supabase data.
+  void syncStudentHolidayAttendance(adapter).catch((error) => {
+    logger.warn({ error }, "Background student holiday attendance sync failed");
   });
 });
 
