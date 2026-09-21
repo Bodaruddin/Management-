@@ -1,10 +1,16 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
+import {
+  getStudentHolidayStatus,
+  syncStudentHolidayAttendance,
+} from "../lib/studentHolidayAttendance.js";
 
 const router = Router();
 
 router.get("/attendance", async (_req, res) => {
-  const rows = await getAdapter().attendance.list();
+  const adapter = getAdapter();
+  await syncStudentHolidayAttendance(adapter);
+  const rows = await adapter.attendance.list();
   res.json(rows);
 });
 
@@ -13,6 +19,12 @@ router.post("/attendance", async (req, res) => {
   if (!submittedRecords.length) { res.status(400).json({ error: "records array is required" }); return; }
   const { date, class: cls } = submittedRecords[0];
   const adapter = getAdapter();
+  const holiday = await getStudentHolidayStatus(adapter, date);
+  if (holiday.isHoliday) {
+    await syncStudentHolidayAttendance(adapter);
+    res.status(409).json({ error: `${holiday.name ?? "This date"} is a holiday; attendance is generated automatically.` });
+    return;
+  }
 
   // Keep an attendance row for every currently inactive student whenever a
   // class attendance day is submitted. Without this, inactive students

@@ -16,6 +16,8 @@ tags:
     description: Teacher leave applications
   - name: teacher-holidays
     description: Teacher holidays
+  - name: student-attendance
+    description: Student attendance holiday rules
 paths:
   /healthz:
     get:
@@ -30,6 +32,78 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /student-attendance/settings:
+    get:
+      operationId: getStudentAttendanceHolidaySettings
+      tags: [student-attendance]
+      responses:
+        "200":
+          description: Student attendance holiday settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentAttendanceHolidaySettings"
+    put:
+      operationId: updateStudentAttendanceHolidaySettings
+      tags: [student-attendance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentAttendanceHolidaySettingsUpdate"
+      responses:
+        "200":
+          description: Updated student attendance holiday settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentAttendanceHolidaySettings"
+  /student-attendance/holidays:
+    post:
+      operationId: createStudentAttendanceHoliday
+      tags: [student-attendance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentAttendanceHolidayCreate"
+      responses:
+        "201":
+          description: Holiday created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherHoliday"
+  /student-attendance/holidays/{id}:
+    put:
+      operationId: updateStudentAttendanceHoliday
+      tags: [student-attendance]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentAttendanceHolidayCreate"
+      responses:
+        "200":
+          description: Holiday updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherHoliday"
+    delete:
+      operationId: deleteStudentAttendanceHoliday
+      tags: [student-attendance]
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+        - $ref: "#/components/parameters/AdminId"
+      responses:
+        "204":
+          description: Holiday deleted
   /settings/teacher-attendance:
     get:
       operationId: getTeacherAttendanceSettings
@@ -469,6 +543,28 @@ components:
         lateGraceMinutes: { type: integer }
         lateDeductionAmount: { type: number }
         deductionType: { type: string, enum: [daily_rate, fixed] }
+    StudentAttendanceHolidaySettings:
+      type: object
+      required: [sundayHoliday, holidays]
+      properties:
+        sundayHoliday: { type: boolean }
+        holidays:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeacherHoliday"
+    StudentAttendanceHolidaySettingsUpdate:
+      type: object
+      required: [adminId, sundayHoliday]
+      properties:
+        adminId: { type: string }
+        sundayHoliday: { type: boolean }
+    StudentAttendanceHolidayCreate:
+      type: object
+      required: [adminId, date, name]
+      properties:
+        adminId: { type: string }
+        date: { type: string, format: date }
+        name: { type: string }
     TeacherAttendanceSettingsUpdate:
       allOf:
         - $ref: "#/components/schemas/TeacherAttendanceSettings"

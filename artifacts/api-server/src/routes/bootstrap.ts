@@ -1,5 +1,9 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
+import {
+  getStudentHolidaySettings,
+  syncStudentHolidayAttendance,
+} from "../lib/studentHolidayAttendance.js";
 
 const router = Router();
 const CLASS_ABSENT_LIMITS_KEY = "class_absent_limits";
@@ -74,6 +78,7 @@ router.get("/bootstrap", async (_req, res) => {
   // Keep the legacy alumni repair, but do it once before the single data load
   // instead of repeating it while several client requests are in flight.
   await adapter.alumni.syncGraduatedStudents();
+  await syncStudentHolidayAttendance(adapter);
 
   const [
     classes,
@@ -99,6 +104,7 @@ router.get("/bootstrap", async (_req, res) => {
     teacherLeaves,
     teacherHolidays,
     teacherAttendanceSettingsSetting,
+    studentAttendanceHolidaySettings,
   ] = await Promise.all([
     adapter.classes.list(),
     adapter.sections.list(),
@@ -123,6 +129,7 @@ router.get("/bootstrap", async (_req, res) => {
     adapter.teacherLeaveApplications.list(),
     adapter.teacherHolidays.list(),
     adapter.appSettings.get(TEACHER_ATTENDANCE_SETTINGS_KEY),
+    getStudentHolidaySettings(adapter),
   ]);
 
   res.json({
@@ -149,6 +156,7 @@ router.get("/bootstrap", async (_req, res) => {
     teacherLeaves,
     teacherHolidays,
     teacherAttendanceSettings: readTeacherAttendanceSettings(teacherAttendanceSettingsSetting?.value),
+    studentAttendanceHolidaySettings,
   });
 });
 

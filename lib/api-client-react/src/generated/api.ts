@@ -24,6 +24,7 @@ import type {
   AdminUser,
   AdminUserCreate,
   AdminUserUpdate,
+  DeleteStudentAttendanceHolidayParams,
   DeleteTeacherHolidayParams,
   DeleteTeacherLeaveParams,
   GetTeacherFaceStatusParams,
@@ -32,6 +33,9 @@ import type {
   ListTeacherLeavesParams,
   PayrollCalculate,
   PayrollReport,
+  StudentAttendanceHolidayCreate,
+  StudentAttendanceHolidaySettings,
+  StudentAttendanceHolidaySettingsUpdate,
   SwitchAdminToTeacherBody,
   TeacherAttendanceRecord,
   TeacherAttendanceSettings,
@@ -152,6 +156,347 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
+
+export const getGetStudentAttendanceHolidaySettingsUrl = () => {
+
+
+
+
+  return `/api/student-attendance/settings`
+}
+
+export const getStudentAttendanceHolidaySettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<StudentAttendanceHolidaySettings> => {
+
+  return customFetch<StudentAttendanceHolidaySettings>(getGetStudentAttendanceHolidaySettingsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStudentAttendanceHolidaySettingsQueryKey = () => {
+    return [
+    `/api/student-attendance/settings`
+    ] as const;
+    }
+
+
+export const getGetStudentAttendanceHolidaySettingsQueryOptions = <TData = Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStudentAttendanceHolidaySettingsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>> = ({ signal }) => getStudentAttendanceHolidaySettings({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStudentAttendanceHolidaySettingsQueryResult = NonNullable<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>>
+export type GetStudentAttendanceHolidaySettingsQueryError = ErrorType<unknown>
+
+
+
+export function useGetStudentAttendanceHolidaySettings<TData = Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStudentAttendanceHolidaySettingsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateStudentAttendanceHolidaySettingsUrl = () => {
+
+
+
+
+  return `/api/student-attendance/settings`
+}
+
+export const updateStudentAttendanceHolidaySettings = async (studentAttendanceHolidaySettingsUpdate: StudentAttendanceHolidaySettingsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<StudentAttendanceHolidaySettings> => {
+
+  return customFetch<StudentAttendanceHolidaySettings>(getUpdateStudentAttendanceHolidaySettingsUrl(),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(studentAttendanceHolidaySettingsUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateStudentAttendanceHolidaySettingsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, TError,{data: BodyType<StudentAttendanceHolidaySettingsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, TError,{data: BodyType<StudentAttendanceHolidaySettingsUpdate>}, TContext> => {
+
+const mutationKey = ['updateStudentAttendanceHolidaySettings'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, {data: BodyType<StudentAttendanceHolidaySettingsUpdate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateStudentAttendanceHolidaySettings(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateStudentAttendanceHolidaySettingsMutationResult = NonNullable<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>>
+    export type UpdateStudentAttendanceHolidaySettingsMutationBody = BodyType<StudentAttendanceHolidaySettingsUpdate>
+    export type UpdateStudentAttendanceHolidaySettingsMutationError = ErrorType<unknown>
+
+    export const useUpdateStudentAttendanceHolidaySettings = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, TError,{data: BodyType<StudentAttendanceHolidaySettingsUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>,
+        TError,
+        {data: BodyType<StudentAttendanceHolidaySettingsUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateStudentAttendanceHolidaySettingsMutationOptions(options));
+    }
+
+export const getCreateStudentAttendanceHolidayUrl = () => {
+
+
+
+
+  return `/api/student-attendance/holidays`
+}
+
+export const createStudentAttendanceHoliday = async (studentAttendanceHolidayCreate: StudentAttendanceHolidayCreate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherHoliday> => {
+
+  return customFetch<TeacherHoliday>(getCreateStudentAttendanceHolidayUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(studentAttendanceHolidayCreate)
+  }
+);}
+
+
+
+
+
+export const getCreateStudentAttendanceHolidayMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, TError,{data: BodyType<StudentAttendanceHolidayCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, TError,{data: BodyType<StudentAttendanceHolidayCreate>}, TContext> => {
+
+const mutationKey = ['createStudentAttendanceHoliday'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, {data: BodyType<StudentAttendanceHolidayCreate>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createStudentAttendanceHoliday(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateStudentAttendanceHolidayMutationResult = NonNullable<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>>
+    export type CreateStudentAttendanceHolidayMutationBody = BodyType<StudentAttendanceHolidayCreate>
+    export type CreateStudentAttendanceHolidayMutationError = ErrorType<unknown>
+
+    export const useCreateStudentAttendanceHoliday = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, TError,{data: BodyType<StudentAttendanceHolidayCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createStudentAttendanceHoliday>>,
+        TError,
+        {data: BodyType<StudentAttendanceHolidayCreate>},
+        TContext
+      > => {
+      return useMutation(getCreateStudentAttendanceHolidayMutationOptions(options));
+    }
+
+export const getUpdateStudentAttendanceHolidayUrl = (id: string,) => {
+
+
+
+
+  return `/api/student-attendance/holidays/${id}`
+}
+
+export const updateStudentAttendanceHoliday = async (id: string,
+    studentAttendanceHolidayCreate: StudentAttendanceHolidayCreate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherHoliday> => {
+
+  return customFetch<TeacherHoliday>(getUpdateStudentAttendanceHolidayUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(studentAttendanceHolidayCreate)
+  }
+);}
+
+
+
+
+
+export const getUpdateStudentAttendanceHolidayMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,{id: string;data: BodyType<StudentAttendanceHolidayCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,{id: string;data: BodyType<StudentAttendanceHolidayCreate>}, TContext> => {
+
+const mutationKey = ['updateStudentAttendanceHoliday'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, {id: string;data: BodyType<StudentAttendanceHolidayCreate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateStudentAttendanceHoliday(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateStudentAttendanceHolidayMutationResult = NonNullable<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>>
+    export type UpdateStudentAttendanceHolidayMutationBody = BodyType<StudentAttendanceHolidayCreate>
+    export type UpdateStudentAttendanceHolidayMutationError = ErrorType<unknown>
+
+    export const useUpdateStudentAttendanceHoliday = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,{id: string;data: BodyType<StudentAttendanceHolidayCreate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>,
+        TError,
+        {id: string;data: BodyType<StudentAttendanceHolidayCreate>},
+        TContext
+      > => {
+      return useMutation(getUpdateStudentAttendanceHolidayMutationOptions(options));
+    }
+
+export const getDeleteStudentAttendanceHolidayUrl = (id: string,
+    params: DeleteStudentAttendanceHolidayParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/student-attendance/holidays/${id}?${stringifiedParams}` : `/api/student-attendance/holidays/${id}`
+}
+
+export const deleteStudentAttendanceHoliday = async (id: string,
+    params: DeleteStudentAttendanceHolidayParams, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getDeleteStudentAttendanceHolidayUrl(id,params),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteStudentAttendanceHolidayMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,{id: string;params: DeleteStudentAttendanceHolidayParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,{id: string;params: DeleteStudentAttendanceHolidayParams}, TContext> => {
+
+const mutationKey = ['deleteStudentAttendanceHoliday'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, {id: string;params: DeleteStudentAttendanceHolidayParams}> = (props) => {
+          const {id,params} = props ?? {};
+
+          return  deleteStudentAttendanceHoliday(id,params,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteStudentAttendanceHolidayMutationResult = NonNullable<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>>
+
+    export type DeleteStudentAttendanceHolidayMutationError = ErrorType<unknown>
+
+    export const useDeleteStudentAttendanceHoliday = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,{id: string;params: DeleteStudentAttendanceHolidayParams}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>,
+        TError,
+        {id: string;params: DeleteStudentAttendanceHolidayParams},
+        TContext
+      > => {
+      return useMutation(getDeleteStudentAttendanceHolidayMutationOptions(options));
+    }
 
 export const getGetTeacherAttendanceSettingsUrl = () => {
 

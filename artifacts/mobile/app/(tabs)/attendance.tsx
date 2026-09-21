@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
-  ScrollView, Platform, Modal
+  ScrollView, Platform, Modal, Alert, Switch
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
+import { useAuth } from '@/context/AuthContext';
 import EmptyState from '@/components/EmptyState';
 
 type ReportMode = 'daily' | 'monthly' | 'class' | 'student';
@@ -224,7 +225,11 @@ const det = StyleSheet.create({
 export default function AttendanceScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { attendanceRecords, students, classes } = useApp();
+  const { user } = useAuth();
+  const {
+    attendanceRecords, students, classes, studentAttendanceHolidaySettings,
+    updateStudentSundayHoliday, addStudentHoliday, deleteStudentHoliday,
+  } = useApp();
 
   const [mode, setMode] = useState<ReportMode>('daily');
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
@@ -237,6 +242,9 @@ export default function AttendanceScreen() {
   const [showStatusPicker, setShowStatusPicker] = useState(false);
 
   const [detailStudent, setDetailStudent] = useState<{ id: string; name: string; cls: string } | null>(null);
+  const [holidayDate, setHolidayDate] = useState('');
+  const [holidayName, setHolidayName] = useState('');
+  const [savingHoliday, setSavingHoliday] = useState(false);
 
   const getFilteredRecords = () => {
     let records = attendanceRecords;
@@ -274,6 +282,24 @@ export default function AttendanceScreen() {
 
   const s = styles(colors);
   const botPad = Platform.OS === 'web' ? 84 : insets.bottom + 80;
+  const isAdmin = user?.role === 'admin';
+
+  const createHoliday = async () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(holidayDate) || !holidayName.trim()) {
+      Alert.alert('Add holiday', 'Enter a date as YYYY-MM-DD and a holiday name.');
+      return;
+    }
+    setSavingHoliday(true);
+    try {
+      await addStudentHoliday({ date: holidayDate, name: holidayName.trim() });
+      setHolidayDate('');
+      setHolidayName('');
+    } catch (error: any) {
+      Alert.alert('Could not add holiday', error?.message ?? 'Please try again.');
+    } finally {
+      setSavingHoliday(false);
+    }
+  };
 
   const renderDailyReport = () => (
     <FlatList
@@ -362,6 +388,61 @@ export default function AttendanceScreen() {
           </TouchableOpacity>
         ))}
       </View>
+
+      {isAdmin && (
+        <View style={[s.holidayPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={s.holidayHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.holidayTitle, { color: colors.text }]}>Student attendance holidays</Text>
+              <Text style={[s.holidayCopy, { color: colors.mutedForeground }]}>
+                Holiday rows are generated automatically and are excluded from attendance percentages.
+              </Text>
+            </View>
+            <Switch
+              value={studentAttendanceHolidaySettings.sundayHoliday}
+              onValueChange={value => updateStudentSundayHoliday(value).catch(error =>
+                Alert.alert('Could not update Sunday rule', error?.message ?? 'Please try again.'),
+              )}
+              trackColor={{ false: colors.muted, true: colors.primary + '80' }}
+              thumbColor={studentAttendanceHolidaySettings.sundayHoliday ? colors.primary : colors.mutedForeground}
+            />
+          </View>
+          <View style={s.sundayRow}>
+            <Feather name="sun" size={16} color={colors.warning} />
+            <Text style={[s.sundayText, { color: colors.text }]}>Every Sunday is a holiday</Text>
+          </View>
+          <View style={s.holidayForm}>
+            <TextInput
+              style={[s.holidayInput, { backgroundColor: colors.muted, color: colors.text }]}
+              value={holidayDate}
+              onChangeText={setHolidayDate}
+              placeholder="YYYY-MM-DD"
+              placeholderTextColor={colors.mutedForeground}
+            />
+            <TextInput
+              style={[s.holidayInput, { backgroundColor: colors.muted, color: colors.text }]}
+              value={holidayName}
+              onChangeText={setHolidayName}
+              placeholder="Holiday name"
+              placeholderTextColor={colors.mutedForeground}
+            />
+            <TouchableOpacity style={[s.addHolidayBtn, { backgroundColor: colors.primary }]} onPress={createHoliday} disabled={savingHoliday}>
+              <Feather name="plus" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          {studentAttendanceHolidaySettings.holidays.map(holiday => (
+            <View key={holiday.id} style={[s.holidayRow, { borderTopColor: colors.border }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.holidayDate, { color: colors.text }]}>{holiday.date}</Text>
+                <Text style={[s.holidayName, { color: colors.mutedForeground }]}>{holiday.name}</Text>
+              </View>
+              <TouchableOpacity onPress={() => deleteStudentHoliday(holiday.id).catch(error => Alert.alert('Could not delete holiday', error?.message ?? 'Please try again.'))}>
+                <Feather name="trash-2" size={16} color={colors.destructive} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+      )}
 
       {/* Filters */}
       <View style={[s.filters, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
@@ -498,4 +579,16 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   sumVal: { fontSize: 18, fontWeight: '700' },
   sumLabel: { fontSize: 11, fontWeight: '600', marginTop: 4 },
   sumCount: { fontSize: 10, marginTop: 2, opacity: 0.8 },
+  holidayPanel: { marginHorizontal: 16, marginBottom: 4, padding: 14, borderRadius: 14, borderWidth: 1 },
+  holidayHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  holidayTitle: { fontSize: 15, fontWeight: '700' },
+  holidayCopy: { fontSize: 12, lineHeight: 17, marginTop: 3 },
+  sundayRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+  sundayText: { fontSize: 13, fontWeight: '600' },
+  holidayForm: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  holidayInput: { flex: 1, minWidth: 0, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 9, fontSize: 12 },
+  addHolidayBtn: { width: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  holidayRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, marginTop: 10, borderTopWidth: 1 },
+  holidayDate: { fontSize: 12, fontWeight: '700' },
+  holidayName: { fontSize: 12, marginTop: 2 },
 });

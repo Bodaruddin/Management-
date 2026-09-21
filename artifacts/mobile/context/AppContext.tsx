@@ -180,6 +180,11 @@ export interface TeacherHoliday {
   createdAt?: string;
 }
 
+export interface StudentAttendanceHolidaySettings {
+  sundayHoliday: boolean;
+  holidays: TeacherHoliday[];
+}
+
 export interface TeacherPayrollResult {
   teacherId: string;
   teacherName: string;
@@ -442,6 +447,7 @@ interface AppState {
   teacherAttendanceRecords: TeacherAttendanceRecord[];
   teacherLeaves: TeacherLeaveApplication[];
   teacherHolidays: TeacherHoliday[];
+  studentAttendanceHolidaySettings: StudentAttendanceHolidaySettings;
   teacherAttendanceSettings: TeacherAttendanceSettings;
 }
 
@@ -533,6 +539,10 @@ interface AppContextType extends AppState {
   addTeacherHoliday: (data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => Promise<TeacherHoliday>;
   updateTeacherHoliday: (id: string, data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => Promise<void>;
   deleteTeacherHoliday: (id: string) => Promise<void>;
+  updateStudentSundayHoliday: (enabled: boolean) => Promise<void>;
+  addStudentHoliday: (data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => Promise<TeacherHoliday>;
+  updateStudentHoliday: (id: string, data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => Promise<void>;
+  deleteStudentHoliday: (id: string) => Promise<void>;
   updateTeacherAttendanceSettings: (settings: TeacherAttendanceSettings) => Promise<void>;
   calculateTeacherPayroll: (month: string, year: number) => Promise<{ month: string; year: number; workingDays: number; result: TeacherPayrollResult[] }>;
 }
@@ -588,6 +598,7 @@ const DEFAULT_STATE: AppState = {
   salaryRecords: [], promotionRecords: [], markSubmissions: [], markAuditLog: [],
   inactivationRequests: [], classAbsentLimits: {}, alumni: [],
   teacherAttendanceRecords: [], teacherLeaves: [], teacherHolidays: [],
+  studentAttendanceHolidaySettings: { sundayHoliday: true, holidays: [] },
   teacherAttendanceSettings: {
     schoolLatitude: null, schoolLongitude: null, radiusMeters: 150,
     checkInStart: '08:00', checkInEnd: '09:30', checkOutStart: '15:00', checkOutEnd: '18:00',
@@ -900,6 +911,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           documentBranding = DEFAULT_STATE.documentBranding, alumni = [],
           teacherAttendance = [], teacherLeaves = [], teacherHolidays = [],
           teacherAttendanceSettings = DEFAULT_STATE.teacherAttendanceSettings,
+          studentAttendanceHolidaySettings = DEFAULT_STATE.studentAttendanceHolidaySettings,
         } = data;
         setState({
           classes: classes.sort((a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })),
@@ -924,6 +936,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           teacherAttendanceRecords: teacherAttendance.map(mapTeacherAttendance),
           teacherLeaves: teacherLeaves.map(mapTeacherLeave),
           teacherHolidays: teacherHolidays.map(mapTeacherHoliday),
+          studentAttendanceHolidaySettings: {
+            sundayHoliday: studentAttendanceHolidaySettings.sundayHoliday !== false,
+            holidays: (studentAttendanceHolidaySettings.holidays ?? []).map(mapTeacherHoliday),
+          },
           teacherAttendanceSettings,
         });
       };
@@ -1493,6 +1509,58 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setState(prev => ({ ...prev, teacherHolidays: prev.teacherHolidays.filter(item => item.id !== id) }));
   }, []);
 
+  const updateStudentSundayHoliday = useCallback(async (enabled: boolean) => {
+    const saved = await apiPut<any>('/student-attendance/settings', {
+      sundayHoliday: enabled,
+      adminId: 'admin',
+    });
+    setState(prev => ({
+      ...prev,
+      studentAttendanceHolidaySettings: {
+        sundayHoliday: saved.sundayHoliday !== false,
+        holidays: (saved.holidays ?? []).map(mapTeacherHoliday),
+      },
+    }));
+  }, []);
+
+  const addStudentHoliday = useCallback(async (data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => {
+    const row = await apiPost<any>('/student-attendance/holidays', { ...data, adminId: 'admin' });
+    const holiday = mapTeacherHoliday(row);
+    setState(prev => ({
+      ...prev,
+      studentAttendanceHolidaySettings: {
+        ...prev.studentAttendanceHolidaySettings,
+        holidays: [...prev.studentAttendanceHolidaySettings.holidays, holiday].sort((a, b) => a.date.localeCompare(b.date)),
+      },
+    }));
+    return holiday;
+  }, []);
+
+  const updateStudentHoliday = useCallback(async (id: string, data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => {
+    const row = await apiPut<any>(`/student-attendance/holidays/${id}`, { ...data, adminId: 'admin' });
+    const holiday = mapTeacherHoliday(row);
+    setState(prev => ({
+      ...prev,
+      studentAttendanceHolidaySettings: {
+        ...prev.studentAttendanceHolidaySettings,
+        holidays: prev.studentAttendanceHolidaySettings.holidays
+          .map(item => item.id === id ? holiday : item)
+          .sort((a, b) => a.date.localeCompare(b.date)),
+      },
+    }));
+  }, []);
+
+  const deleteStudentHoliday = useCallback(async (id: string) => {
+    await apiDelete(`/student-attendance/holidays/${id}?adminId=admin`);
+    setState(prev => ({
+      ...prev,
+      studentAttendanceHolidaySettings: {
+        ...prev.studentAttendanceHolidaySettings,
+        holidays: prev.studentAttendanceHolidaySettings.holidays.filter(item => item.id !== id),
+      },
+    }));
+  }, []);
+
   const updateTeacherAttendanceSettings = useCallback(async (settings: TeacherAttendanceSettings) => {
     const saved = await apiPut<TeacherAttendanceSettings>('/settings/teacher-attendance', { ...settings, adminId: 'admin' });
     setState(prev => ({ ...prev, teacherAttendanceSettings: saved }));
@@ -1732,6 +1800,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
        checkInTeacher, checkOutTeacher, applyTeacherLeave,
       updateTeacherLeave, deleteTeacherLeave,
       reviewTeacherLeave, addTeacherHoliday, updateTeacherHoliday, deleteTeacherHoliday,
+      updateStudentSundayHoliday, addStudentHoliday, updateStudentHoliday, deleteStudentHoliday,
       updateTeacherAttendanceSettings, calculateTeacherPayroll,
     }}>
       {children}

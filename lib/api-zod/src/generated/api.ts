@@ -17,6 +17,72 @@ export const HealthCheckResponse = zod.object({
 })
 
 
+export const GetStudentAttendanceHolidaySettingsResponse = zod.object({
+  "sundayHoliday": zod.boolean(),
+  "holidays": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "date": zod.coerce.date().optional(),
+  "name": zod.string().optional()
+}))
+})
+
+
+export const UpdateStudentAttendanceHolidaySettingsBody = zod.object({
+  "adminId": zod.string(),
+  "sundayHoliday": zod.boolean()
+})
+
+export const UpdateStudentAttendanceHolidaySettingsResponse = zod.object({
+  "sundayHoliday": zod.boolean(),
+  "holidays": zod.array(zod.object({
+  "id": zod.string().optional(),
+  "date": zod.coerce.date().optional(),
+  "name": zod.string().optional()
+}))
+})
+
+
+export const CreateStudentAttendanceHolidayBody = zod.object({
+  "adminId": zod.string(),
+  "date": zod.coerce.date(),
+  "name": zod.string()
+})
+
+export const CreateStudentAttendanceHolidayResponse = zod.object({
+  "id": zod.string().optional(),
+  "date": zod.coerce.date().optional(),
+  "name": zod.string().optional()
+})
+
+
+export const UpdateStudentAttendanceHolidayParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateStudentAttendanceHolidayBody = zod.object({
+  "adminId": zod.string(),
+  "date": zod.coerce.date(),
+  "name": zod.string()
+})
+
+export const UpdateStudentAttendanceHolidayResponse = zod.object({
+  "id": zod.string().optional(),
+  "date": zod.coerce.date().optional(),
+  "name": zod.string().optional()
+})
+
+
+export const DeleteStudentAttendanceHolidayParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteStudentAttendanceHolidayQueryParams = zod.object({
+  "adminId": zod.coerce.string()
+})
+
+export const DeleteStudentAttendanceHolidayResponse = zod.void()
+
+
 export const GetTeacherAttendanceSettingsResponse = zod.object({
   "schoolLatitude": zod.number().nullish(),
   "schoolLongitude": zod.number().nullish(),

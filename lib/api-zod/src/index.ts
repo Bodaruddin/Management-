@@ -2,6 +2,9 @@ export * from "./generated/api";
 export type {
   AdminAction,
   AdminIdParameter,
+  AdminUser,
+  AdminUserCreate,
+  AdminUserUpdate,
   GetTeacherFaceStatusParams,
   HealthStatus,
   ListTeacherAttendanceParams,
@@ -11,6 +14,9 @@ export type {
   PayrollReport,
   PayrollReportResultItem,
   StatusParameter,
+  StudentAttendanceHolidayCreate,
+  StudentAttendanceHolidaySettings,
+  StudentAttendanceHolidaySettingsUpdate,
   TeacherAttendanceRecord,
   TeacherAttendanceRecordStatus,
   TeacherAttendanceSettings,
@@ -27,4 +33,6 @@ export type {
   TeacherLeaveStatus,
   TeacherLeave,
   TeacherLeaveUpdate,
+  TeacherProfile,
+  TeacherProfilePermissions,
 } from "./generated/types";

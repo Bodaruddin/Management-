@@ -393,6 +393,18 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
         await batch.commit();
         return results;
       },
+      async clearGeneratedHolidaysExcept(dates) {
+        const keep = new Set(dates);
+        const snap = await col("attendance_records").where("status", "==", "holiday").get();
+        const batch = fs.batch();
+        snap.docs.forEach((doc) => {
+          const data = doc.data() as any;
+          if (String(data.takenBy ?? "").startsWith("System — ") && !keep.has(String(data.date ?? ""))) {
+            batch.delete(doc.ref);
+          }
+        });
+        await batch.commit();
+      },
       async checkAndMarkInactive(date, cls, absentStudentIds) {
         if (!absentStudentIds.length) return [];
 

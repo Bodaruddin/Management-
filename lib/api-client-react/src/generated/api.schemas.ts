@@ -70,6 +70,28 @@ export interface TeacherAttendanceSettings {
   deductionType?: TeacherAttendanceSettingsDeductionType;
 }
 
+export interface TeacherHoliday {
+  id?: string;
+  date?: string;
+  name?: string;
+}
+
+export interface StudentAttendanceHolidaySettings {
+  sundayHoliday: boolean;
+  holidays: TeacherHoliday[];
+}
+
+export interface StudentAttendanceHolidaySettingsUpdate {
+  adminId: string;
+  sundayHoliday: boolean;
+}
+
+export interface StudentAttendanceHolidayCreate {
+  adminId: string;
+  date: string;
+  name: string;
+}
+
 export type TeacherAttendanceSettingsUpdate = TeacherAttendanceSettings & {
   adminId: string;
 };
@@ -201,12 +223,6 @@ export interface AdminAction {
   adminNote?: string;
 }
 
-export interface TeacherHoliday {
-  id?: string;
-  date?: string;
-  name?: string;
-}
-
 export interface TeacherHolidayCreate {
   adminId: string;
   date: string;
@@ -235,6 +251,10 @@ export type MonthParameter = string;
 export type StatusParameter = string;
 
 export type AdminIdParameter = string;
+
+export type DeleteStudentAttendanceHolidayParams = {
+adminId: AdminIdParameter;
+};
 
 export type ListTeacherAttendanceParams = {
 teacherId?: TeacherIdParameter;

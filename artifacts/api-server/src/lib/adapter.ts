@@ -41,6 +41,7 @@ export interface DataAdapter {
   attendance: {
     list(): Promise<any[]>;
     bulkUpsert(date: string, cls: string, records: any[]): Promise<any[]>;
+    clearGeneratedHolidaysExcept(dates: string[]): Promise<void>;
     /** After attendance upsert: count consecutive absents and mark students inactive if over limit. Returns newly inactivated student IDs. */
     checkAndMarkInactive(date: string, cls: string, absentStudentIds: string[]): Promise<string[]>;
   };

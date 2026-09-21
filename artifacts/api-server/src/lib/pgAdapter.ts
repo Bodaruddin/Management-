@@ -2,7 +2,7 @@
  * PostgreSQL DataAdapter — wraps Drizzle ORM queries.
  */
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { eq, asc, and, desc, inArray, sql as drizzleSql } from "drizzle-orm";
+import { eq, asc, and, desc, inArray, notInArray, sql as drizzleSql } from "drizzle-orm";
 import * as schema from "@workspace/db/schema";
 import type { DataAdapter } from "./adapter.js";
 
@@ -266,6 +266,14 @@ export function createPgAdapter(db: DB): DataAdapter {
           }));
           return tx.insert(attendanceRecordsTable).values(values).returning();
         });
+      },
+      async clearGeneratedHolidaysExcept(dates) {
+        const predicates = [
+          eq(attendanceRecordsTable.status, "holiday"),
+          drizzleSql`${attendanceRecordsTable.takenBy} LIKE 'System — %'`,
+        ];
+        if (dates.length) predicates.push(notInArray(attendanceRecordsTable.date, dates));
+        await db.delete(attendanceRecordsTable).where(and(...predicates));
       },
       async checkAndMarkInactive(date, cls, absentStudentIds) {
         if (!absentStudentIds.length) return [];
