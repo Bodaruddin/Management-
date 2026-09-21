@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
-  ScrollView, Platform, Modal, Alert, Switch
+  ScrollView, Platform, Modal, Alert, Switch, type NativeSyntheticEvent, type NativeScrollEvent
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -245,6 +245,7 @@ export default function AttendanceScreen() {
   const [holidayDate, setHolidayDate] = useState('');
   const [holidayName, setHolidayName] = useState('');
   const [savingHoliday, setSavingHoliday] = useState(false);
+  const [showHolidayPanel, setShowHolidayPanel] = useState(true);
 
   const getFilteredRecords = () => {
     let records = attendanceRecords;
@@ -301,11 +302,22 @@ export default function AttendanceScreen() {
     }
   };
 
+  const handleReportScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offset = event.nativeEvent.contentOffset.y;
+    if (offset > 24 && showHolidayPanel) {
+      setShowHolidayPanel(false);
+    } else if (offset <= 0 && !showHolidayPanel) {
+      setShowHolidayPanel(true);
+    }
+  };
+
   const renderDailyReport = () => (
     <FlatList
       data={records}
       keyExtractor={i => i.id}
       contentContainerStyle={{ padding: 16, paddingBottom: botPad, flexGrow: 1 }}
+      onScroll={handleReportScroll}
+      scrollEventThrottle={16}
       ListEmptyComponent={<EmptyState icon="calendar" title="No Records" subtitle="No attendance taken for this date." />}
       renderItem={({ item: r }) => (
         <TouchableOpacity
@@ -348,6 +360,8 @@ export default function AttendanceScreen() {
         data={data}
         keyExtractor={i => i.id}
         contentContainerStyle={{ padding: 16, paddingBottom: botPad, flexGrow: 1 }}
+        onScroll={handleReportScroll}
+        scrollEventThrottle={16}
         ListEmptyComponent={<EmptyState icon="users" title="No Students" subtitle="Adjust filters or search" />}
         renderItem={({ item: stat }) => {
           const attendanceDays = stat.present + stat.absent + stat.inactive;
@@ -383,13 +397,13 @@ export default function AttendanceScreen() {
       {/* Modes Segmented Control */}
       <View style={[s.segmentContainer, { backgroundColor: colors.card }]}>
         {(['daily', 'monthly', 'class', 'student'] as ReportMode[]).map(m => (
-          <TouchableOpacity key={m} style={[s.segmentBtn, mode === m && { backgroundColor: colors.primary }]} onPress={() => setMode(m)} activeOpacity={0.8}>
+          <TouchableOpacity key={m} style={[s.segmentBtn, mode === m && { backgroundColor: colors.primary }]} onPress={() => { setMode(m); setShowHolidayPanel(true); }} activeOpacity={0.8}>
             <Text style={[s.segmentText, { color: mode === m ? '#fff' : colors.text, textTransform: 'capitalize' }]}>{m}</Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {isAdmin && (
+      {isAdmin && showHolidayPanel && (
         <View style={[s.holidayPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={s.holidayHeader}>
             <View style={{ flex: 1 }}>
