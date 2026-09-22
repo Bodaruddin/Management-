@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
-  ScrollView, Platform, Modal, Alert, Switch, type NativeSyntheticEvent, type NativeScrollEvent
+  ScrollView, Platform, Modal, Alert, Switch
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -245,7 +245,7 @@ export default function AttendanceScreen() {
   const [holidayDate, setHolidayDate] = useState('');
   const [holidayName, setHolidayName] = useState('');
   const [savingHoliday, setSavingHoliday] = useState(false);
-  const [showHolidayPanel, setShowHolidayPanel] = useState(true);
+  const [showHolidayPanel, setShowHolidayPanel] = useState(false);
 
   const getFilteredRecords = () => {
     let records = attendanceRecords;
@@ -302,22 +302,11 @@ export default function AttendanceScreen() {
     }
   };
 
-  const handleReportScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const offset = event.nativeEvent.contentOffset.y;
-    if (offset > 24 && showHolidayPanel) {
-      setShowHolidayPanel(false);
-    } else if (offset <= 0 && !showHolidayPanel) {
-      setShowHolidayPanel(true);
-    }
-  };
-
   const renderDailyReport = () => (
     <FlatList
       data={records}
       keyExtractor={i => i.id}
       contentContainerStyle={{ padding: 16, paddingBottom: botPad, flexGrow: 1 }}
-      onScroll={handleReportScroll}
-      scrollEventThrottle={16}
       ListEmptyComponent={<EmptyState icon="calendar" title="No Records" subtitle="No attendance taken for this date." />}
       renderItem={({ item: r }) => (
         <TouchableOpacity
@@ -360,8 +349,6 @@ export default function AttendanceScreen() {
         data={data}
         keyExtractor={i => i.id}
         contentContainerStyle={{ padding: 16, paddingBottom: botPad, flexGrow: 1 }}
-        onScroll={handleReportScroll}
-        scrollEventThrottle={16}
         ListEmptyComponent={<EmptyState icon="users" title="No Students" subtitle="Adjust filters or search" />}
         renderItem={({ item: stat }) => {
           const attendanceDays = stat.present + stat.absent + stat.inactive;
@@ -394,14 +381,32 @@ export default function AttendanceScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
-      {/* Modes Segmented Control */}
-      <View style={[s.segmentContainer, { backgroundColor: colors.card }]}>
-        {(['daily', 'monthly', 'class', 'student'] as ReportMode[]).map(m => (
-          <TouchableOpacity key={m} style={[s.segmentBtn, mode === m && { backgroundColor: colors.primary }]} onPress={() => { setMode(m); setShowHolidayPanel(true); }} activeOpacity={0.8}>
-            <Text style={[s.segmentText, { color: mode === m ? '#fff' : colors.text, textTransform: 'capitalize' }]}>{m}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {!showHolidayPanel && (
+        <>
+          {/* Modes Segmented Control */}
+          <View style={[s.segmentContainer, { backgroundColor: colors.card }]}>
+            {(['daily', 'monthly', 'class', 'student'] as ReportMode[]).map(m => (
+              <TouchableOpacity key={m} style={[s.segmentBtn, mode === m && { backgroundColor: colors.primary }]} onPress={() => setMode(m)} activeOpacity={0.8}>
+                <Text style={[s.segmentText, { color: mode === m ? '#fff' : colors.text, textTransform: 'capitalize' }]}>{m}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {isAdmin && (
+            <TouchableOpacity
+              style={[s.manageHolidaysBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => setShowHolidayPanel(true)}
+              activeOpacity={0.8}
+            >
+              <View style={s.manageHolidaysLabel}>
+                <Feather name="calendar" size={16} color={colors.primary} />
+                <Text style={[s.manageHolidaysText, { color: colors.text }]}>Manage holidays</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          )}
+        </>
+      )}
 
       {isAdmin && showHolidayPanel && (
         <View style={[s.holidayPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -412,14 +417,23 @@ export default function AttendanceScreen() {
                 Holiday rows are generated automatically and are excluded from attendance percentages.
               </Text>
             </View>
-            <Switch
-              value={studentAttendanceHolidaySettings.sundayHoliday}
-              onValueChange={value => updateStudentSundayHoliday(value).catch(error =>
-                Alert.alert('Could not update Sunday rule', error?.message ?? 'Please try again.'),
-              )}
-              trackColor={{ false: colors.muted, true: colors.primary + '80' }}
-              thumbColor={studentAttendanceHolidaySettings.sundayHoliday ? colors.primary : colors.mutedForeground}
-            />
+            <View style={s.holidayHeaderActions}>
+              <Switch
+                value={studentAttendanceHolidaySettings.sundayHoliday}
+                onValueChange={value => updateStudentSundayHoliday(value).catch(error =>
+                  Alert.alert('Could not update Sunday rule', error?.message ?? 'Please try again.'),
+                )}
+                trackColor={{ false: colors.muted, true: colors.primary + '80' }}
+                thumbColor={studentAttendanceHolidaySettings.sundayHoliday ? colors.primary : colors.mutedForeground}
+              />
+              <TouchableOpacity
+                onPress={() => setShowHolidayPanel(false)}
+                activeOpacity={0.7}
+                accessibilityLabel="Close holiday management"
+              >
+                <Feather name="x" size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
           </View>
           <View style={s.sundayRow}>
             <Feather name="sun" size={16} color={colors.warning} />
@@ -458,72 +472,76 @@ export default function AttendanceScreen() {
         </View>
       )}
 
-      {/* Filters */}
-      <View style={[s.filters, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        {mode === 'daily' && (
-          <View style={s.filterRow}>
-            <View style={s.filterWrap}>
-              <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Date</Text>
-              <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={filterDate} onChangeText={setFilterDate} placeholder="YYYY-MM-DD" />
-            </View>
-            <TouchableOpacity style={[s.filterWrap, s.pickerBtn, { backgroundColor: colors.muted }]} onPress={() => setShowClassPicker(true)}>
-              <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
-              <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
-            </TouchableOpacity>
+      {!showHolidayPanel && (
+        <>
+          {/* Filters */}
+          <View style={[s.filters, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            {mode === 'daily' && (
+              <View style={s.filterRow}>
+                <View style={s.filterWrap}>
+                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Date</Text>
+                  <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={filterDate} onChangeText={setFilterDate} placeholder="YYYY-MM-DD" />
+                </View>
+                <TouchableOpacity style={[s.filterWrap, s.pickerBtn, { backgroundColor: colors.muted }]} onPress={() => setShowClassPicker(true)}>
+                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
+                  <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {mode === 'monthly' && (
+              <View style={s.filterRow}>
+                <View style={s.filterWrap}>
+                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Month</Text>
+                  <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={filterMonth} onChangeText={setFilterMonth} placeholder="YYYY-MM" />
+                </View>
+                <TouchableOpacity style={[s.filterWrap, s.pickerBtn, { backgroundColor: colors.muted }]} onPress={() => setShowClassPicker(true)}>
+                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
+                  <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {mode === 'class' && (
+              <View style={s.filterRow}>
+                <TouchableOpacity style={[s.filterWrap, s.pickerBtn, { backgroundColor: colors.muted }]} onPress={() => setShowClassPicker(true)}>
+                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
+                  <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
+                </TouchableOpacity>
+                <View style={s.filterWrap}>
+                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Month (Optional)</Text>
+                  <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={filterMonth} onChangeText={setFilterMonth} placeholder="YYYY-MM" />
+                </View>
+              </View>
+            )}
+            {mode === 'student' && (
+              <View style={s.filterRow}>
+                <View style={s.filterWrap}>
+                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Student Name</Text>
+                  <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={searchStudent} onChangeText={setSearchStudent} placeholder="Search..." />
+                </View>
+              </View>
+            )}
           </View>
-        )}
-        {mode === 'monthly' && (
-          <View style={s.filterRow}>
-            <View style={s.filterWrap}>
-              <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Month</Text>
-              <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={filterMonth} onChangeText={setFilterMonth} placeholder="YYYY-MM" />
-            </View>
-            <TouchableOpacity style={[s.filterWrap, s.pickerBtn, { backgroundColor: colors.muted }]} onPress={() => setShowClassPicker(true)}>
-              <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
-              <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {mode === 'class' && (
-          <View style={s.filterRow}>
-             <TouchableOpacity style={[s.filterWrap, s.pickerBtn, { backgroundColor: colors.muted }]} onPress={() => setShowClassPicker(true)}>
-              <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
-              <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
-            </TouchableOpacity>
-            <View style={s.filterWrap}>
-              <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Month (Optional)</Text>
-              <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={filterMonth} onChangeText={setFilterMonth} placeholder="YYYY-MM" />
-            </View>
-          </View>
-        )}
-        {mode === 'student' && (
-          <View style={s.filterRow}>
-            <View style={s.filterWrap}>
-              <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Student Name</Text>
-              <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={searchStudent} onChangeText={setSearchStudent} placeholder="Search..." />
-            </View>
-          </View>
-        )}
-      </View>
 
-      {/* Summary Cards */}
-      <View style={s.summaryCards}>
-        {[
-          { label: 'Total Records', val: total, color: colors.primary },
-          { label: 'Present', val: `${presentPct}%`, count: presentCount, color: colors.success },
-          { label: 'Absent', val: `${absentPct}%`, count: absentCount, color: colors.destructive },
-          { label: 'Holiday', val: `${holidayPct}%`, count: holidayCount, color: colors.warning },
-          { label: 'Inactive', val: `${attendanceDays > 0 ? Math.round((inactiveCount / attendanceDays) * 100) : 0}%`, count: inactiveCount, color: colors.mutedForeground },
-        ].map(st => (
-          <View key={st.label} style={[s.sumCard, { backgroundColor: st.color + '15' }]}>
-            <Text style={[s.sumVal, { color: st.color }]}>{st.val}</Text>
-            <Text style={[s.sumLabel, { color: st.color }]}>{st.label}</Text>
-            {st.count !== undefined && <Text style={[s.sumCount, { color: st.color }]}>({st.count})</Text>}
+          {/* Summary Cards */}
+          <View style={s.summaryCards}>
+            {[
+              { label: 'Total Records', val: total, color: colors.primary },
+              { label: 'Present', val: `${presentPct}%`, count: presentCount, color: colors.success },
+              { label: 'Absent', val: `${absentPct}%`, count: absentCount, color: colors.destructive },
+              { label: 'Holiday', val: `${holidayPct}%`, count: holidayCount, color: colors.warning },
+              { label: 'Inactive', val: `${attendanceDays > 0 ? Math.round((inactiveCount / attendanceDays) * 100) : 0}%`, count: inactiveCount, color: colors.mutedForeground },
+            ].map(st => (
+              <View key={st.label} style={[s.sumCard, { backgroundColor: st.color + '15' }]}>
+                <Text style={[s.sumVal, { color: st.color }]}>{st.val}</Text>
+                <Text style={[s.sumLabel, { color: st.color }]}>{st.label}</Text>
+                {st.count !== undefined && <Text style={[s.sumCount, { color: st.color }]}>({st.count})</Text>}
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
 
-      {mode === 'daily' ? renderDailyReport() : renderStudentWiseReport()}
+          {mode === 'daily' ? renderDailyReport() : renderStudentWiseReport()}
+        </>
+      )}
 
       {/* Student Attendance Detail */}
       {detailStudent && (
@@ -582,6 +600,9 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   segmentContainer: { flexDirection: 'row', margin: 16, borderRadius: 12, padding: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 },
   segmentBtn: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 8 },
   segmentText: { fontSize: 13, fontWeight: '600' },
+  manageHolidaysBtn: { marginHorizontal: 16, marginBottom: 12, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  manageHolidaysLabel: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  manageHolidaysText: { fontSize: 14, fontWeight: '700' },
   filters: { padding: 16, borderBottomWidth: 1, paddingTop: 0 },
   filterRow: { flexDirection: 'row', gap: 12 },
   filterWrap: { flex: 1 },
@@ -595,6 +616,7 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   sumCount: { fontSize: 10, marginTop: 2, opacity: 0.8 },
   holidayPanel: { marginHorizontal: 16, marginBottom: 4, padding: 14, borderRadius: 14, borderWidth: 1 },
   holidayHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  holidayHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   holidayTitle: { fontSize: 15, fontWeight: '700' },
   holidayCopy: { fontSize: 12, lineHeight: 17, marginTop: 3 },
   sundayRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
