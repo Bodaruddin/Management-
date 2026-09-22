@@ -614,7 +614,7 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   sumVal: { fontSize: 18, fontWeight: '700' },
   sumLabel: { fontSize: 11, fontWeight: '600', marginTop: 4 },
   sumCount: { fontSize: 10, marginTop: 2, opacity: 0.8 },
-  holidayPanel: { marginHorizontal: 16, marginBottom: 4, padding: 14, borderRadius: 14, borderWidth: 1 },
+  holidayPanel: { marginHorizontal: 16, marginTop: 16, marginBottom: 4, padding: 14, borderRadius: 14, borderWidth: 1 },
   holidayHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   holidayHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   holidayTitle: { fontSize: 15, fontWeight: '700' },
