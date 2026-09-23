@@ -302,6 +302,18 @@ export default function AttendanceScreen() {
     }
   };
 
+  const renderClassFilter = () => (
+    <View style={s.filterWrap}>
+      <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
+      <TouchableOpacity
+        style={[s.pickerBtn, { backgroundColor: colors.muted }]}
+        onPress={() => setShowClassPicker(true)}
+      >
+        <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderDailyReport = () => (
     <FlatList
       data={records}
@@ -482,10 +494,7 @@ export default function AttendanceScreen() {
                   <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Date</Text>
                   <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={filterDate} onChangeText={setFilterDate} placeholder="YYYY-MM-DD" />
                 </View>
-                <TouchableOpacity style={[s.filterWrap, s.pickerBtn, { backgroundColor: colors.muted }]} onPress={() => setShowClassPicker(true)}>
-                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
-                  <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
-                </TouchableOpacity>
+                {renderClassFilter()}
               </View>
             )}
             {mode === 'monthly' && (
@@ -494,18 +503,12 @@ export default function AttendanceScreen() {
                   <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Month</Text>
                   <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={filterMonth} onChangeText={setFilterMonth} placeholder="YYYY-MM" />
                 </View>
-                <TouchableOpacity style={[s.filterWrap, s.pickerBtn, { backgroundColor: colors.muted }]} onPress={() => setShowClassPicker(true)}>
-                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
-                  <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
-                </TouchableOpacity>
+                {renderClassFilter()}
               </View>
             )}
             {mode === 'class' && (
               <View style={s.filterRow}>
-                <TouchableOpacity style={[s.filterWrap, s.pickerBtn, { backgroundColor: colors.muted }]} onPress={() => setShowClassPicker(true)}>
-                  <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Class</Text>
-                  <Text style={{ color: colors.text, fontWeight: '500' }}>{filterClass}</Text>
-                </TouchableOpacity>
+                {renderClassFilter()}
                 <View style={s.filterWrap}>
                   <Text style={[s.filterLabel, { color: colors.mutedForeground }]}>Month (Optional)</Text>
                   <TextInput style={[s.filterInput, { backgroundColor: colors.muted, color: colors.text }]} value={filterMonth} onChangeText={setFilterMonth} placeholder="YYYY-MM" />
