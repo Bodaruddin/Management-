@@ -240,17 +240,47 @@ async function waitForImages(doc: Document, timeoutMs = 10_000): Promise<void> {
   if (still > 0) console.warn('[PDF]', still, 'image(s) still not complete after timeout');
 }
 
-/** Detect if a canvas is entirely white (signals a failed foreignObjectRendering). */
+/**
+ * Detect a canvas that is effectively empty.
+ *
+ * Chromium can return a solid black canvas when the GPU/canvas allocation
+ * fails after several large captures. Treat both solid white and solid black
+ * output as a failed capture so the non-foreignObject fallback gets a chance.
+ */
 function isCanvasBlank(canvas: HTMLCanvasElement): boolean {
   try {
     const ctx = canvas.getContext('2d');
     if (!ctx) return true;
-    // Sample a 50×50 block from the top-left to decide quickly
-    const { data } = ctx.getImageData(0, 0, Math.min(canvas.width, 50), Math.min(canvas.height, 50));
-    for (let i = 0; i < data.length; i += 4) {
-      if (data[i] !== 255 || data[i + 1] !== 255 || data[i + 2] !== 255) return false;
+    const samplePoints = [
+      [0.02, 0.02], [0.5, 0.02], [0.98, 0.02],
+      [0.02, 0.5],  [0.5, 0.5],  [0.98, 0.5],
+      [0.02, 0.98], [0.5, 0.98], [0.98, 0.98],
+    ];
+    const pixels = samplePoints.map(([xRatio, yRatio]) => {
+      const x = Math.max(0, Math.min(canvas.width - 1, Math.round(canvas.width * xRatio)));
+      const y = Math.max(0, Math.min(canvas.height - 1, Math.round(canvas.height * yRatio)));
+      return ctx.getImageData(x, y, 1, 1).data;
+    });
+    let hasLight = false;
+    let hasDark = false;
+    let hasColorVariation = false;
+    let previousLuma: number | null = null;
+
+    for (const pixel of pixels) {
+      const alpha = pixel[3];
+      if (alpha === 0) continue;
+      const luma = Math.round(
+        0.2126 * pixel[0] + 0.7152 * pixel[1] + 0.0722 * pixel[2],
+      );
+      hasLight ||= luma > 235;
+      hasDark ||= luma < 20;
+      if (previousLuma !== null && Math.abs(previousLuma - luma) > 12) {
+        hasColorVariation = true;
+      }
+      previousLuma = luma;
     }
-    return true;
+
+    return !hasColorVariation || (!hasLight && hasDark) || (hasLight && !hasDark);
   } catch {
     return false; // cannot sample — assume not blank
   }
@@ -866,7 +896,11 @@ export async function downloadMultipleHtmlsAsPdf(
   /* ── Helper: render one prepared HTML string → canvas ────────────────── */
   const A4_PX_W = 794;
   const A4_PX_H = 1123;
-  const SCALE   = 3;
+  // A 3× PNG per page keeps excellent quality for a single sheet but can
+  // exhaust Chromium's canvas memory when six or more pages are combined.
+  // 2× JPEG keeps text sharp while reducing peak memory substantially.
+  const SCALE   = 2;
+  const JPEG_QUALITY = 0.92;
 
   async function capturePageCanvas(preparedHtml: string, pageNum: number): Promise<HTMLCanvasElement> {
     const iframe = document.createElement('iframe');
@@ -995,7 +1029,11 @@ export async function downloadMultipleHtmlsAsPdf(
     if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH / srcAspect; }
     const imgX = (A4_W - imgW) / 2;
     const imgY = (A4_H - imgH) / 2;
-    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', imgX, imgY, imgW, imgH);
+    const imageData = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
+    pdf.addImage(imageData, 'JPEG', imgX, imgY, imgW, imgH);
+    // Release the backing pixel buffer before the next student's capture.
+    canvas.width = 0;
+    canvas.height = 0;
     console.log(`[PDF] Page ${i + 1} added to PDF ✓`);
   }
 

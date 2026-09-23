@@ -683,6 +683,16 @@ export default function AdmitCardScreen() {
     filename: string;
     fileUri: string;
   } | null>(null);
+  const [downloadReady, setDownloadReady] = useState<{
+    url: string;
+    filename: string;
+  } | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (downloadReady?.url) URL.revokeObjectURL(downloadReady.url);
+    };
+  }, [downloadReady]);
 
   // ── Academic Session state ─────────────────────────────────────────────────
   const [academicSession, setAcademicSession] = useState(getAcademicYear);
@@ -806,14 +816,19 @@ export default function AdmitCardScreen() {
           documentBranding,
           academicSession,
         );
-        await downloadHtmlAsPdf(
+        const url = await downloadHtmlAsPdf(
           html,
           `Admit Card – ${student.name}`,
           ".pg",
           'img[alt="QR"]',
-          true,
-          (fn, uri) => setPdfSaved({ filename: fn, fileUri: uri }),
+          Platform.OS === "web" ? false : true,
+          Platform.OS !== "web"
+            ? (fn, uri) => setPdfSaved({ filename: fn, fileUri: uri })
+            : undefined,
         );
+        if (url && Platform.OS === "web") {
+          setDownloadReady({ url, filename: `Admit Card – ${student.name}.pdf` });
+        }
       } catch (e: any) {
         if (!e?.message?.includes("cancelled"))
           Alert.alert("PDF Error", e?.message ?? "Download failed");
@@ -883,7 +898,7 @@ export default function AdmitCardScreen() {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setLoading(true);
     try {
-      await downloadMultipleHtmlsAsPdf(
+      const url = await downloadMultipleHtmlsAsPdf(
         {
           count: list.length,
           getPage: (index) =>
@@ -897,9 +912,17 @@ export default function AdmitCardScreen() {
         },
         `Admit Cards – Class ${selectedClass}`,
         ".pg",
-        true,
-        (fn, uri) => setPdfSaved({ filename: fn, fileUri: uri }),
+        Platform.OS === "web" ? false : true,
+        Platform.OS !== "web"
+          ? (fn, uri) => setPdfSaved({ filename: fn, fileUri: uri })
+          : undefined,
       );
+      if (url && Platform.OS === "web") {
+        setDownloadReady({
+          url,
+          filename: `Admit Cards – Class ${selectedClass}.pdf`,
+        });
+      }
     } catch (e: any) {
       if (!e?.message?.includes("cancelled"))
         Alert.alert("PDF Error", e?.message ?? "Download failed");
@@ -1604,6 +1627,46 @@ export default function AdmitCardScreen() {
         </View>
       )}
 
+      {downloadReady && Platform.OS === "web" && (
+        <View style={st.downloadReadyCard}>
+          <View style={st.downloadReadyIcon}>
+            <Feather name="check" size={18} color="#15803D" />
+          </View>
+          <View style={st.downloadReadyCopy}>
+            <Text style={st.downloadReadyTitle}>PDF is ready</Text>
+            <Text style={st.downloadReadySub} numberOfLines={1}>
+              Click Download PDF to save it to your device.
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={st.downloadReadyBtn}
+            onPress={() => {
+              const current = downloadReady;
+              if (!current) return;
+              const anchor = document.createElement("a");
+              anchor.href = current.url;
+              anchor.download = current.filename;
+              anchor.rel = "noopener";
+              anchor.click();
+            }}
+            activeOpacity={0.8}
+          >
+            <Feather name="download" size={14} color="#fff" />
+            <Text style={st.downloadReadyBtnTxt}>Download PDF</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={st.downloadReadyClose}
+            onPress={() => {
+              if (downloadReady.url) URL.revokeObjectURL(downloadReady.url);
+              setDownloadReady(null);
+            }}
+            activeOpacity={0.7}
+          >
+            <Feather name="x" size={16} color="#64748B" />
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* ── Exam Picker Modal ────────────────────────────────────────────────── */}
       <Modal
         visible={showExamPicker}
@@ -2119,6 +2182,53 @@ const st = StyleSheet.create({
     shadowRadius: 24,
   },
   loadingTxt: { fontSize: 15, fontWeight: "600", color: "#0F172A" },
+  downloadReadyCard: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 92,
+    zIndex: 120,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    shadowColor: "#0F172A",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  downloadReadyIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    backgroundColor: "#DCFCE7",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  downloadReadyCopy: { flex: 1, minWidth: 0 },
+  downloadReadyTitle: { fontSize: 13, fontWeight: "800", color: "#166534" },
+  downloadReadySub: { fontSize: 10, color: "#64748B", marginTop: 2 },
+  downloadReadyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#1E3A8A",
+    borderRadius: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  downloadReadyBtnTxt: { color: "#fff", fontSize: 11, fontWeight: "800" },
+  downloadReadyClose: {
+    width: 28,
+    height: 28,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   // Academic Session card (marksheet-style)
   sessionCard: {
