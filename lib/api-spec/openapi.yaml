@@ -147,6 +147,23 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TeacherAttendanceRecord"
+  /teacher-attendance/reset:
+    post:
+      operationId: resetTeacherAttendance
+      tags: [teacher-attendance]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherAttendanceReset"
+      responses:
+        "200":
+          description: Teacher attendance records reset
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAttendanceResetResult"
   /teacher-attendance/face-status:
     get:
       operationId: getTeacherFaceStatus
@@ -588,6 +605,18 @@ components:
         distanceFromSchool: { type: [number, "null"] }
         faceVerified: { type: string }
         faceVerificationMethod: { type: [string, "null"] }
+    TeacherAttendanceReset:
+      type: object
+      required: [adminId]
+      properties:
+        adminId: { type: string }
+        teacherId: { type: string, description: "Omit to reset attendance for every teacher" }
+    TeacherAttendanceResetResult:
+      type: object
+      required: [deletedCount]
+      properties:
+        deletedCount: { type: integer }
+        teacherId: { type: [string, "null"] }
     TeacherFaceStatus:
       type: object
       properties:

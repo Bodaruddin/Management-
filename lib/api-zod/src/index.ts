@@ -36,3 +36,4 @@ export type {
   TeacherProfile,
   TeacherProfilePermissions,
 } from "./generated/types";
+export * from './generated/types';

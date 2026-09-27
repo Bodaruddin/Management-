@@ -6,8 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface PayrollCalculate {
+export interface TeacherAttendanceReset {
   adminId: string;
-  month: string;
-  year: number;
+  /** Omit to reset attendance for every teacher */
+  teacherId?: string;
 }

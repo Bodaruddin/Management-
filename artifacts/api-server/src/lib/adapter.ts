@@ -90,6 +90,7 @@ export interface DataAdapter {
     create(data: any): Promise<any>;
     createIfAbsent(teacherId: string, date: string, data: any): Promise<{ row: any; created: boolean }>;
     updateCheckOut(id: string, data: any): Promise<any | null>;
+    reset(teacherId?: string): Promise<number>;
   };
   teacherLeaveApplications: {
     list(filters?: { teacherId?: string; status?: string }): Promise<any[]>;

@@ -335,6 +335,18 @@ router.get("/teacher-attendance", async (req, res) => {
   res.json(await getAdapter().teacherAttendance.list({ teacherId, month }));
 });
 
+router.post("/teacher-attendance/reset", async (req, res) => {
+  if (req.body?.adminId !== "admin") {
+    res.status(403).json({ error: "Only administrators can reset teacher attendance" });
+    return;
+  }
+  const teacherId = typeof req.body?.teacherId === "string" && req.body.teacherId.trim()
+    ? req.body.teacherId.trim()
+    : undefined;
+  const deletedCount = await getAdapter().teacherAttendance.reset(teacherId);
+  res.json({ deletedCount, teacherId: teacherId ?? null });
+});
+
 router.get("/teacher-attendance/face-status", async (req, res) => {
   const teacherId = typeof req.query.teacherId === "string" ? req.query.teacherId : "";
   if (!teacherId) {

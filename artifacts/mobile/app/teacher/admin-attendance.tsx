@@ -81,7 +81,7 @@ export default function AdminTeacherAttendance() {
   const insets = useSafeAreaInsets();
   const {
     teacherAttendanceSettings, teacherAttendanceRecords, teacherLeaves, teacherHolidays, teachers,
-    refreshTeacherAttendance, updateTeacherAttendanceSettings, reviewTeacherLeave,
+    refreshTeacherAttendance, resetTeacherAttendance, updateTeacherAttendanceSettings, reviewTeacherLeave,
     addTeacherHoliday, updateTeacherHoliday, deleteTeacherHoliday, calculateTeacherPayroll,
   } = useApp();
   const [settings, setSettings] = useState<TeacherAttendanceSettings>(teacherAttendanceSettings);
@@ -97,6 +97,7 @@ export default function AdminTeacherAttendance() {
   const [historyFilter, setHistoryFilter] = useState<'all' | 'approved' | 'rejected'>('all');
   const [selectedLeaveHistory, setSelectedLeaveHistory] = useState<TeacherLeaveApplication | null>(null);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
+  const [resetTarget, setResetTarget] = useState<{ teacherId?: string; teacherName?: string } | null>(null);
 
   useEffect(() => {
     refreshTeacherAttendance().catch(error => console.error('[AdminTeacherAttendance]', error));
@@ -181,6 +182,22 @@ export default function AdminTeacherAttendance() {
     const report = await calculateTeacherPayroll(month, Number(year));
     setPayroll(report);
   });
+
+  const performResetAttendance = async (teacherId?: string) => {
+    setSaving(true);
+    try {
+      await resetTeacherAttendance(teacherId);
+    } catch (error: any) {
+      const message = error?.message ?? 'Please try again.';
+      Alert.alert('Could not reset attendance', message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmResetAttendance = (teacherId?: string, teacherName?: string) => {
+    setResetTarget({ teacherId, teacherName });
+  };
 
   const s = styles(colors);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -318,6 +335,26 @@ export default function AdminTeacherAttendance() {
         <View style={[s.section, { backgroundColor: colors.card }]}>
           <View style={s.sectionHeader}>
             <View style={{ flex: 1 }}>
+              <Text style={[s.sectionTitle, { color: colors.text }]}>Reset attendance records</Text>
+              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>
+                Clear saved check-in and check-out history without deleting teacher accounts, leave applications, or school holidays.
+              </Text>
+            </View>
+            <Feather name="rotate-ccw" size={20} color={colors.destructive} />
+          </View>
+          <TouchableOpacity
+            style={[s.dangerButton, { borderColor: colors.destructive }]}
+            onPress={() => confirmResetAttendance()}
+            disabled={saving}
+          >
+            <Feather name="trash-2" size={16} color={colors.destructive} />
+            <Text style={[s.dangerText, { color: colors.destructive }]}>Reset all teachers</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[s.section, { backgroundColor: colors.card }]}>
+          <View style={s.sectionHeader}>
+            <View style={{ flex: 1 }}>
               <Text style={[s.sectionTitle, { color: colors.text }]}>This month&apos;s attendance</Text>
               <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>Present, absent, late, leave, and holiday totals for {reportMonthKey}. Tap a teacher for the full report.</Text>
             </View>
@@ -341,9 +378,20 @@ export default function AdminTeacherAttendance() {
                   <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Present {present} · Absent {absent} · Holidays {monthlyHolidays.length}</Text>
                   <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Late {late} · Leave {leave} · Check-outs {rows.filter(record => record.checkOutAt).length}</Text>
                 </View>
-                <View style={s.reportLink}>
-                  <Text style={[s.amount, { color: rows.length ? colors.success : colors.mutedForeground }]}>{rows.length ? rows.length + ' records' : 'No records'}</Text>
-                  <Feather name="chevron-right" size={17} color={colors.primary} />
+                <View style={s.reportActions}>
+                  <TouchableOpacity
+                    style={[s.teacherResetButton, { borderColor: colors.destructive }]}
+                    onPress={() => confirmResetAttendance(teacher.id, teacher.name)}
+                    disabled={saving}
+                    hitSlop={6}
+                  >
+                    <Feather name="rotate-ccw" size={13} color={colors.destructive} />
+                    <Text style={[s.teacherResetText, { color: colors.destructive }]}>Reset</Text>
+                  </TouchableOpacity>
+                  <View style={s.reportLink}>
+                    <Text style={[s.amount, { color: rows.length ? colors.success : colors.mutedForeground }]}>{rows.length ? rows.length + ' records' : 'No records'}</Text>
+                    <Feather name="chevron-right" size={17} color={colors.primary} />
+                  </View>
                 </View>
               </TouchableOpacity>
             );
@@ -543,6 +591,59 @@ export default function AdminTeacherAttendance() {
           ))}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={!!resetTarget}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setResetTarget(null)}
+      >
+        <View style={s.confirmOverlay}>
+          <View style={[s.resetModal, { backgroundColor: colors.card }]}>
+            <LinearGradient
+              colors={[colors.destructive, '#FF8A65']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.resetIconWrap}
+            >
+              <Feather name="alert-triangle" size={27} color="#fff" />
+            </LinearGradient>
+            <Text style={[s.resetModalTitle, { color: colors.text }]}>Reset attendance?</Text>
+            <Text style={[s.resetModalCopy, { color: colors.mutedForeground }]}>
+              {resetTarget?.teacherId
+                ? `You're about to remove all saved attendance records for ${resetTarget.teacherName ?? 'this teacher'}.`
+                : 'You’re about to remove every saved attendance record for all teachers.'}
+            </Text>
+            <View style={[s.resetWarning, { backgroundColor: `${colors.destructive}0D`, borderColor: `${colors.destructive}24` }]}>
+              <Feather name="info" size={15} color={colors.destructive} />
+              <Text style={[s.resetWarningText, { color: colors.text }]}>
+                This action cannot be undone. Teacher accounts, leave applications, and school holidays will stay safe.
+              </Text>
+            </View>
+            <View style={s.resetModalActions}>
+              <TouchableOpacity
+                style={[s.resetCancelButton, { borderColor: colors.border }]}
+                onPress={() => setResetTarget(null)}
+                disabled={saving}
+              >
+                <Text style={[s.resetCancelText, { color: colors.mutedForeground }]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.resetConfirmButton, { backgroundColor: colors.destructive, opacity: saving ? 0.65 : 1 }]}
+                onPress={() => {
+                  const target = resetTarget;
+                  setResetTarget(null);
+                  void performResetAttendance(target?.teacherId);
+                }}
+                disabled={saving}
+              >
+                <Feather name="rotate-ccw" size={15} color="#fff" />
+                <Text style={s.resetConfirmText}>Reset attendance</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={!!selectedTeacher}
@@ -757,11 +858,28 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   choiceText: { fontSize: 13, fontWeight: '600' },
   secondaryButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1.5, marginBottom: 12 },
   secondaryText: { fontSize: 14, fontWeight: '800' },
+  dangerButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1.5 },
+  dangerText: { fontSize: 14, fontWeight: '800' },
   cancelButton: { minHeight: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderWidth: 1, marginBottom: 10 },
   cancelText: { fontSize: 12, fontWeight: '700' },
   payrollBox: { borderRadius: 11, padding: 11, marginTop: 2 },
   payrollRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
-  reportLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginLeft: 8 },
+  reportActions: { alignItems: 'flex-end', gap: 8, marginLeft: 8 },
+  teacherResetButton: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 7, paddingHorizontal: 7, paddingVertical: 5 },
+  teacherResetText: { fontSize: 10, fontWeight: '800' },
+  reportLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  confirmOverlay: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.56)', alignItems: 'center', justifyContent: 'center', padding: 22 },
+  resetModal: { width: '100%', maxWidth: 390, borderRadius: 24, padding: 22, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 12 },
+  resetIconWrap: { width: 62, height: 62, borderRadius: 21, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: 16, shadowColor: '#FF4D5A', shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
+  resetModalTitle: { fontSize: 21, fontWeight: '800', letterSpacing: -0.3, textAlign: 'center' },
+  resetModalCopy: { fontSize: 14, lineHeight: 21, marginTop: 8 },
+  resetWarning: { flexDirection: 'row', alignItems: 'flex-start', gap: 9, borderWidth: 1, borderRadius: 13, padding: 12, marginTop: 17 },
+  resetWarningText: { flex: 1, fontSize: 12, lineHeight: 18, fontWeight: '600' },
+  resetModalActions: { flexDirection: 'row', gap: 10, marginTop: 22 },
+  resetCancelButton: { flex: 1, minHeight: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1 },
+  resetCancelText: { fontSize: 14, fontWeight: '800' },
+  resetConfirmButton: { flex: 1.25, minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 12 },
+  resetConfirmText: { color: '#fff', fontSize: 13, fontWeight: '800' },
   historyTitle: { fontSize: 13, fontWeight: '700' },
   historyMeta: { fontSize: 12, lineHeight: 17, marginTop: 3 },
   amount: { fontSize: 15, fontWeight: '800' },

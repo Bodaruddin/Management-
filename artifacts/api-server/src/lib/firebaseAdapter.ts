@@ -871,6 +871,21 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
         await ref.update(updates);
         return { id, ...existing.data(), ...updates };
       },
+      async reset(teacherId) {
+        const snap = teacherId
+          ? await col("teacher_attendance_records").where("teacherId", "==", teacherId).get()
+          : await col("teacher_attendance_records").get();
+        let deletedCount = 0;
+        for (let start = 0; start < snap.docs.length; start += 400) {
+          const chunk = snap.docs.slice(start, start + 400);
+          if (chunk.length === 0) continue;
+          const batch = fs.batch();
+          chunk.forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+          deletedCount += chunk.length;
+        }
+        return deletedCount;
+      },
     },
 
     // ── Teacher Leave Applications ─────────────────────────────────────────────

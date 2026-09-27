@@ -529,6 +529,7 @@ interface AppContextType extends AppState {
   deleteAlumni: (id: string) => void;
   bulkAddAlumni: (records: Omit<Alumni, 'id' | 'batch'>[], batch: string) => Promise<void>;
   refreshTeacherAttendance: (teacherId?: string) => Promise<void>;
+  resetTeacherAttendance: (teacherId?: string) => Promise<number>;
   getTeacherFaceStatus: (teacherId: string) => Promise<{ enrolled: boolean; canReEnroll: boolean }>;
   enrollTeacherFace: (teacherId: string, faceSamplesBase64: string[], replaceExisting?: boolean) => Promise<void>;
   checkInTeacher: (data: {
@@ -1497,6 +1498,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
+  const resetTeacherAttendance = useCallback(async (teacherId?: string) => {
+    const result = await apiPost<{ deletedCount?: number }>('/teacher-attendance/reset', {
+      adminId: 'admin',
+      ...(teacherId ? { teacherId } : {}),
+    });
+    const deletedCount = Number(result.deletedCount ?? 0);
+    setState(prev => ({
+      ...prev,
+      teacherAttendanceRecords: teacherId
+        ? prev.teacherAttendanceRecords.filter(record => record.teacherId !== teacherId)
+        : [],
+    }));
+    return deletedCount;
+  }, []);
+
   const getTeacherFaceStatus = useCallback(async (teacherId: string) => {
     return apiGet<{ enrolled: boolean; canReEnroll: boolean }>(
       `/teacher-attendance/face-status?teacherId=${encodeURIComponent(teacherId)}`,
@@ -1871,7 +1887,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       deleteInactivationRequestDocument, deleteInactivationRequest,
       refreshInactivationRequests, loadInactivationRequestDocument, setStudentStatus, setClassAbsentLimit, updateDocumentBranding,
       addAlumni, updateAlumni, deleteAlumni, bulkAddAlumni,
-       refreshTeacherAttendance, getTeacherFaceStatus, enrollTeacherFace,
+       refreshTeacherAttendance, resetTeacherAttendance, getTeacherFaceStatus, enrollTeacherFace,
        checkInTeacher, checkOutTeacher, applyTeacherLeave,
       updateTeacherLeave, deleteTeacherLeave,
       reviewTeacherLeave, addTeacherHoliday, updateTeacherHoliday, deleteTeacherHoliday,

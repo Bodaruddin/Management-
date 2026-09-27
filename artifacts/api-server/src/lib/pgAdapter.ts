@@ -771,6 +771,15 @@ export function createPgAdapter(db: DB): DataAdapter {
         }).where(eq(teacherAttendanceRecordsTable.id, id)).returning();
         return row ?? null;
       },
+      async reset(teacherId) {
+        const deleted = teacherId
+          ? await db.delete(teacherAttendanceRecordsTable)
+            .where(eq(teacherAttendanceRecordsTable.teacherId, teacherId))
+            .returning({ id: teacherAttendanceRecordsTable.id })
+          : await db.delete(teacherAttendanceRecordsTable)
+            .returning({ id: teacherAttendanceRecordsTable.id });
+        return deleted.length;
+      },
     },
 
     // ── Teacher Leave Applications ─────────────────────────────────────────────
