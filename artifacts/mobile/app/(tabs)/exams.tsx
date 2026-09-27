@@ -107,6 +107,7 @@ export default function ExamsScreen() {
   const [frExamIds, setFrExamIds] = useState<string[]>([]);
   const [frClass, setFrClass] = useState<string | null>(null);
   const [frGenerating, setFrGenerating] = useState(false);
+  const [frReportKind, setFrReportKind] = useState<'combined' | 'classMarks'>('combined');
 
   const frSelectedExams = useMemo(
     () => exams.filter(e => frExamIds.includes(e.id)),
@@ -161,10 +162,17 @@ export default function ExamsScreen() {
       .sort((a, b) => {
         // Students with no results go to the bottom
         if (a.hasAny !== b.hasAny) return a.hasAny ? -1 : 1;
-        // Sort by percentage descending (highest % = rank 1)
-        return b.pct - a.pct;
+        // Keep the class report in roll-number order.
+        return compareStudentRollNumbers(a.student, b.student);
       });
   }, [frSelectedExams, frClass, examResults, students]);
+
+  const frReportSubjects = useMemo(() => {
+    if (!frClass || frSelectedExams.length === 0) return [];
+    return [...new Set(
+      frSelectedExams.flatMap(exam => getExamSubjectsForClass(exam, frClass)),
+    )];
+  }, [frSelectedExams, frClass]);
 
   // ── Derived data ────────────────────────────────────────────────────────────
   const examClasses = useMemo(() => {
@@ -490,40 +498,99 @@ export default function ExamsScreen() {
   if (screen === 'finalResults') {
     const passed = frRows.filter(r => r.pass && r.hasAny).length;
     const totalStudents = frRows.length;
+    const isClassMarksReport = frReportKind === 'classMarks';
 
     const toggleExam = (id: string) => {
       setFrClass(null);
       setFrExamIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     };
 
+    const getMatrixMark = (studentId: string, exam: Exam, subject: string) => {
+      if (!frClass || !getExamSubjectsForClass(exam, frClass).includes(subject)) return '—';
+      const result = examResults.find(r => r.examId === exam.id && r.studentId === studentId);
+      if (!result || result.marks[subject] === undefined) return '—';
+      const maxMarks = getSubjectMaxMarksForClass(exam, subject, frClass);
+      return `${result.marks[subject]}/${maxMarks}`;
+    };
+
     const buildPdfHtml = () => {
       const examLabels = frSelectedExams.map(e => e.name);
-      const title = frSelectedExams.length > 1
-        ? `Combined Result — ${examLabels.join(' + ')}`
-        : examLabels[0] ?? 'Result Sheet';
+      const title = isClassMarksReport
+        ? `Class Exam Marks — ${examLabels.join(' + ')}`
+        : frSelectedExams.length > 1
+          ? `Combined Result — ${examLabels.join(' + ')}`
+          : examLabels[0] ?? 'Result Sheet';
+
+      if (isClassMarksReport) {
+        const studentBlocks = frRows.map(row => {
+          const examRows = frSelectedExams.map(exam => `
+            <tr>
+              <td style="padding:6px 8px;border:1px solid #e2e8f0;font-weight:700;">${exam.name}</td>
+              ${frReportSubjects.map(subject => `
+                <td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">${getMatrixMark(row.student.id, exam, subject)}</td>
+              `).join('')}
+            </tr>
+          `).join('');
+          return `
+            <section class="student-block">
+              <h3>Student Name: ${row.student.name} <span>Roll: ${row.student.rollNumber}</span></h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Exam</th>
+                    ${frReportSubjects.map(subject => `<th>${subject}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody>${examRows}</tbody>
+              </table>
+            </section>
+          `;
+        }).join('');
+
+        return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
+          <title>${title}</title>
+          <style>
+            body{font-family:Arial,sans-serif;padding:16px 16px 4px;color:#0C1F4A;}
+            h2{text-align:center;color:#1E3A8A;margin:0 0 2px;}
+            .sub{text-align:center;color:#64748B;font-size:12px;margin-bottom:16px;}
+            .student-block{break-inside:avoid;margin:0 0 18px;}
+            h3{font-size:14px;color:#1E3A8A;margin:0 0 6px;}
+            h3 span{font-size:11px;font-weight:400;color:#64748B;margin-left:12px;}
+            table{width:100%;border-collapse:collapse;font-size:12px;}
+            th{background:#1E3A8A;color:#fff;padding:6px 8px;border:1px solid #ccc;text-align:center;}
+            th:first-child{text-align:left;}
+            @media print{@page{size:landscape;margin:8mm;}}
+          </style></head><body>
+          <h2>${SCHOOL_INFO.name}</h2>
+          <div class="sub">${title} &nbsp;•&nbsp; Class: ${frClass ?? ''}</div>
+          ${studentBlocks}
+          <p style="text-align:center;font-size:11px;color:#888;margin-top:20px;">
+            Marks shown as obtained/max marks &nbsp;•&nbsp; Sorted by Roll Number &nbsp;•&nbsp; ${SCHOOL_INFO.name}
+          </p>
+          </body></html>`;
+      }
 
       const examHeaderCols = frSelectedExams.map(ex =>
-        `<th colspan="2" style="background:#1E3A8A;color:#fff;padding:6px 4px;font-size:11px;border:1px solid #ccc;">${ex.name}</th>`
-      ).join('');
-      const subHeaderCols = frSelectedExams.map(() =>
-        `<th style="padding:5px 4px;font-size:10px;border:1px solid #ccc;background:#f0f4ff;">Score</th><th style="padding:5px 4px;font-size:10px;border:1px solid #ccc;background:#f0f4ff;">Max</th>`
+        `<th style="background:#1E3A8A;color:#fff;padding:6px 4px;font-size:11px;border:1px solid #ccc;">${ex.name}</th>`
       ).join('');
 
       const dataRows = frRows.map((row, i) => {
         const bg = i % 2 === 0 ? '#fff' : '#f8fafc';
         const examCells = frSelectedExams.map(ex => {
           const et = row.examTotals.find(t => t.examId === ex.id);
-          return `<td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;">${et?.hasResult ? et.total : '—'}</td><td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;color:#888;">${et?.hasResult ? et.maxTotal : '—'}</td>`;
+          return `<td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;">${et?.hasResult ? `${et.total}/${et.maxTotal}` : '—'}</td>`;
         }).join('');
         const resultColor = row.hasAny ? (row.pass ? '#10B981' : '#EF4444') : '#888';
+        const summaryCells = isClassMarksReport ? '' : `
+          <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;font-weight:700;">${row.hasAny ? `${row.grandTotal}/${row.grandMax}` : '—'}</td>
+          <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;">${row.hasAny ? `${formatPercentage(row.pct)}%` : '—'}</td>
+          <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;font-weight:800;color:${resultColor};">${row.hasAny ? row.grade : '—'}</td>
+          <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:${resultColor};">${row.hasAny ? (row.pass ? 'PASS' : 'FAIL') : '—'}</td>`;
         return `<tr style="background:${bg};">
-          <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;font-weight:700;">${i + 1}</td>
+          <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;font-weight:700;">${row.student.rollNumber}</td>
           <td style="padding:5px 8px;border:1px solid #e2e8f0;">${row.student.name}</td>
           ${examCells}
-          <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;font-weight:700;">${row.hasAny ? `${row.grandTotal}/${row.grandMax}` : '—'}</td>
-           <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;">${row.hasAny ? `${formatPercentage(row.pct)}%` : '—'}</td>
-          <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;font-weight:800;color:${resultColor};">${row.hasAny ? row.grade : '—'}</td>
-          <td style="padding:5px 4px;border:1px solid #e2e8f0;text-align:center;font-weight:700;color:${resultColor};">${row.hasAny ? (row.pass ? 'PASS' : 'FAIL') : '—'}</td>
+          ${summaryCells}
         </tr>`;
       }).join('');
 
@@ -543,24 +610,24 @@ export default function ExamsScreen() {
       </style></head><body>
       <h2>${SCHOOL_INFO.name}</h2>
       <div class="sub">${title} &nbsp;•&nbsp; Class: ${frClass ?? ''}</div>
-      <div class="stats">
+       ${isClassMarksReport ? '' : `<div class="stats">
         <div class="stat"><div class="stat-v">${totalStudents}</div><div class="stat-k">Total</div></div>
         <div class="stat"><div class="stat-v" style="color:#10B981">${passed}</div><div class="stat-k">Passed</div></div>
         <div class="stat"><div class="stat-v" style="color:#EF4444">${totalStudents - passed}</div><div class="stat-k">Failed</div></div>
         <div class="stat"><div class="stat-v">${totalStudents > 0 ? Math.round((passed / totalStudents) * 100) : 0}%</div><div class="stat-k">Pass Rate</div></div>
-      </div>
+       </div>`}
       <table>
         <thead>
           <tr>
-            <th rowspan="2" style="padding:6px 4px;border:1px solid #ccc;">Roll</th>
-            <th rowspan="2" style="padding:6px 8px;border:1px solid #ccc;">Student Name</th>
+             <th style="padding:6px 4px;border:1px solid #ccc;">Roll</th>
+             <th style="padding:6px 8px;border:1px solid #ccc;">Student Name</th>
             ${examHeaderCols}
-            <th rowspan="2" style="padding:6px 4px;border:1px solid #ccc;">Grand Total</th>
-            <th rowspan="2" style="padding:6px 4px;border:1px solid #ccc;">%</th>
-            <th rowspan="2" style="padding:6px 4px;border:1px solid #ccc;">Grade</th>
-            <th rowspan="2" style="padding:6px 4px;border:1px solid #ccc;">Result</th>
+             ${isClassMarksReport ? '' : `
+             <th style="padding:6px 4px;border:1px solid #ccc;">Grand Total</th>
+             <th style="padding:6px 4px;border:1px solid #ccc;">%</th>
+             <th style="padding:6px 4px;border:1px solid #ccc;">Grade</th>
+             <th style="padding:6px 4px;border:1px solid #ccc;">Result</th>`}
           </tr>
-          <tr>${subHeaderCols}</tr>
         </thead>
         <tbody>${dataRows}</tbody>
       </table>
@@ -825,7 +892,9 @@ export default function ExamsScreen() {
             <Feather name="arrow-left" size={22} color={colors.text} />
           </TouchableOpacity>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={[s.backTitle, { color: colors.text }]}>Combined Results</Text>
+            <Text style={[s.backTitle, { color: colors.text }]}>
+              {isClassMarksReport ? 'Class Exam Marks' : 'Combined Results'}
+            </Text>
             {frSelectedExams.length > 0 && (
               <Text style={{ fontSize: 11, color: colors.mutedForeground }} numberOfLines={1}>
                 {frSelectedExams.map(e => e.name).join(' + ')}
@@ -908,32 +977,103 @@ export default function ExamsScreen() {
 
           {/* ── Result table ── */}
           {frSelectedExams.length > 0 && frClass && (
-            <>
-              {/* Summary */}
-              <View style={[fr.summaryBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                {[
-                  { val: totalStudents, label: 'Total', color: colors.primary },
-                  { val: passed, label: 'Passed', color: colors.success },
-                  { val: totalStudents - passed, label: 'Failed', color: colors.destructive },
-                  { val: `${totalStudents > 0 ? Math.round((passed / totalStudents) * 100) : 0}%`, label: 'Pass Rate', color: colors.text },
-                ].map((item, i, arr) => (
-                  <React.Fragment key={item.label}>
-                    <View style={fr.summaryItem}>
-                      <Text style={[fr.summaryVal, { color: item.color }]}>{item.val}</Text>
-                      <Text style={[fr.summaryKey, { color: colors.mutedForeground }]}>{item.label}</Text>
+            isClassMarksReport ? (
+              <View>
+                <View style={[fr.resultHeader, { backgroundColor: colors.primary }]}>
+                  <Text style={fr.resultHeaderTitle}>{SCHOOL_INFO.name}</Text>
+                  <Text style={fr.resultHeaderExam}>All Exam Marks</Text>
+                  <Text style={fr.resultHeaderSub}>Class: {frClass}</Text>
+                </View>
+                {frRows.length === 0 ? (
+                  <View style={{ padding: 40, alignItems: 'center' }}>
+                    <Feather name="inbox" size={32} color={colors.mutedForeground} />
+                    <Text style={{ color: colors.mutedForeground, marginTop: 10 }}>No students in {frClass}</Text>
+                  </View>
+                ) : (
+                  frRows.map(row => (
+                    <View key={row.student.id} style={{ marginBottom: 16 }}>
+                      <View style={[fr.studentHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: colors.text }}>
+                          Student Name: {row.student.name}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
+                          Roll: {row.student.rollNumber}
+                        </Text>
+                      </View>
+                      <ScrollView horizontal showsHorizontalScrollIndicator>
+                        <View>
+                          <View style={[fr.tableHead, { backgroundColor: colors.primary }]}>
+                            <Text style={[fr.th, { width: 130, color: '#fff', textAlign: 'left' }]}>Exam</Text>
+                            {frReportSubjects.map(subject => (
+                              <Text key={subject} style={[fr.th, { width: 100, color: '#fff' }]} numberOfLines={1}>
+                                {subject}
+                              </Text>
+                            ))}
+                          </View>
+                          {frSelectedExams.map((exam, examIndex) => (
+                            <View
+                              key={exam.id}
+                              style={[
+                                fr.tableRow,
+                                {
+                                  backgroundColor: examIndex % 2 === 0 ? colors.card : colors.muted + '50',
+                                  borderColor: colors.border,
+                                },
+                              ]}
+                            >
+                              <Text style={[fr.td, { width: 130, textAlign: 'left', fontWeight: '700', color: colors.text }]}>
+                                {exam.name}
+                              </Text>
+                              {frReportSubjects.map(subject => (
+                                <Text key={subject} style={[fr.td, { width: 100, color: colors.text }]}>
+                                  {getMatrixMark(row.student.id, exam, subject)}
+                                </Text>
+                              ))}
+                            </View>
+                          ))}
+                        </View>
+                      </ScrollView>
                     </View>
-                    {i < arr.length - 1 && <View style={[fr.summaryDivider, { backgroundColor: colors.border }]} />}
-                  </React.Fragment>
-                ))}
+                  ))
+                )}
+                {frRows.length > 0 && (
+                  <View style={[fr.tableFooter, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Text style={{ fontSize: 11, color: colors.mutedForeground, textAlign: 'center' }}>
+                      Marks shown as obtained/max marks • Sorted by Roll Number
+                    </Text>
+                  </View>
+                )}
               </View>
+            ) : (
+            <>
+              {!isClassMarksReport && (
+                <View style={[fr.summaryBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  {[
+                    { val: totalStudents, label: 'Total', color: colors.primary },
+                    { val: passed, label: 'Passed', color: colors.success },
+                    { val: totalStudents - passed, label: 'Failed', color: colors.destructive },
+                    { val: `${totalStudents > 0 ? Math.round((passed / totalStudents) * 100) : 0}%`, label: 'Pass Rate', color: colors.text },
+                  ].map((item, i, arr) => (
+                    <React.Fragment key={item.label}>
+                      <View style={fr.summaryItem}>
+                        <Text style={[fr.summaryVal, { color: item.color }]}>{item.val}</Text>
+                        <Text style={[fr.summaryKey, { color: colors.mutedForeground }]}>{item.label}</Text>
+                      </View>
+                      {i < arr.length - 1 && <View style={[fr.summaryDivider, { backgroundColor: colors.border }]} />}
+                    </React.Fragment>
+                  ))}
+                </View>
+              )}
 
               {/* Result header */}
               <View style={[fr.resultHeader, { backgroundColor: colors.primary }]}>
                 <Text style={fr.resultHeaderTitle}>{SCHOOL_INFO.name}</Text>
                 <Text style={fr.resultHeaderExam} numberOfLines={2}>
-                  {frSelectedExams.length > 1
-                    ? `Combined: ${frSelectedExams.map(e => e.name).join(' + ')}`
-                    : frSelectedExams[0]?.name}
+                  {isClassMarksReport
+                    ? 'All Exam Marks'
+                    : frSelectedExams.length > 1
+                      ? `Combined: ${frSelectedExams.map(e => e.name).join(' + ')}`
+                      : frSelectedExams[0]?.name}
                 </Text>
                 <Text style={fr.resultHeaderSub}>Class: {frClass}</Text>
               </View>
@@ -941,17 +1081,21 @@ export default function ExamsScreen() {
               {/* Scrollable table */}
               <ScrollView horizontal showsHorizontalScrollIndicator>
                 <View>
-                  {/* Table header — row 1: exam names spanning 2 cols each */}
+                  {/* One column per exam; each cell shows marks as score/max. */}
                   <View style={[fr.tableHead, { backgroundColor: colors.primary }]}>
                     <Text style={[fr.th, { width: 44, color: '#fff' }]}>Roll</Text>
                     <Text style={[fr.th, { width: 130, color: '#fff', textAlign: 'left' }]}>Name</Text>
                     {frSelectedExams.map(ex => (
                       <Text key={ex.id} style={[fr.th, { width: 100, color: '#fff' }]} numberOfLines={1}>{ex.name}</Text>
                     ))}
-                    <Text style={[fr.th, { width: 80, color: '#fff' }]}>Grand{'\n'}Total</Text>
-                    <Text style={[fr.th, { width: 48, color: '#fff' }]}>%</Text>
-                    <Text style={[fr.th, { width: 40, color: '#fff' }]}>Grd</Text>
-                    <Text style={[fr.th, { width: 48, color: '#fff' }]}>Result</Text>
+                    {!isClassMarksReport && (
+                      <>
+                        <Text style={[fr.th, { width: 80, color: '#fff' }]}>Grand{'\n'}Total</Text>
+                        <Text style={[fr.th, { width: 48, color: '#fff' }]}>%</Text>
+                        <Text style={[fr.th, { width: 40, color: '#fff' }]}>Grd</Text>
+                        <Text style={[fr.th, { width: 48, color: '#fff' }]}>Result</Text>
+                      </>
+                    )}
                   </View>
 
                   {frRows.length === 0 ? (
@@ -965,7 +1109,7 @@ export default function ExamsScreen() {
                       const resultColor = row.hasAny ? (row.pass ? colors.success : colors.destructive) : colors.mutedForeground;
                       return (
                         <View key={row.student.id} style={[fr.tableRow, { backgroundColor: rowBg, borderColor: colors.border }]}>
-                          <Text style={[fr.td, { width: 44, fontWeight: '700', color: colors.text }]}>{idx + 1}</Text>
+                          <Text style={[fr.td, { width: 44, fontWeight: '700', color: colors.text }]}>{row.student.rollNumber}</Text>
                           <Text style={[fr.td, { width: 130, textAlign: 'left', color: colors.text }]} numberOfLines={1}>{row.student.name}</Text>
                           {frSelectedExams.map(ex => {
                             const et = row.examTotals.find(t => t.examId === ex.id);
@@ -975,18 +1119,22 @@ export default function ExamsScreen() {
                               </Text>
                             );
                           })}
-                          <Text style={[fr.td, { width: 80, fontWeight: '700', color: colors.text }]}>
-                            {row.hasAny ? `${row.grandTotal}/${row.grandMax}` : '—'}
-                          </Text>
-                           <Text style={[fr.td, { width: 48, color: colors.text }]}>{row.hasAny ? `${formatPercentage(row.pct)}%` : '—'}</Text>
-                          <Text style={[fr.td, { width: 40, fontWeight: '800', color: resultColor }]}>{row.hasAny ? row.grade : '—'}</Text>
-                          <View style={{ width: 48, alignItems: 'center', justifyContent: 'center' }}>
-                            {row.hasAny ? (
-                              <View style={[fr.resultBadge, { backgroundColor: row.pass ? colors.success + '25' : colors.destructive + '25' }]}>
-                                <Text style={{ fontSize: 9, fontWeight: '800', color: resultColor }}>{row.pass ? 'PASS' : 'FAIL'}</Text>
+                          {!isClassMarksReport && (
+                            <>
+                              <Text style={[fr.td, { width: 80, fontWeight: '700', color: colors.text }]}>
+                                {row.hasAny ? `${row.grandTotal}/${row.grandMax}` : '—'}
+                              </Text>
+                              <Text style={[fr.td, { width: 48, color: colors.text }]}>{row.hasAny ? `${formatPercentage(row.pct)}%` : '—'}</Text>
+                              <Text style={[fr.td, { width: 40, fontWeight: '800', color: resultColor }]}>{row.hasAny ? row.grade : '—'}</Text>
+                              <View style={{ width: 48, alignItems: 'center', justifyContent: 'center' }}>
+                                {row.hasAny ? (
+                                  <View style={[fr.resultBadge, { backgroundColor: row.pass ? colors.success + '25' : colors.destructive + '25' }]}>
+                                    <Text style={{ fontSize: 9, fontWeight: '800', color: resultColor }}>{row.pass ? 'PASS' : 'FAIL'}</Text>
+                                  </View>
+                                ) : <Text style={{ fontSize: 10, color: colors.mutedForeground }}>—</Text>}
                               </View>
-                            ) : <Text style={{ fontSize: 10, color: colors.mutedForeground }}>—</Text>}
-                          </View>
+                            </>
+                          )}
                         </View>
                       );
                     })
@@ -995,13 +1143,14 @@ export default function ExamsScreen() {
                   {frRows.length > 0 && (
                     <View style={[fr.tableFooter, { backgroundColor: colors.card, borderColor: colors.border }]}>
                       <Text style={{ fontSize: 11, color: colors.mutedForeground, textAlign: 'center' }}>
-                        Roll No. assigned by Percentage Rank • {SCHOOL_INFO.name}
+                        Sorted by Roll Number • {SCHOOL_INFO.name}
                       </Text>
                     </View>
                   )}
                 </View>
               </ScrollView>
             </>
+            )
           )}
 
           {frSelectedExams.length === 0 && (
@@ -1617,24 +1766,50 @@ export default function ExamsScreen() {
       {/* ── Quick Actions ── */}
       <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 }}>
         <Text style={[qa.sectionLabel, { color: colors.mutedForeground }]}>QUICK ACTIONS</Text>
-        <TouchableOpacity
-          style={[qa.card, { backgroundColor: colors.success + '12', borderColor: colors.success + '30' }]}
-          onPress={() => { setFrExamIds([]); setFrClass(null); setScreen('finalResults'); }}
-          activeOpacity={0.82}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <View style={[qa.iconWrap, { backgroundColor: colors.success }]}>
-              <Feather name="award" size={20} color="#fff" />
+        <View style={qa.actionRow}>
+          <TouchableOpacity
+            style={[qa.card, qa.compactCard, { backgroundColor: colors.success + '12', borderColor: colors.success + '30' }]}
+            onPress={() => { setFrReportKind('combined'); setFrExamIds([]); setFrClass(null); setScreen('finalResults'); }}
+            activeOpacity={0.82}
+          >
+            <View style={qa.compactTop}>
+              <View style={[qa.compactIconWrap, { backgroundColor: colors.success }]}>
+                <Feather name="award" size={17} color="#fff" />
+              </View>
+              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[qa.cardTitle, { color: colors.text }]}>Generate Combined Results</Text>
-              <Text style={[qa.cardSub, { color: colors.mutedForeground }]}>
-                Select one or more exams → combine marks → download PDF, sorted by roll no.
-              </Text>
+            <Text style={[qa.compactCardTitle, { color: colors.text }]} numberOfLines={2}>
+              Combined Results
+            </Text>
+            <Text style={[qa.compactCardSub, { color: colors.mutedForeground }]} numberOfLines={3}>
+              Select exams and download a PDF.
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="download-class-all-exam-marks"
+            style={[qa.card, qa.compactCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
+            onPress={() => {
+              setFrReportKind('classMarks');
+              setFrExamIds([]);
+              setFrClass(null);
+              setScreen('finalResults');
+            }}
+            activeOpacity={0.82}
+          >
+            <View style={qa.compactTop}>
+              <View style={[qa.compactIconWrap, { backgroundColor: colors.primary }]}>
+                <Feather name="download" size={17} color="#fff" />
+              </View>
+              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
             </View>
-            <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
-          </View>
-        </TouchableOpacity>
+            <Text style={[qa.compactCardTitle, { color: colors.text }]} numberOfLines={2}>
+              Class All Marks
+            </Text>
+            <Text style={[qa.compactCardSub, { color: colors.mutedForeground }]} numberOfLines={3}>
+              Select exams, choose a class, and download.
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={{ paddingHorizontal: 16, paddingTop: 14 }}>
@@ -2089,6 +2264,12 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
 const qa = StyleSheet.create({
   sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10 },
   card: { borderRadius: 14, borderWidth: 1, padding: 14 },
+  actionRow: { flexDirection: 'row', gap: 10 },
+  compactCard: { flex: 1, minHeight: 128, padding: 11 },
+  compactTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
+  compactIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  compactCardTitle: { fontSize: 13, lineHeight: 17, fontWeight: '800' },
+  compactCardSub: { fontSize: 10.5, lineHeight: 14, marginTop: 4 },
   iconWrap: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   cardTitle: { fontSize: 15, fontWeight: '700' },
   cardSub: { fontSize: 12, lineHeight: 17, marginTop: 2 },
@@ -2105,6 +2286,7 @@ const fr = StyleSheet.create({
   resultHeaderTitle: { color: '#fff', fontSize: 13, fontWeight: '600', opacity: 0.85, marginBottom: 2 },
   resultHeaderExam: { color: '#fff', fontSize: 17, fontWeight: '800', textAlign: 'center' },
   resultHeaderSub: { color: '#fff', fontSize: 12, opacity: 0.75, marginTop: 4 },
+  studentHeader: { borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 10, marginTop: 8 },
   tableHead: { flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 10, borderTopLeftRadius: 10, borderTopRightRadius: 10, marginTop: 8 },
   th: { fontSize: 11, fontWeight: '700', textAlign: 'center', color: '#fff' },
   tableRow: { flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 10, borderBottomWidth: 1, alignItems: 'center' },
