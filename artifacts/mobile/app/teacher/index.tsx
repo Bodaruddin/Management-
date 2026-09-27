@@ -777,7 +777,7 @@ export default function TeacherDashboard() {
                 <View style={bc.card} ref={birthdayCardRef} nativeID="birthday-card-capture">
                   <LinearGradient
                     colors={['#0F0C29','#302B63','#24243E']}
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                     start={{x:0,y:0}} end={{x:1,y:1}}
                   />
                   {/* Top gold accent */}

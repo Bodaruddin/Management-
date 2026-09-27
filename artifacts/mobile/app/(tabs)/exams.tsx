@@ -9,10 +9,12 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { useAuth } from '@/context/AuthContext';
 import { useColors } from '@/hooks/useColors';
 import {
   useApp, Exam, ExamResult, SubjectSchedule, ClassSubjectAssignment,
   getExamSubjectsForClass, getSubjectMaxMarksForClass, isActiveStudent,
+  compareStudentRollNumbers,
   isGraduatedStudent,
 } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
@@ -43,6 +45,7 @@ const formatPercentage = (pct: number) => (
 
 export default function ExamsScreen() {
   const colors = useColors();
+  const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -50,7 +53,7 @@ export default function ExamsScreen() {
   const androidKeyboardPadding = Platform.OS === 'android'
     ? Math.max(0, keyboardHeight - Math.max(0, screenHeight - windowHeight))
     : 0;
-  const { exams, students, classes, subjects, addExam, updateExam, deleteExam, examResults, saveExamResults, addSubject, deleteSubject, documentBranding } = useApp();
+  const { exams, students, classes, subjects, addExam, updateExam, deleteExam, examResults, markSubmissions, saveExamResults, resetExamMarks, addSubject, deleteSubject, documentBranding } = useApp();
 
   const [screen, setScreen] = useState<Screen>('list');
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
@@ -91,6 +94,9 @@ export default function ExamsScreen() {
 
   // Marks entry
   const [marksData, setMarksData] = useState<Record<string, Record<string, string>>>({});
+  const [marksStudentIndex, setMarksStudentIndex] = useState(0);
+  const [resettingMarks, setResettingMarks] = useState(false);
+  const [pendingResetSubjects, setPendingResetSubjects] = useState<string[] | null>(null);
 
   // Delete confirmations
   const [examToDelete, setExamToDelete] = useState<Exam | null>(null);
@@ -237,12 +243,13 @@ export default function ExamsScreen() {
     if (!selectedExam) return;
     setSelectedClass(cls);
     setMarksData(initMarks(selectedExam, cls));
+    setMarksStudentIndex(0);
     setScreen('marks');
   };
 
   // ── Save marks ──────────────────────────────────────────────────────────────
   const handleSaveMarks = async () => {
-    if (!selectedExam || !selectedClass) return;
+    if (!selectedExam || !selectedClass || resettingMarks) return;
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const subs = getExamSubjectsForClass(selectedExam, selectedClass);
     const classStudents = students.filter(s => s.class === selectedClass && !isGraduatedStudent(s));
@@ -253,6 +260,46 @@ export default function ExamsScreen() {
     }));
     saveExamResults(results);
     setScreen('results');
+  };
+
+  const runMarksReset = async (subjectsToReset: string[]) => {
+    if (!selectedExam || !selectedClass || resettingMarks) return;
+    setResettingMarks(true);
+    try {
+      await resetExamMarks({
+        examId: selectedExam.id,
+        class: selectedClass,
+        subjects: subjectsToReset,
+        adminId: user?.id ?? 'admin',
+        adminName: user?.name ?? 'Administrator',
+      });
+      const resetSubjects = new Set(subjectsToReset);
+      setMarksData(prev => Object.fromEntries(
+        Object.entries(prev).map(([studentId, marks]) => [
+          studentId,
+          Object.fromEntries(Object.entries(marks).map(([subject, value]) => [
+            subject,
+            resetSubjects.has(subject) ? '' : value,
+          ])),
+        ]),
+      ));
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        'Marks reset',
+        subjectsToReset.length === getExamSubjectsForClass(selectedExam, selectedClass).length
+          ? `All subject marks for ${selectedClass} have been cleared. Teachers can enter them again.`
+          : `${subjectsToReset[0]} marks for ${selectedClass} have been cleared. Teachers can enter them again.`,
+      );
+    } catch (error) {
+      Alert.alert('Reset failed', error instanceof Error ? error.message : 'Could not reset marks. Please try again.');
+    } finally {
+      setResettingMarks(false);
+    }
+  };
+
+  const confirmMarksReset = (subjectsToReset: string[]) => {
+    if (user?.role !== 'admin' || !selectedExam || !selectedClass || subjectsToReset.length === 0) return;
+    setPendingResetSubjects(subjectsToReset);
   };
 
   // ── Create exam ─────────────────────────────────────────────────────────────
@@ -1149,47 +1196,261 @@ export default function ExamsScreen() {
   // ── Enter Marks View ──────────────────────────────────────────────────────
   if (screen === 'marks' && selectedExam && selectedClass) {
     const markSubs = getExamSubjectsForClass(selectedExam, selectedClass);
-    const markStudents = students.filter(s => s.class === selectedClass && !isGraduatedStudent(s));
+    const markStudents = students
+      .filter(s => s.class === selectedClass && !isGraduatedStudent(s))
+      .sort(compareStudentRollNumbers);
+    const currentMarkStudent = markStudents[marksStudentIndex] ?? markStudents[0];
+    const subjectStatuses = markSubs.map(subject => {
+      const submission = markSubmissions.find(item =>
+        item.examId === selectedExam.id &&
+        item.class === selectedClass &&
+        item.subject === subject,
+      );
+      const hasStoredMarks = markStudents.some(student => {
+        const mark = examResultsList.find(result => result.studentId === student.id)?.marks?.[subject];
+        return mark !== undefined && mark !== null && String(mark).trim() !== '';
+      });
+      const status = submission?.status === 'submitted' || submission?.status === 'locked' || submission?.status === 'draft'
+        ? submission.status
+        : hasStoredMarks ? 'submitted' : 'draft';
+      return { subject, submission, status };
+    });
     return (
       <View style={[s.root, { backgroundColor: colors.background }]}>
         <View style={[s.backBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
           <TouchableOpacity style={s.backBtn} onPress={() => setScreen('results')}><Feather name="arrow-left" size={22} color={colors.text} /></TouchableOpacity>
-          <Text style={[s.backTitle, { color: colors.text }]}>Enter Marks — {selectedClass}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.backTitle, { color: colors.text }]}>Enter Marks</Text>
+            <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 2 }}>
+              {selectedExam.name} · {selectedClass}
+            </Text>
+          </View>
         </View>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
-          {markStudents.map(student => (
-            <View key={student.id} style={[mrk.card, { backgroundColor: colors.card }]}>
-              <Text style={[mrk.studentName, { color: colors.text }]}>{student.name} <Text style={{ color: colors.mutedForeground, fontWeight: '400' }}>Roll {student.rollNumber}</Text></Text>
-              {markSubs.map(sub => {
-                const subMax = getSubjectMax(selectedExam, sub, selectedClass);
-                return (
-                  <View key={sub} style={mrk.subjectRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[mrk.subLabel, { color: colors.text }]}>{sub}</Text>
-                      {selectedExam.subjectSchedule && (
-                        <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 1 }}>
-                          {selectedExam.subjectSchedule.find(sc => sc.subject === sub)?.date ?? selectedExam.date}
-                        </Text>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card }}>
+          <Text style={{ fontSize: 12, color: colors.mutedForeground }}>
+            {selectedClass} · {markSubs.length} subjects · Individual subject maximums
+          </Text>
+        </View>
+        <View style={{ paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.card }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: colors.mutedForeground, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Subject Status
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, flexDirection: 'row' }}>
+            {subjectStatuses.map(({ subject, submission, status }) => {
+              const statusColor = status === 'locked'
+                ? colors.destructive
+                : status === 'submitted' ? colors.success : colors.mutedForeground;
+              return (
+                <View key={subject} style={[mrk.statusPill, { borderColor: colors.border, backgroundColor: colors.muted }]}>
+                  <Feather
+                    name={status === 'locked' ? 'lock' : status === 'submitted' ? 'check-circle' : 'edit-2'}
+                    size={12}
+                    color={statusColor}
+                  />
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: colors.text, marginLeft: 4 }}>{subject}</Text>
+                  <Text style={{ fontSize: 11, color: statusColor, marginLeft: 4, fontWeight: '500' }}>
+                    · {status.charAt(0).toUpperCase() + status.slice(1)}
+                  </Text>
+                  {submission?.teacherName && status !== 'draft' && (
+                    <Text style={{ fontSize: 10, color: colors.mutedForeground, marginLeft: 4 }}>
+                      by {submission.teacherName}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+        {user?.role === 'admin' && (
+          <View style={[mrk.resetPanel, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+            <View style={mrk.resetHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.text, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Admin reset controls
+                </Text>
+                <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 2 }}>
+                  Reset marks to let teachers enter them again
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={[mrk.resetAllButton, { backgroundColor: colors.destructive + '12', borderColor: colors.destructive + '45', opacity: resettingMarks ? 0.5 : 1 }]}
+                onPress={() => confirmMarksReset(markSubs)}
+                disabled={resettingMarks}
+                accessibilityLabel="Reset all subject marks"
+              >
+                <Feather name="rotate-ccw" size={14} color={colors.destructive} />
+                <Text style={{ color: colors.destructive, fontSize: 11, fontWeight: '700', marginLeft: 5 }}>
+                  Reset all
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, flexDirection: 'row', paddingTop: 8 }}>
+              {markSubs.map(subject => (
+                <TouchableOpacity
+                  key={subject}
+                  style={[mrk.resetSubjectButton, { borderColor: colors.border, backgroundColor: colors.muted, opacity: resettingMarks ? 0.5 : 1 }]}
+                  onPress={() => confirmMarksReset([subject])}
+                  disabled={resettingMarks}
+                  accessibilityLabel={`Reset ${subject} marks`}
+                >
+                  <Feather name="trash-2" size={12} color={colors.mutedForeground} />
+                  <Text style={{ color: colors.text, fontSize: 11, fontWeight: '600', marginLeft: 5 }}>
+                    Reset {subject}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+        <Modal
+          visible={pendingResetSubjects !== null}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={() => setPendingResetSubjects(null)}
+        >
+          <View style={mrk.resetModalOverlay}>
+            <View style={[mrk.resetModal, { backgroundColor: colors.card }]}>
+              <View style={[mrk.resetModalIcon, { backgroundColor: colors.destructive + '12' }]}>
+                <Feather name="rotate-ccw" size={22} color={colors.destructive} />
+              </View>
+              <Text style={[mrk.resetModalTitle, { color: colors.text }]}>
+                {pendingResetSubjects?.length === markSubs.length ? 'Reset all subject marks?' : `Reset ${pendingResetSubjects?.[0] ?? ''} marks?`}
+              </Text>
+              <Text style={[mrk.resetModalText, { color: colors.mutedForeground }]}>
+                {pendingResetSubjects?.length === markSubs.length
+                  ? `This clears every subject mark for all students in ${selectedClass}. Teachers can enter the marks again afterward.`
+                  : `This clears ${pendingResetSubjects?.[0] ?? 'the selected subject'} marks for all students in ${selectedClass}. Teachers can enter it again afterward.`}
+              </Text>
+              <View style={mrk.resetModalActions}>
+                <TouchableOpacity
+                  style={[mrk.resetCancelButton, { borderColor: colors.border }]}
+                  onPress={() => setPendingResetSubjects(null)}
+                  disabled={resettingMarks}
+                >
+                  <Text style={{ color: colors.mutedForeground, fontWeight: '700' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[mrk.resetConfirmButton, { backgroundColor: colors.destructive, opacity: resettingMarks ? 0.6 : 1 }]}
+                  onPress={() => {
+                    const subjectsToReset = pendingResetSubjects;
+                    setPendingResetSubjects(null);
+                    if (subjectsToReset) void runMarksReset(subjectsToReset);
+                  }}
+                  disabled={resettingMarks}
+                >
+                  <Feather name="trash-2" size={15} color="#fff" />
+                  <Text style={{ color: '#fff', fontWeight: '700', marginLeft: 6 }}>
+                    {resettingMarks ? 'Resetting…' : 'Reset marks'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: Platform.OS === 'web' ? 164 : insets.bottom + 160 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          {markStudents.length > 0 && currentMarkStudent ? (
+            <>
+              <View style={[mrk.studentPager, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <TouchableOpacity
+                  style={[mrk.pagerButton, { borderColor: colors.border, opacity: marksStudentIndex > 0 ? 1 : 0.45 }]}
+                  onPress={() => setMarksStudentIndex(index => Math.max(0, index - 1))}
+                  disabled={marksStudentIndex === 0}
+                  accessibilityLabel="Previous student"
+                >
+                  <Feather name="chevron-left" size={18} color={colors.primary} />
+                  <Text style={[mrk.pagerButtonText, { color: colors.primary }]}>Previous</Text>
+                </TouchableOpacity>
+                <View style={mrk.pagerCenter}>
+                  <Text style={[mrk.pagerTitle, { color: colors.text }]}>
+                    Student {marksStudentIndex + 1} of {markStudents.length}
+                  </Text>
+                  <Text style={[mrk.pagerSubtitle, { color: colors.mutedForeground }]}>
+                    Enter marks for Roll {currentMarkStudent.rollNumber}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[mrk.pagerButton, { borderColor: colors.border, opacity: marksStudentIndex < markStudents.length - 1 ? 1 : 0.45 }]}
+                  onPress={() => setMarksStudentIndex(index => Math.min(markStudents.length - 1, index + 1))}
+                  disabled={marksStudentIndex === markStudents.length - 1}
+                  accessibilityLabel="Next student"
+                >
+                  <Text style={[mrk.pagerButtonText, { color: colors.primary }]}>Next</Text>
+                  <Feather name="chevron-right" size={18} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+              <View style={[mrk.card, { backgroundColor: colors.card }]}>
+                <View style={mrk.studentHeader}>
+                  <View style={[mrk.avatar, { backgroundColor: colors.secondary }]}>
+                    <Text style={[mrk.avatarText, { color: colors.primary }]}>{currentMarkStudent.name.charAt(0)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={[mrk.studentName, { color: colors.text }]}>{currentMarkStudent.name}</Text>
+                      {currentMarkStudent.status === 'inactive' && (
+                        <View style={{ backgroundColor: colors.destructive + '18', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 }}>
+                          <Text style={{ color: colors.destructive, fontSize: 9, fontWeight: '700' }}>INACTIVE</Text>
+                        </View>
                       )}
                     </View>
-                    <TextInput
-                      style={[mrk.marksInput, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border }]}
-                      value={marksData[student.id]?.[sub] ?? ''}
-                      onChangeText={v => {
-                        const num = Number(v);
-                        if (v !== '' && (isNaN(num) || num < 0 || num > subMax)) return;
-                        setMarksData(prev => ({ ...prev, [student.id]: { ...(prev[student.id] ?? {}), [sub]: v } }));
-                      }}
-                      placeholder={`/${subMax}`}
-                      placeholderTextColor={colors.mutedForeground}
-                      keyboardType="number-pad"
-                    />
+                    <Text style={{ fontSize: 12, color: colors.mutedForeground, marginTop: 2 }}>
+                      Roll {currentMarkStudent.rollNumber}
+                    </Text>
                   </View>
-                );
-              })}
-            </View>
-          ))}
-          {markStudents.length === 0 && (
+                </View>
+                {markSubs.map(sub => {
+                  const subMax = getSubjectMax(selectedExam, sub, selectedClass);
+                  const status = subjectStatuses.find(item => item.subject === sub)?.status ?? 'draft';
+                  const statusColor = status === 'locked'
+                    ? colors.destructive
+                    : status === 'submitted' ? colors.success : colors.mutedForeground;
+                  return (
+                    <View key={sub} style={mrk.subjectRow}>
+                      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[mrk.subLabel, { color: colors.mutedForeground }]}>{sub}</Text>
+                          {selectedExam.subjectSchedule && (
+                            <Text style={{ fontSize: 11, color: colors.mutedForeground, marginTop: 1 }}>
+                              {selectedExam.subjectSchedule.find(sc => sc.subject === sub)?.date ?? selectedExam.date}
+                            </Text>
+                          )}
+                        </View>
+                        {status !== 'draft' && (
+                          <Feather name={status === 'locked' ? 'lock' : 'check-circle'} size={12} color={statusColor} />
+                        )}
+                      </View>
+                      <View style={mrk.inputWrap}>
+                        <TextInput
+                          style={[mrk.marksInput, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border }]}
+                          value={marksData[currentMarkStudent.id]?.[sub] ?? ''}
+                          onChangeText={value => {
+                            const num = Number(value);
+                            if (value !== '' && (isNaN(num) || num < 0 || num > subMax)) return;
+                            setMarksData(prev => ({
+                              ...prev,
+                              [currentMarkStudent.id]: {
+                                ...(prev[currentMarkStudent.id] ?? {}),
+                                [sub]: value,
+                              },
+                            }));
+                          }}
+                          placeholder="0"
+                          placeholderTextColor={colors.mutedForeground}
+                          keyboardType="number-pad"
+                          maxLength={3}
+                        />
+                        <Text style={[mrk.maxText, { color: colors.mutedForeground }]}>/{subMax}</Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          ) : (
             <Text style={{ textAlign: 'center', color: colors.mutedForeground, padding: 20 }}>
               No students in {selectedClass}
             </Text>
@@ -1201,9 +1462,9 @@ export default function ExamsScreen() {
           paddingBottom: Platform.OS === 'web' ? 16 : insets.bottom + 12,
           marginBottom: Platform.OS === 'web' ? 84 : insets.bottom + 60,
         }]}>
-          <TouchableOpacity style={[s.saveBtn, { backgroundColor: colors.primary }]} onPress={handleSaveMarks} activeOpacity={0.85}>
+           <TouchableOpacity style={[s.saveBtn, { backgroundColor: resettingMarks ? colors.muted : colors.primary }]} onPress={handleSaveMarks} activeOpacity={0.85} disabled={resettingMarks}>
             <Feather name="save" size={18} color="#fff" />
-            <Text style={s.saveBtnText}>Save All Marks</Text>
+             <Text style={s.saveBtnText}>{resettingMarks ? 'Resetting Marks…' : 'Save All Marks'}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1728,10 +1989,34 @@ const res = StyleSheet.create({
 });
 const mrk = StyleSheet.create({
   card: { padding: 16, borderRadius: 14, marginBottom: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
-  studentName: { fontSize: 16, fontWeight: '700', marginBottom: 12 },
+  studentHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
+  avatar: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 16, fontWeight: '700' },
+  studentName: { fontSize: 15, fontWeight: '700' },
   subjectRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   subLabel: { fontSize: 14, fontWeight: '500', flex: 1 },
-  marksInput: { width: 100, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 15, textAlign: 'center' },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  marksInput: { width: 70, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, fontSize: 15, textAlign: 'center' },
+  maxText: { fontSize: 13, fontWeight: '500' },
+  statusPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  resetPanel: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1 },
+  resetHeader: { flexDirection: 'row', alignItems: 'center' },
+  resetAllButton: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 7 },
+  resetSubjectButton: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 9, paddingVertical: 7 },
+  resetModalOverlay: { flex: 1, backgroundColor: 'rgba(7, 20, 52, 0.45)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  resetModal: { width: '100%', maxWidth: 360, borderRadius: 20, padding: 22, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 10 },
+  resetModalIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 12 },
+  resetModalTitle: { fontSize: 18, fontWeight: '800', textAlign: 'center' },
+  resetModalText: { fontSize: 13, lineHeight: 19, textAlign: 'center', marginTop: 8 },
+  resetModalActions: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  resetCancelButton: { flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 11, paddingVertical: 12 },
+  resetConfirmButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 11, paddingVertical: 12 },
+  studentPager: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderRadius: 14, padding: 8, marginBottom: 12 },
+  pagerButton: { flexDirection: 'row', alignItems: 'center', gap: 2, borderWidth: 1, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 9 },
+  pagerButtonText: { fontSize: 12, fontWeight: '700' },
+  pagerCenter: { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
+  pagerTitle: { fontSize: 13, fontWeight: '700' },
+  pagerSubtitle: { fontSize: 10, marginTop: 2 },
 });
 const mk = StyleSheet.create({
   sheet: { borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 4 },

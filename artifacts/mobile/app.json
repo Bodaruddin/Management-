@@ -38,7 +38,8 @@
         {
           "faceIDPermission": "Allow School Management to use Face ID to verify teacher attendance."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

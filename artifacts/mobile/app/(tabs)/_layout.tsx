@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { isLiquidGlassAvailable } from 'expo-glass-effect';
 import { Tabs, useRouter } from 'expo-router';
-import { Icon, Label, NativeTabs } from 'expo-router/unstable-native-tabs';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── Visible tab definitions ───────────────────────────────────────────────────
@@ -165,28 +165,28 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: 'house', selected: 'house.fill' }} />
-        <Label>Dashboard</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'house', selected: 'house.fill' }} />
+        <NativeTabs.Trigger.Label>Dashboard</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="students">
-        <Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
-        <Label>Students</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'person.2', selected: 'person.2.fill' }} />
+        <NativeTabs.Trigger.Label>Students</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="teachers">
-        <Icon sf={{ default: 'person.badge.key', selected: 'person.badge.key.fill' }} />
-        <Label>Teachers</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'person.badge.key', selected: 'person.badge.key.fill' }} />
+        <NativeTabs.Trigger.Label>Teachers</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="finance">
-        <Icon sf={{ default: 'dollarsign.circle', selected: 'dollarsign.circle.fill' }} />
-        <Label>Finance</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'dollarsign.circle', selected: 'dollarsign.circle.fill' }} />
+        <NativeTabs.Trigger.Label>Finance</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="exams">
-        <Icon sf={{ default: 'book.closed', selected: 'book.closed.fill' }} />
-        <Label>Exams</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'book.closed', selected: 'book.closed.fill' }} />
+        <NativeTabs.Trigger.Label>Exams</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="alumni">
-        <Icon sf={{ default: 'person.crop.circle.badge.checkmark', selected: 'person.crop.circle.badge.checkmark' }} />
-        <Label>Alumni</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: 'person.crop.circle.badge.checkmark', selected: 'person.crop.circle.badge.checkmark' }} />
+        <NativeTabs.Trigger.Label>Alumni</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

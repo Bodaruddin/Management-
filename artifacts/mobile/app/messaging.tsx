@@ -8,7 +8,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import ViewShot from 'react-native-view-shot';
+import ViewShot, { type ViewShotRef } from 'react-native-view-shot';
 import { useColors } from '@/hooks/useColors';
 import { useApp, Student, isActiveStudent } from '@/context/AppContext';
 import { SCHOOL_INFO } from '@/constants/schoolInfo';
@@ -100,7 +100,7 @@ export default function MessagingScreen() {
   const [imgStudent, setImgStudent] = useState<Student | null>(null);
   const [imgCaptured, setImgCaptured] = useState<string | null>(null);
   const [imgSharing, setImgSharing] = useState(false);
-  const viewShotRef = useRef<ViewShot>(null);
+  const viewShotRef = useRef<ViewShotRef | null>(null);
   const [imgQueue, setImgQueue] = useState<Student[]>([]);
   const [imgQueueIdx, setImgQueueIdx] = useState(0);
 
@@ -164,7 +164,7 @@ export default function MessagingScreen() {
     if (!viewShotRef.current) return;
     setImgSharing(true);
     try {
-      const uri = await (viewShotRef.current as any).capture();
+      const uri = await viewShotRef.current.capture();
       setImgCaptured(uri);
     } catch {
       Alert.alert('Capture failed', 'Could not capture the card. Please try again.');

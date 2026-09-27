@@ -42,7 +42,7 @@ export default function TeacherMarks() {
   const {
     exams, students, examResults, teachers,
     saveExamResults, markSubmissions,
-    submitSubjectMarks, lockSubject, unlockSubject, refreshTeachers,
+    submitSubjectMarks, lockSubject, unlockSubject, refreshTeachers, refreshExamMarks,
   } = useApp();
 
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
@@ -67,7 +67,10 @@ export default function TeacherMarks() {
     refreshTeachers().catch(() => {
       // Keep the existing cached permissions if the refresh is temporarily unavailable.
     });
-  }, [refreshTeachers]));
+    refreshExamMarks().catch(() => {
+      // Keep the cached marks if the server is temporarily unavailable.
+    });
+  }, [refreshTeachers, refreshExamMarks]));
 
   // ── Subject status helpers ───────────────────────────────────────────────────
   const getSubjectStatus = useCallback((subject: string): SubjectStatus => {

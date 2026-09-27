@@ -2,6 +2,17 @@ import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
 
 const router = Router();
+const ADMIN_USERS_KEY = "admin_users";
+
+async function isAdministrator(adminId: unknown): Promise<boolean> {
+  const normalizedId = String(adminId ?? "");
+  if (!normalizedId) return false;
+  const setting = await getAdapter().appSettings.get(ADMIN_USERS_KEY);
+  if (Array.isArray(setting?.value) && setting.value.length > 0) {
+    return setting.value.some((account: any) => String(account?.id) === normalizedId);
+  }
+  return normalizedId === "admin";
+}
 
 // ── List all mark submissions ──────────────────────────────────────────────────
 router.get("/mark-submissions", async (_req, res) => {
@@ -215,6 +226,48 @@ router.post("/mark-submissions/submit", async (req, res) => {
   });
 
   res.status(200).json(submission);
+});
+
+// ── Admin resets marks for one subject ─────────────────────────────────────────
+// Resetting uses the subject-level adapter operation so it removes only the
+// selected subject while preserving every other subject on each result row.
+router.post("/mark-submissions/reset", async (req, res) => {
+  const { examId, class: cls, subject, adminId, adminName } = req.body;
+  if (!examId || !cls || !subject) {
+    res.status(400).json({ error: "examId, class, subject are required" });
+    return;
+  }
+  if (!(await isAdministrator(adminId))) {
+    res.status(403).json({ error: "Unauthorized: only administrators can reset subject marks" });
+    return;
+  }
+
+  const adapter = getAdapter();
+  await adapter.examResults.replaceSubjectMarks(examId, cls, subject, []);
+  const submission = await adapter.markSubmissions.upsert({
+    examId,
+    class: cls,
+    subject,
+    status: "draft",
+    teacherId: null,
+    teacherName: null,
+    submittedAt: null,
+    lockedBy: null,
+    lockedAt: null,
+  });
+
+  await adapter.markAuditLog.create({
+    examId,
+    class: cls,
+    subject,
+    action: "reset",
+    actorId: adminId,
+    actorName: adminName ?? "Admin",
+    actorRole: "admin",
+    notes: `Reset marks for ${subject} — reopened for teacher entry`,
+  });
+
+  res.json(submission);
 });
 
 // ── Admin locks a subject ──────────────────────────────────────────────────────

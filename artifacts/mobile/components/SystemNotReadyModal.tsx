@@ -168,7 +168,7 @@ export default function SystemNotReadyModal({ visible, onDismiss }: Props) {
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(8, 18, 46, 0.72)',
   },
   centeredView: {

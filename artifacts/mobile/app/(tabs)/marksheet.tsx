@@ -2475,7 +2475,7 @@ const s = StyleSheet.create({
   emptyTitle: { fontSize: 17, fontWeight: '800', color: '#1E293B', marginBottom: 8 },
   emptyBody: { fontSize: 14, color: '#64748B', textAlign: 'center', lineHeight: 20 },
 
-  loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', zIndex: 99 },
+  loadingOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center', zIndex: 99 },
   loadingBox: { backgroundColor: '#fff', borderRadius: 20, padding: 28, alignItems: 'center', gap: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 12 },
   loadingTxt: { fontSize: 14, fontWeight: '700', color: '#334155' },
   downloadReadyCard: { position: 'absolute', left: 16, right: 16, bottom: 92, zIndex: 120, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#BBF7D0', shadowColor: '#0F172A', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.16, shadowRadius: 14, elevation: 10 },

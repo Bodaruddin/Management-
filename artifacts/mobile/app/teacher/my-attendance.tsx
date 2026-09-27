@@ -2087,7 +2087,7 @@ const resultStyles = StyleSheet.create({
 
 const cameraStyles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   root: { flex: 1, backgroundColor: '#080B12' },
-  cameraShade: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(5,9,18,0.28)' },
+  cameraShade: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(5,9,18,0.28)' },
   topBar: { position: 'absolute', left: 18, right: 18, top: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   roundButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(8,11,18,0.62)', alignItems: 'center', justifyContent: 'center' },
   livePill: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 18, backgroundColor: 'rgba(8,11,18,0.62)' },

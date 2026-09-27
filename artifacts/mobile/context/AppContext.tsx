@@ -483,6 +483,14 @@ interface AppContextType extends AppState {
   updateExam: (id: string, e: Partial<Exam>) => void;
   deleteExam: (id: string) => void;
   saveExamResults: (results: Omit<ExamResult, 'id'>[]) => void;
+  resetExamMarks: (params: {
+    examId: string;
+    class: string;
+    subjects: string[];
+    adminId: string;
+    adminName: string;
+  }) => Promise<void>;
+  refreshExamMarks: () => Promise<void>;
   submitSubjectMarks: (params: {
     examId: string; class: string; subject: string;
     teacherId: string; teacherName: string;
@@ -1304,6 +1312,73 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
+  const resetExamMarks = useCallback(async (params: {
+    examId: string;
+    class: string;
+    subjects: string[];
+    adminId: string;
+    adminName: string;
+  }) => {
+    if (params.subjects.length === 0) return;
+    await Promise.all(params.subjects.map(subject => apiPost('/mark-submissions/reset', {
+      examId: params.examId,
+      class: params.class,
+      subject,
+      adminId: params.adminId,
+      adminName: params.adminName,
+    })));
+    const resetSubjects = new Set(params.subjects);
+    setState(prev => {
+      const examResults = prev.examResults.map(result => {
+        if (result.examId !== params.examId || result.class !== params.class) return result;
+        const marks = { ...result.marks };
+        resetSubjects.forEach(subject => { delete marks[subject]; });
+        return { ...result, marks };
+      });
+      const markSubmissions = prev.markSubmissions.map(submission => {
+        if (
+          submission.examId !== params.examId ||
+          submission.class !== params.class ||
+          !resetSubjects.has(submission.subject)
+        ) return submission;
+
+        return {
+          ...submission,
+          status: 'draft',
+          teacherId: undefined,
+          teacherName: undefined,
+          submittedAt: undefined,
+          lockedBy: undefined,
+          lockedAt: undefined,
+        };
+      });
+      return {
+        ...prev,
+        examResults,
+        markSubmissions,
+      };
+    });
+  }, []);
+
+  const refreshExamMarks = useCallback(async () => {
+    const [resultsRes, submissionsRes] = await Promise.all([
+      fetch(`${getApiBase()}/api/exam-results`),
+      fetch(`${getApiBase()}/api/mark-submissions`),
+    ]);
+    if (!resultsRes.ok || !submissionsRes.ok) {
+      throw new Error('Could not refresh exam marks');
+    }
+    const [results, submissions] = await Promise.all([
+      resultsRes.json() as Promise<any[]>,
+      submissionsRes.json() as Promise<MarkSubmission[]>,
+    ]);
+    setState(prev => ({
+      ...prev,
+      examResults: results.map(mapExamResult),
+      markSubmissions: submissions,
+    }));
+  }, []);
+
   // ── Exam Results ──
   const saveExamResults = useCallback((results: Omit<ExamResult, 'id'>[]) => {
     const nr = results.map(r => ({ ...r, id: genId() }));
@@ -1785,7 +1860,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addSubject, deleteSubject,
       addFeeType, updateFeeType, deleteFeeType,
       addAttendance,
-      addExam, updateExam, deleteExam, saveExamResults,
+      addExam, updateExam, deleteExam, saveExamResults, resetExamMarks, refreshExamMarks,
       submitSubjectMarks, lockSubject, unlockSubject,
       addFeeRecord, deleteFeeRecord,
       updateFeeRecord,
