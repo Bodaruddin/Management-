@@ -143,6 +143,8 @@ export default function FinanceScreen() {
   const [feeReportStart, setFeeReportStart] = useState(new Date().toISOString().split('T')[0]);
   const [feeReportEnd, setFeeReportEnd] = useState(new Date().toISOString().split('T')[0]);
   const [isDownloadingFinancialReport, setIsDownloadingFinancialReport] = useState(false);
+  const [showFinancialReportFeePicker, setShowFinancialReportFeePicker] = useState(false);
+  const [selectedFinancialReportFeeTypes, setSelectedFinancialReportFeeTypes] = useState<string[]>(['All']);
 
   // ── Fee Reminder state ──
   const viewShotRef = useRef<any>(null);
@@ -197,10 +199,32 @@ export default function FinanceScreen() {
     setShowFeeReport(true);
   };
 
-  const handleDownloadFinancialReport = async () => {
+  const toggleFinancialReportFeeType = (option: string) => {
+    if (option === 'All') {
+      setSelectedFinancialReportFeeTypes(['All']);
+      return;
+    }
+    setSelectedFinancialReportFeeTypes(previous => {
+      const withoutAll = previous.filter(item => item !== 'All');
+      return withoutAll.includes(option)
+        ? withoutAll.filter(item => item !== option)
+        : [...withoutAll, option];
+    });
+  };
+
+  const handleDownloadFinancialReport = async (selectedFeeTypes: string[] = ['All']) => {
     if (isDownloadingFinancialReport) return;
+    if (selectedFeeTypes.length === 0) {
+      Alert.alert('Select fee type', 'Choose at least one fee type to download.');
+      return;
+    }
+    setShowFinancialReportFeePicker(false);
     setIsDownloadingFinancialReport(true);
     try {
+      const reportFees = selectedFeeTypes.includes('All')
+        ? financialReportFeeRecords
+        : financialReportFeeRecords.filter(f => selectedFeeTypes.includes(f.feeTypeName ?? f.description ?? 'Other'));
+      const reportTotalFees = reportFees.reduce((sum, fee) => sum + fee.amount, 0);
       const periodLabel = PERIODS.find(item => item.key === period)?.label ?? 'Selected period';
       const reportHtml = buildFinancialReportHtml({
         periodLabel,
@@ -213,14 +237,14 @@ export default function FinanceScreen() {
               : period === 'year'
                 ? yearStr
                 : 'All recorded dates',
-        feeRecords: filteredPeriodFees,
+        feeRecords: reportFees,
         salaryRecords: periodSalaryRecords,
         expenses: periodExpenses,
-        totalFees,
+        totalFees: reportTotalFees,
         totalSalaryPaid,
         totalSalaryPending,
         totalExpenses,
-        netBalance: totalFees - totalSalaryPaid - totalExpenses,
+        netBalance: reportTotalFees - totalSalaryPaid - totalExpenses,
       }, documentBranding);
       await downloadHtmlAsPdf(reportHtml, `financial-report-${todayStr}`);
     } catch (error) {
@@ -241,6 +265,19 @@ export default function FinanceScreen() {
       default:      return feeRecords;
     }
   }, [feeRecords, period, todayStr, weekStartStr, monthStr, yearStr]);
+
+  const financialReportFeeRecords = useMemo(
+    () => periodFees.filter(fee => teacherFilter === 'All' || fee.collectedBy === teacherFilter),
+    [periodFees, teacherFilter],
+  );
+
+  const financialReportFeeTypeOptions = useMemo(() => {
+    const names = [
+      ...feeTypes.map(feeType => feeType.name),
+      ...financialReportFeeRecords.map(fee => fee.feeTypeName ?? fee.description ?? 'Other'),
+    ].filter(Boolean);
+    return ['All', ...Array.from(new Set(names)).sort((a, b) => a.localeCompare(b))];
+  }, [feeTypes, financialReportFeeRecords]);
 
   const feeFilterOptions = useMemo(() => {
     const names = feeRecords
@@ -744,7 +781,10 @@ export default function FinanceScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[s.reportShortcut, s.reportShortcutSecondary, { borderColor: colors.success + '45', backgroundColor: colors.success + '0D' }]}
-              onPress={handleDownloadFinancialReport}
+              onPress={() => {
+                setSelectedFinancialReportFeeTypes(['All']);
+                setShowFinancialReportFeePicker(true);
+              }}
               disabled={isDownloadingFinancialReport}
               activeOpacity={0.8}
               accessibilityRole="button"
@@ -1612,6 +1652,94 @@ export default function FinanceScreen() {
                 );
               })}
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Financial Report Fee Type Picker */}
+      <Modal visible={showFinancialReportFeePicker} animationType="slide" transparent>
+        <View style={mo.overlay}>
+          <View style={[mo.sheet, { backgroundColor: colors.card, minHeight: 0, maxHeight: '72%' }]}>
+            <View style={[mo.header, { borderBottomColor: colors.border }]}>
+              <View>
+                <Text style={[mo.title, { color: colors.text }]}>Choose Fee Type</Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: 3 }}>
+                  Select which fee collections to include in the download
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowFinancialReportFeePicker(false)}
+                accessibilityLabel="Close financial report fee type picker"
+              >
+                <Feather name="x" size={24} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {financialReportFeeTypeOptions.map(option => {
+                const label = option === 'All' ? 'All fee types' : option;
+                const selected = selectedFinancialReportFeeTypes.includes(option);
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    style={[picker.row, { borderBottomColor: colors.border }]}
+                    onPress={() => toggleFinancialReportFeeType(option)}
+                    disabled={isDownloadingFinancialReport}
+                    activeOpacity={0.75}
+                  >
+                    <View style={[filterOptionIcon, { backgroundColor: selected ? colors.success + '15' : colors.muted }]}>
+                      <Feather name={option === 'All' ? 'layers' : 'tag'} size={15} color={selected ? colors.success : colors.mutedForeground} />
+                    </View>
+                    <Text style={[picker.name, { color: selected ? colors.success : colors.text, fontWeight: selected ? '700' : '500' }]}>{label}</Text>
+                    <View style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      borderWidth: 1.5,
+                      borderColor: selected ? colors.success : colors.border,
+                      backgroundColor: selected ? colors.success : colors.card,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginLeft: 'auto',
+                    }}>
+                      {selected && <Feather name="check" size={15} color="#fff" />}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+              {financialReportFeeTypeOptions.length === 1 && (
+                <Text style={{ color: colors.mutedForeground, textAlign: 'center', padding: 20 }}>
+                  No fee collections found for this period
+                </Text>
+              )}
+            </ScrollView>
+            <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.card }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  backgroundColor: selectedFinancialReportFeeTypes.length > 0 ? colors.success : colors.muted,
+                  borderRadius: 14,
+                  paddingVertical: 15,
+                }}
+                onPress={() => handleDownloadFinancialReport(selectedFinancialReportFeeTypes)}
+                disabled={selectedFinancialReportFeeTypes.length === 0 || isDownloadingFinancialReport}
+                activeOpacity={0.85}
+                testID="download-selected-financial-report"
+              >
+                <Feather
+                  name="download"
+                  size={17}
+                  color={selectedFinancialReportFeeTypes.length > 0 ? '#fff' : colors.mutedForeground}
+                />
+                <Text style={{ color: selectedFinancialReportFeeTypes.length > 0 ? '#fff' : colors.mutedForeground, fontSize: 15, fontWeight: '800' }}>
+                  Download {selectedFinancialReportFeeTypes.includes('All')
+                    ? 'All Fees'
+                    : `${selectedFinancialReportFeeTypes.length} Fee Type${selectedFinancialReportFeeTypes.length === 1 ? '' : 's'}`}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
