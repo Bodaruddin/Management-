@@ -15,6 +15,8 @@ import EmptyState from '@/components/EmptyState';
 import { printFeeReceipt, printSalarySlip, shareReceiptWhatsApp, shareSalaryReceiptWhatsApp } from '@/utils/receipt';
 import { buildReminderMessage, sendReminderSMS, shareReminderImage } from '@/utils/reminder';
 import ReminderCard from '@/components/ReminderCard';
+import { downloadHtmlAsPdf } from '@/utils/pdfExport';
+import { buildFinancialReportHtml } from '@/utils/financialReport';
 
 type Tab = 'overview' | 'salary' | 'fees' | 'feeTypes' | 'expenses';
 type Period = 'today' | 'week' | 'month' | 'year' | 'all';
@@ -139,6 +141,7 @@ export default function FinanceScreen() {
   const [feeReportClass, setFeeReportClass] = useState('All');
   const [feeReportStart, setFeeReportStart] = useState(new Date().toISOString().split('T')[0]);
   const [feeReportEnd, setFeeReportEnd] = useState(new Date().toISOString().split('T')[0]);
+  const [isDownloadingFinancialReport, setIsDownloadingFinancialReport] = useState(false);
 
   // ── Fee Reminder state ──
   const viewShotRef = useRef<any>(null);
@@ -191,6 +194,40 @@ export default function FinanceScreen() {
     setFeeReportStart(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
     setFeeReportEnd(todayStr);
     setShowFeeReport(true);
+  };
+
+  const handleDownloadFinancialReport = async () => {
+    if (isDownloadingFinancialReport) return;
+    setIsDownloadingFinancialReport(true);
+    try {
+      const periodLabel = PERIODS.find(item => item.key === period)?.label ?? 'Selected period';
+      const reportHtml = buildFinancialReportHtml({
+        periodLabel,
+        rangeLabel: period === 'today'
+          ? todayStr
+          : period === 'week'
+            ? `${weekStartStr} to ${todayStr}`
+            : period === 'month'
+              ? monthStr
+              : period === 'year'
+                ? yearStr
+                : 'All recorded dates',
+        feeRecords: filteredPeriodFees,
+        salaryRecords: periodSalaryRecords,
+        expenses: periodExpenses,
+        totalFees,
+        totalSalaryPaid,
+        totalSalaryPending,
+        totalExpenses,
+        netBalance: totalFees - totalSalaryPaid - totalExpenses,
+      }, documentBranding);
+      await downloadHtmlAsPdf(reportHtml, `financial-report-${todayStr}`);
+    } catch (error) {
+      console.error('[Finance] Financial report download failed:', error);
+      Alert.alert('Download failed', 'The financial report could not be generated. Please try again.');
+    } finally {
+      setIsDownloadingFinancialReport(false);
+    }
   };
 
   // ── Period-filtered records ───────────────────────────────────────────────
@@ -666,6 +703,28 @@ export default function FinanceScreen() {
                 <Text style={[s.reportShortcutSub, { color: colors.mutedForeground }]}>Month, year, custom dates and class-wise balances</Text>
               </View>
               <Feather name="chevron-right" size={18} color={colors.primary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.reportShortcut, s.reportShortcutSecondary, { borderColor: colors.success + '45', backgroundColor: colors.success + '0D' }]}
+              onPress={handleDownloadFinancialReport}
+              disabled={isDownloadingFinancialReport}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Download financial report"
+              testID="download-financial-report"
+            >
+              <View style={[s.reportShortcutIcon, { backgroundColor: colors.success + '18' }]}>
+                <Feather name="download" size={17} color={colors.success} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.reportShortcutTitle, { color: colors.text }]}>
+                  {isDownloadingFinancialReport ? 'Preparing report...' : 'Download Financial Report'}
+                </Text>
+                <Text style={[s.reportShortcutSub, { color: colors.mutedForeground }]}>
+                  Fees, salaries, expenses and net balance · {PERIODS.find(item => item.key === period)?.label}
+                </Text>
+              </View>
+              <Feather name={isDownloadingFinancialReport ? 'loader' : 'download-cloud'} size={18} color={colors.success} />
             </TouchableOpacity>
           </View>
 
@@ -1966,6 +2025,7 @@ const s = StyleSheet.create({
   filterPill: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.12)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' },
   filterPillText: { flex: 1, minWidth: 0, fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.88)' },
   reportShortcut: { flexDirection: 'row', alignItems: 'center', gap: 11, borderWidth: 1, borderRadius: 15, padding: 12 },
+  reportShortcutSecondary: { marginTop: 9 },
   reportShortcutIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   reportShortcutTitle: { fontSize: 13, fontWeight: '800' },
   reportShortcutSub: { fontSize: 11, marginTop: 2 },
