@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { useApp, Student, Teacher, FeeType, SalaryRecord, getStudentFeeInfo, isActiveStudent, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
+import { useApp, Student, Teacher, FeeType, FeeRecord, SalaryRecord, getStudentFeeInfo, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
 import { printFeeReceipt, printSalarySlip, shareReceiptWhatsApp, shareSalaryReceiptWhatsApp } from '@/utils/receipt';
 import { buildReminderMessage, sendReminderSMS, shareReminderImage } from '@/utils/reminder';
@@ -109,7 +109,7 @@ export default function FinanceScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const {
-    students, teachers, feeRecords, addFeeRecord, deleteFeeRecord, documentBranding,
+    students, teachers, feeRecords, addFeeRecord, updateFeeRecord, deleteFeeRecord, documentBranding,
     feeTypes, addFeeType, updateFeeType, deleteFeeType,
     expenses, addExpense, deleteExpense,
     salaryRecords, updateSalaryRecord, deleteSalaryRecord,
@@ -130,6 +130,7 @@ export default function FinanceScreen() {
   const [collectDesc, setCollectDesc] = useState('');
   const [collectDate, setCollectDate] = useState(new Date().toISOString().split('T')[0]);
   const [showFeeHistory, setShowFeeHistory] = useState<Student | null>(null);
+  const [editingFeeRecord, setEditingFeeRecord] = useState<FeeRecord | null>(null);
   const [showFeeTypePicker, setShowFeeTypePicker] = useState(false);
   const [collectPaymentMethod, setCollectPaymentMethod] = useState('Cash');
   const [feeSearch, setFeeSearch] = useState('');
@@ -362,13 +363,16 @@ export default function FinanceScreen() {
 
   const getStudentLastFee  = (id: string) => feeRecords.filter(f => f.studentId === id).sort((a, b) => b.date.localeCompare(a.date))[0] ?? null;
   const getStudentTotal    = (id: string) => feeRecords.filter(f => f.studentId === id).reduce((s, f) => s + f.amount, 0);
-  const activeStudents     = useMemo(() => students.filter(isActiveStudent), [students]);
-  const uniqueClasses      = useMemo(() => ['All', ...Array.from(new Set(activeStudents.map(s => s.class))).sort()], [activeStudents]);
-  const filteredStudents   = useMemo(() => activeStudents.filter(s => {
+  const feeCollectionStudents = useMemo(
+    () => students.filter(student => student.status !== 'graduated'),
+    [students],
+  );
+  const uniqueClasses      = useMemo(() => ['All', ...Array.from(new Set(feeCollectionStudents.map(s => s.class))).sort()], [feeCollectionStudents]);
+  const filteredStudents   = useMemo(() => feeCollectionStudents.filter(s => {
     const matchSearch = feeSearch === '' || s.name.toLowerCase().includes(feeSearch.toLowerCase());
     const matchClass  = feeClassFilter === 'All' || s.class === feeClassFilter;
     return matchSearch && matchClass;
-  }), [activeStudents, feeSearch, feeClassFilter]);
+  }), [feeCollectionStudents, feeSearch, feeClassFilter]);
   // Alumni are kept in the students response with a graduated status after
   // an alumni import. They should not appear in the current fee report.
   const feeReportStudents = useMemo(
@@ -449,6 +453,7 @@ export default function FinanceScreen() {
 
   // ── Collect fee handlers ──────────────────────────────────────────────────
   const openCollect = (student: Student) => {
+    setEditingFeeRecord(null);
     setCollectStudent(student);
     setCollectFeeTypeId('');
     const fi = getStudentFeeInfo(student, feeRecords);
@@ -456,6 +461,19 @@ export default function FinanceScreen() {
     setCollectDesc(`Monthly Fee - ${MONTHS[now.getMonth()]} ${now.getFullYear()}`);
     setCollectDate(now.toISOString().split('T')[0]);
     setCollectPaymentMethod('Cash');
+    setShowCollectModal(true);
+  };
+  const openEditFeeRecord = (record: FeeRecord) => {
+    const student = students.find(s => s.id === record.studentId) ?? showFeeHistory;
+    if (!student) return;
+    setShowFeeHistory(null);
+    setEditingFeeRecord(record);
+    setCollectStudent(student);
+    setCollectFeeTypeId(record.feeTypeId ?? '');
+    setCollectAmount(String(record.amount));
+    setCollectDesc(record.description);
+    setCollectDate(record.date);
+    setCollectPaymentMethod(record.paymentMethod ?? 'Cash');
     setShowCollectModal(true);
   };
   const selectFeeType = (ft: FeeType) => {
@@ -471,16 +489,36 @@ export default function FinanceScreen() {
     if (!collectStudent) return;
     const finalAmt = Number(collectAmount);
     const selectedFt = feeTypes.find(f => f.id === collectFeeTypeId);
-    const isAnnualFee = selectedFt?.category === 'annual' || (selectedFt?.name.toLowerCase().includes('annual fee') ?? false);
+    const isAnnualFee = selectedFt?.category === 'annual'
+      || (selectedFt?.name.toLowerCase().includes('annual fee') ?? false)
+      || (editingFeeRecord?.feeCategory === 'annual')
+      || (!editingFeeRecord?.feeCategory && (editingFeeRecord?.feeTypeName?.toLowerCase().includes('annual fee') ?? false));
     if (isAnnualFee) {
       const fi = getStudentFeeInfo(collectStudent, feeRecords);
-      if (fi.annualFee > 0 && finalAmt > fi.remaining) {
-        Alert.alert('Overpayment', `Remaining balance is ₹${fi.remaining.toLocaleString('en-IN')}. You cannot collect more than the outstanding balance.`);
+      const currentRecordCountsTowardAnnual = editingFeeRecord?.feeCategory === 'annual'
+        || (!editingFeeRecord?.feeCategory && (editingFeeRecord?.feeTypeName?.toLowerCase().includes('annual fee') ?? false));
+      const remainingAfterCurrentRecord = fi.remaining + (currentRecordCountsTowardAnnual ? (editingFeeRecord?.amount ?? 0) : 0);
+      if (fi.annualFee > 0 && finalAmt > remainingAfterCurrentRecord) {
+        Alert.alert('Overpayment', `Remaining balance is ₹${remainingAfterCurrentRecord.toLocaleString('en-IN')}. You cannot collect more than the outstanding balance.`);
         return;
       }
     }
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const feeTypeName = selectedFt?.name;
+    if (editingFeeRecord) {
+      updateFeeRecord(editingFeeRecord.id, {
+        amount: finalAmt,
+        date: collectDate || now.toISOString().split('T')[0],
+        description: collectDesc.trim(),
+        feeTypeId: collectFeeTypeId,
+        feeTypeName,
+        paymentMethod: collectPaymentMethod,
+        feeCategory: isAnnualFee ? 'annual' : 'additional',
+      });
+      setEditingFeeRecord(null);
+      setShowCollectModal(false);
+      return;
+    }
     const record = addFeeRecord({
       studentId: collectStudent.id, studentName: collectStudent.name, class: collectStudent.class,
       amount: finalAmt, date: collectDate || now.toISOString().split('T')[0],
@@ -1190,8 +1228,15 @@ export default function FinanceScreen() {
                     {last && <Text style={[fc.sub, { color: colors.mutedForeground }]}>Last: {last.date}</Text>}
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                    <View style={[fc.statusBadge, { backgroundColor: statusColor + '20' }]}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: statusColor }}>{STATUS_LABELS[fi.status]}</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                      {st.status === 'inactive' && (
+                        <View style={[fc.statusBadge, { backgroundColor: colors.muted }]}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: colors.mutedForeground }}>Inactive</Text>
+                        </View>
+                      )}
+                      <View style={[fc.statusBadge, { backgroundColor: statusColor + '20' }]}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: statusColor }}>{STATUS_LABELS[fi.status]}</Text>
+                      </View>
                     </View>
                     <View style={{ flexDirection: 'row', gap: 6 }}>
                       <TouchableOpacity
@@ -1578,7 +1623,7 @@ export default function FinanceScreen() {
             <View style={{ backgroundColor: colors.primary, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 24 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
                 <View>
-                  <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' }}>Fee Collection</Text>
+                  <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' }}>{editingFeeRecord ? 'Edit Fee Payment' : 'Fee Collection'}</Text>
                   <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginTop: 2 }}>{collectStudent?.name ?? ''}</Text>
                   <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, marginTop: 2 }}>{collectStudent?.class} • Roll {collectStudent?.rollNumber}</Text>
                 </View>
@@ -1666,7 +1711,7 @@ export default function FinanceScreen() {
                   >
                     <Feather name="check-circle" size={18} color={collectFeeTypeId && amt > 0 ? '#fff' : colors.mutedForeground} />
                     <Text style={{ color: collectFeeTypeId && amt > 0 ? '#fff' : colors.mutedForeground, fontSize: 16, fontWeight: '800' }}>
-                      Collect ₹{amt > 0 ? amt.toLocaleString('en-IN') : '0'}
+                      {editingFeeRecord ? 'Save Changes' : `Collect ₹${amt > 0 ? amt.toLocaleString('en-IN') : '0'}`}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -1769,6 +1814,12 @@ export default function FinanceScreen() {
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => printFeeReceipt(f, showFeeHistory, documentBranding)}>
                               <Feather name="printer" size={15} color={colors.primary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              onPress={() => openEditFeeRecord(f)}
+                              accessibilityLabel={`Edit ${f.description}`}
+                            >
+                              <Feather name="edit-2" size={15} color={colors.primary} />
                             </TouchableOpacity>
                             <TouchableOpacity onPress={() => confirmDeleteFee(f.id, f.description)}>
                               <Feather name="trash-2" size={15} color={colors.destructive} />
