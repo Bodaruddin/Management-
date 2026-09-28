@@ -299,8 +299,13 @@ function applyNativePrintMargins(html: string, marginMm: number): string {
   const safeMargin = Math.max(0, Math.min(marginMm, 20));
   const pageWidth = `calc(210mm - ${safeMargin * 2}mm)`;
   const pageHeight = `calc(297mm - ${safeMargin * 2}mm)`;
+  const hasFinancialReportContinuationPages = html.includes('class="financial-report"');
   const printOverrides = `<style id="pdf-margin-overrides">
   @page { size: A4 portrait; margin: ${safeMargin}mm !important; }
+  ${hasFinancialReportContinuationPages ? `
+  @page { margin-top: 0 !important; }
+  @page :first { margin-top: ${safeMargin}mm !important; }
+  ` : ''}
   html, body {
     height: auto !important;
     min-height: 0 !important;
@@ -605,6 +610,7 @@ export async function downloadHtmlAsPdf(
      when the iframe parses the HTML — zero network requests inside iframe.    */
   let preparedHtml = await preEmbedQrCodes(html, QRCode);
   preparedHtml     = await embedGoogleFonts(preparedHtml);
+  const topAlignFinancialReportPages = preparedHtml.includes('class="financial-report"');
 
   /* ── Step 2: Hidden iframe ─────────────────────────────────────────── */
   // A4 at 96 CSS-px/inch: 210 mm = 794 px wide, 297 mm = 1123 px tall.
@@ -762,9 +768,12 @@ export async function downloadHtmlAsPdf(
       let imgW = maxImgW;
       let imgH = imgW * srcAspect;
       if (imgH > maxImgH) { imgH = maxImgH; imgW = imgH / srcAspect; }
-      // Centre horizontally and vertically → equal white space on all four sides.
+      // Financial report continuation pages are intentionally shorter than A4.
+      // Top-align them so the next report page does not appear to have a large
+      // blank padding block above its header. Other document types retain the
+      // existing centered placement.
       const imgX = (A4_W - imgW) / 2;
-      const imgY = (A4_H - imgH) / 2;
+      const imgY = topAlignFinancialReportPages ? m : (A4_H - imgH) / 2;
       pdf.addImage(imgData, 'PNG', imgX, imgY, imgW, imgH);
     }
 

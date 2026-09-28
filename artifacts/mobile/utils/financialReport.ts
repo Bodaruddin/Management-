@@ -113,8 +113,14 @@ export function buildFinancialReportHtml(
     `)
     .join('');
 
-  const expenseDetailRows = [...data.expenses]
-    .sort((a, b) => b.date.localeCompare(a.date))
+  // Keep each expense detail table within a printable A4 page. The shared
+  // PDF exporter captures every `.page` element as its own PDF page, while
+  // native printing uses the same elements as explicit print page breaks.
+  const sortedExpenses = [...data.expenses].sort((a, b) => b.date.localeCompare(a.date));
+  const EXPENSES_ON_SUMMARY_PAGE = 6;
+  const MAX_EXPENSES_PER_PAGE = 32;
+  const summaryExpenseRows = sortedExpenses
+    .slice(0, EXPENSES_ON_SUMMARY_PAGE)
     .map(expense => `
       <tr>
         <td class="date">${escapeHtml(formatDate(expense.date))}</td>
@@ -124,12 +130,71 @@ export function buildFinancialReportHtml(
       </tr>
     `)
     .join('');
+  const remainingExpenses = sortedExpenses.slice(EXPENSES_ON_SUMMARY_PAGE);
+  const expensePageCount = remainingExpenses.length > 0
+    ? Math.ceil(remainingExpenses.length / MAX_EXPENSES_PER_PAGE)
+    : 0;
+  const expensesPerDetailPage = expensePageCount > 0
+    ? Math.ceil(remainingExpenses.length / expensePageCount)
+    : 0;
+  const expensePageRows = Array.from(
+    { length: expensePageCount },
+    (_, pageIndex) => remainingExpenses
+      .slice(
+        pageIndex * expensesPerDetailPage,
+        (pageIndex + 1) * expensesPerDetailPage,
+      )
+      .map(expense => `
+        <tr>
+          <td class="date">${escapeHtml(formatDate(expense.date))}</td>
+          <td>${escapeHtml(expense.description || 'Unspecified expense')}</td>
+          <td>${escapeHtml(expense.category || 'Other')}</td>
+          <td class="money">${amount(expense.amount)}</td>
+        </tr>
+      `)
+      .join(''),
+  );
 
   const logo = branding.logoDataUrl
     ? documentLogoHtml(branding, 72, 72, `${SCHOOL_INFO.name} logo`)
     : `<div class="logo-fallback">${escapeHtml(SCHOOL_INFO.name.split(' ').slice(0, 3).join(' '))}</div>`;
 
   const balanceClass = data.netBalance >= 0 ? 'positive' : 'negative';
+  const renderHeader = (title: string) => `
+    <div class="header">
+      <div class="logo">${logo}</div>
+      <div class="school">
+        <div class="school-name">${escapeHtml(SCHOOL_INFO.name)}</div>
+        <div class="school-meta">${escapeHtml(SCHOOL_INFO.address)}<br/>Contact: ${escapeHtml(SCHOOL_INFO.contact)} · ${escapeHtml(SCHOOL_INFO.email)}</div>
+      </div>
+      <div class="report-meta">
+        <div class="report-label">School Finance</div>
+        <div class="report-title">${escapeHtml(title)}</div>
+        <div class="report-period">${escapeHtml(data.periodLabel)}<br/>${escapeHtml(data.rangeLabel)}</div>
+      </div>
+    </div>`;
+
+  const expenseDetailPages = expensePageRows.length > 0
+    ? expensePageRows.map((rows, index) => `
+      <div class="page expense-detail-page">
+        ${renderHeader(index === 0 ? 'Expense Details' : 'Expense Details · Continued')}
+        <div class="section">
+          <div class="section-title">
+            <span>Expense details</span>
+            <span class="section-total">Page ${index + 2} of ${expensePageRows.length + 1}</span>
+          </div>
+          <table>
+            <thead><tr><th class="date">Date</th><th>Description</th><th>Category</th><th class="money">Amount</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <div class="footer">
+          <span>Generated from School Finance</span>
+          <span>${escapeHtml(new Date().toISOString().split('T')[0])}</span>
+        </div>
+      </div>
+    `).join('')
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -141,7 +206,9 @@ export function buildFinancialReportHtml(
     @page { size: A4 portrait; margin: 10mm; }
     html, body { margin: 0; padding: 0; background: #f4f7fb; color: #17233d; font-family: Arial, sans-serif; }
     body { font-size: 11px; }
-    .page { width: 100%; max-width: 760px; margin: 0 auto; padding: 24px; background: #fff; border-top: 8px solid #0b2b55; }
+    .page { width: 100%; max-width: 760px; margin: 0 auto; padding: 24px; background: #fff; border-top: 8px solid #0b2b55; page-break-after: always; break-after: page; }
+    .page:not(:first-child) { padding: 0 12px; }
+    .page:last-child { page-break-after: auto; break-after: auto; }
     .header { display: flex; align-items: center; gap: 16px; padding-bottom: 15px; border-bottom: 2px solid #d9a832; }
     .logo { width: 72px; height: 72px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
     .logo img { max-width: 72px; max-height: 72px; object-fit: contain; }
@@ -170,6 +237,8 @@ export function buildFinancialReportHtml(
     th { background: #edf2f8; color: #0b2b55; font-size: 9px; font-weight: 800; text-align: left; padding: 7px 8px; }
     td { border-bottom: 1px solid #e7edf5; padding: 7px 8px; font-size: 10px; }
     tr:last-child td { border-bottom: none; }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; break-inside: avoid; }
     .count { width: 70px; text-align: center; color: #66758a; }
     .money { width: 125px; text-align: right; font-weight: 800; white-space: nowrap; }
     .date { width: 100px; white-space: nowrap; color: #66758a; }
@@ -177,20 +246,9 @@ export function buildFinancialReportHtml(
     .footer { margin-top: 20px; padding-top: 10px; border-top: 1px solid #d8e1ee; color: #7b899b; font-size: 9px; display: flex; justify-content: space-between; }
   </style>
 </head>
-<body>
+<body class="financial-report">
   <div class="page">
-    <div class="header">
-      <div class="logo">${logo}</div>
-      <div class="school">
-        <div class="school-name">${escapeHtml(SCHOOL_INFO.name)}</div>
-        <div class="school-meta">${escapeHtml(SCHOOL_INFO.address)}<br/>Contact: ${escapeHtml(SCHOOL_INFO.contact)} · ${escapeHtml(SCHOOL_INFO.email)}</div>
-      </div>
-      <div class="report-meta">
-        <div class="report-label">School Finance</div>
-        <div class="report-title">Financial Report</div>
-        <div class="report-period">${escapeHtml(data.periodLabel)}<br/>${escapeHtml(data.rangeLabel)}</div>
-      </div>
-    </div>
+    ${renderHeader('Financial Report')}
 
     <div class="summary">
       <div class="summary-card">
@@ -243,7 +301,11 @@ export function buildFinancialReportHtml(
       <div class="section-title"><span>Expense details</span><span class="section-total">${data.expenses.length} item${data.expenses.length === 1 ? '' : 's'}</span></div>
       <table>
         <thead><tr><th class="date">Date</th><th>Description</th><th>Category</th><th class="money">Amount</th></tr></thead>
-        <tbody>${expenseDetailRows || emptyRow('No expense details for this period', 4)}</tbody>
+        <tbody>${data.expenses.length > 0
+          ? `${summaryExpenseRows}${remainingExpenses.length > 0
+            ? `<tr><td class="empty" colspan="4">${remainingExpenses.length} more expense${remainingExpenses.length === 1 ? '' : 's'} continue on the following page${expensePageRows.length === 1 ? '' : 's'}.</td></tr>`
+            : ''}`
+          : emptyRow('No expense details for this period', 4)}</tbody>
       </table>
     </div>
 
@@ -252,6 +314,7 @@ export function buildFinancialReportHtml(
       <span>${escapeHtml(new Date().toISOString().split('T')[0])}</span>
     </div>
   </div>
+  ${expenseDetailPages}
 </body>
 </html>`;
 }
