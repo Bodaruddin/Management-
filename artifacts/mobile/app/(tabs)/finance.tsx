@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, FontAwesome5 } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { useApp, Student, Teacher, FeeType, FeeRecord, SalaryRecord, getStudentFeeInfo, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
+import { useApp, Student, Teacher, FeeType, FeeRecord, Expense, SalaryRecord, getStudentFeeInfo, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
 import { printFeeReceipt, printSalarySlip, shareReceiptWhatsApp, shareSalaryReceiptWhatsApp } from '@/utils/receipt';
 import { buildReminderMessage, sendReminderSMS, shareReminderImage } from '@/utils/reminder';
@@ -111,7 +111,7 @@ export default function FinanceScreen() {
   const {
     students, teachers, feeRecords, addFeeRecord, updateFeeRecord, deleteFeeRecord, documentBranding,
     feeTypes, addFeeType, updateFeeType, deleteFeeType,
-    expenses, addExpense, deleteExpense,
+    expenses, addExpense, updateExpense, deleteExpense,
     salaryRecords, updateSalaryRecord, deleteSalaryRecord,
   } = useApp();
 
@@ -159,6 +159,7 @@ export default function FinanceScreen() {
 
   // ── Expense state ──
   const [showExpenseModal, setShowExpenseModal] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expForm, setExpForm] = useState({ description: '', amount: '', category: 'Supplies', date: new Date().toISOString().split('T')[0] });
   const [showCatPicker, setShowCatPicker] = useState(false);
 
@@ -586,11 +587,37 @@ export default function FinanceScreen() {
   };
 
   // ── Expense handlers ─────────────────────────────────────────────────────
-  const handleAddExpense = async () => {
+  const openAddExpense = () => {
+    setEditingExpense(null);
+    setExpForm({ description: '', amount: '', category: 'Supplies', date: now.toISOString().split('T')[0] });
+    setShowExpenseModal(true);
+  };
+  const openEditExpense = (expense: Expense) => {
+    setEditingExpense(expense);
+    setExpForm({
+      description: expense.description,
+      amount: String(expense.amount),
+      category: expense.category || 'Supplies',
+      date: expense.date,
+    });
+    setShowExpenseModal(true);
+  };
+  const handleSaveExpense = async () => {
     if (!expForm.description.trim() || !expForm.amount || Number(expForm.amount) <= 0) { Alert.alert('Validation', 'Fill all fields'); return; }
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    addExpense({ description: expForm.description.trim(), amount: Number(expForm.amount), date: expForm.date || now.toISOString().split('T')[0], category: expForm.category });
+    const data = {
+      description: expForm.description.trim(),
+      amount: Number(expForm.amount),
+      date: expForm.date || now.toISOString().split('T')[0],
+      category: expForm.category,
+    };
+    if (editingExpense) {
+      updateExpense(editingExpense.id, data);
+    } else {
+      addExpense(data);
+    }
     setExpForm({ description: '', amount: '', category: 'Supplies', date: now.toISOString().split('T')[0] });
+    setEditingExpense(null);
     setShowExpenseModal(false);
   };
   const confirmDeleteExpense = (id: string, desc: string) => {
@@ -1365,7 +1392,7 @@ export default function FinanceScreen() {
       {tab === 'expenses' && (
         <>
           <View style={{ paddingHorizontal: 16, paddingTop: 16 }}>
-            <TouchableOpacity style={[s.addBtn, { borderColor: colors.destructive }]} onPress={() => setShowExpenseModal(true)} activeOpacity={0.8}>
+            <TouchableOpacity style={[s.addBtn, { borderColor: colors.destructive }]} onPress={openAddExpense} activeOpacity={0.8}>
               <Feather name="plus" size={18} color={colors.destructive} />
               <Text style={[s.addBtnText, { color: colors.destructive }]}>Add Expense</Text>
             </TouchableOpacity>
@@ -1385,6 +1412,9 @@ export default function FinanceScreen() {
                   <Text style={[ec.meta, { color: colors.mutedForeground }]}>{exp.category} • {exp.date}</Text>
                 </View>
                 <Text style={[ec.amount, { color: colors.destructive }]}>₹{exp.amount.toLocaleString('en-IN')}</Text>
+                <TouchableOpacity onPress={() => openEditExpense(exp)} style={{ padding: 6, marginLeft: 4 }}>
+                  <Feather name="edit-2" size={16} color={colors.primary} />
+                </TouchableOpacity>
                 <TouchableOpacity onPress={() => confirmDeleteExpense(exp.id, exp.description)} style={{ padding: 6, marginLeft: 4 }}>
                   <Feather name="trash-2" size={16} color={colors.mutedForeground} />
                 </TouchableOpacity>
@@ -2002,7 +2032,7 @@ export default function FinanceScreen() {
         <View style={mo.overlay}>
           <View style={[mo.sheet, { backgroundColor: colors.card }]}>
             <View style={[mo.header, { borderBottomColor: colors.border }]}>
-              <Text style={[mo.title, { color: colors.text }]}>Add Expense</Text>
+              <Text style={[mo.title, { color: colors.text }]}>{editingExpense ? 'Edit Expense' : 'Add Expense'}</Text>
               <TouchableOpacity onPress={() => setShowExpenseModal(false)}><Feather name="x" size={24} color={colors.mutedForeground} /></TouchableOpacity>
             </View>
             <ScrollView style={{ padding: 20 }} keyboardShouldPersistTaps="handled">
@@ -2028,8 +2058,8 @@ export default function FinanceScreen() {
               <TouchableOpacity style={[mo.btn, { borderColor: colors.border }]} onPress={() => setShowExpenseModal(false)}>
                 <Text style={{ color: colors.text, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[mo.btn, { flex: 2, backgroundColor: colors.destructive }]} onPress={handleAddExpense}>
-                <Text style={{ color: '#fff', fontWeight: '700' }}>Add Expense</Text>
+              <TouchableOpacity style={[mo.btn, { flex: 2, backgroundColor: colors.destructive }]} onPress={handleSaveExpense}>
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{editingExpense ? 'Save Changes' : 'Add Expense'}</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -502,6 +502,7 @@ interface AppContextType extends AppState {
   updateFeeRecord: (id: string, r: Partial<FeeRecord>) => void;
   deleteFeeRecord: (id: string) => void;
   addExpense: (e: Omit<Expense, 'id'>) => void;
+  updateExpense: (id: string, changes: Partial<Expense>) => void;
   deleteExpense: (id: string) => void;
   updateSalaryStatus: (teacherId: string, month: string, year: number, status: 'paid' | 'pending') => SalaryRecord;
   addSalaryRecord: (r: Omit<SalaryRecord, 'id'>) => SalaryRecord;
@@ -1428,6 +1429,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }).catch(console.error);
   }, []);
 
+  const updateExpense = useCallback((id: string, changes: Partial<Expense>) => {
+    setState(prev => ({
+      ...prev,
+      expenses: prev.expenses.map(expense => expense.id === id ? { ...expense, ...changes } : expense),
+    }));
+    apiPut(`/expenses/${id}`, changes).catch(console.error);
+  }, []);
+
   const deleteExpense = useCallback((id: string) => {
     setState(prev => ({ ...prev, expenses: prev.expenses.filter(x => x.id !== id) }));
     apiDelete(`/expenses/${id}`).catch(console.error);
@@ -1880,7 +1889,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       submitSubjectMarks, lockSubject, unlockSubject,
       addFeeRecord, deleteFeeRecord,
       updateFeeRecord,
-      addExpense, deleteExpense,
+      addExpense, updateExpense, deleteExpense,
       updateSalaryStatus, addSalaryRecord, updateSalaryRecord, deleteSalaryRecord,
       promoteStudent, bulkPromoteClass,
       submitInactivationRequest, approveInactivationRequest, rejectInactivationRequest,

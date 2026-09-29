@@ -108,6 +108,7 @@ export interface DataAdapter {
   expenses: {
     list(): Promise<any[]>;
     create(data: any): Promise<any>;
+    update(id: string, data: any): Promise<any | null>;
     delete(id: string): Promise<void>;
   };
   promotions: {

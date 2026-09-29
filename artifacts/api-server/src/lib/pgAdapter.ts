@@ -864,6 +864,15 @@ export function createPgAdapter(db: DB): DataAdapter {
         const [row] = await db.insert(expensesTable).values(values).returning();
         return row;
       },
+      async update(id, data: any) {
+        const [row] = await db.update(expensesTable).set({
+          description: data.description,
+          amount: data.amount,
+          date: data.date ?? "",
+          category: data.category ?? "",
+        }).where(eq(expensesTable.id, id)).returning();
+        return row ?? null;
+      },
       async delete(id) {
         await db.delete(expensesTable).where(eq(expensesTable.id, id));
       },
