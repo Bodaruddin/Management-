@@ -404,18 +404,18 @@ function buildSingleMarksheetHtml(
   .inner { border:1.5px solid #c8a040; border-radius:6px; padding:12px; overflow:hidden; display:flex; flex-direction:column; ${_innerZoomCss} }
 
   /* ---------- header ---------- */
-  .hdr { display:flex; align-items:flex-start; gap:18px; padding-bottom:10px; border-bottom:3px solid #0c1f4a; }
-  .badge-wrap { flex-shrink:0; }
-  .hdr-center { flex:1; text-align:center; }
+  .hdr { display:table; width:100%; table-layout:fixed; padding-bottom:10px; border-bottom:3px solid #0c1f4a; }
+  .badge-wrap { display:table-cell; width:136px; vertical-align:top; }
+  .hdr-center { display:table-cell; width:auto; vertical-align:top; text-align:center; }
   .school-h1 { font-family:'Archivo Black',sans-serif; font-size:28px; color:#0c1f4a; line-height:1.2; letter-spacing:0.4px; }
   .tagline-row { display:flex; align-items:center; gap:8px; margin:5px 0 4px; }
   .tline { flex:1; height:1.5px; background:#c8a040; }
   .tagline-txt { font-size:10.5px; font-weight:700; color:#0c1f4a; letter-spacing:3.5px; white-space:nowrap; }
   .addr { font-size:12px; font-weight:600; color:#0c1f4a; display:flex; align-items:center; justify-content:center; gap:5px; }
-  .hdr-right { flex-shrink:0; text-align:center; }
-  .session-box { background:#0c1f4a; color:#fff; border-radius:6px; padding:7px 20px; display:inline-block; }
-  .session-lbl { font-size:9px; letter-spacing:1.5px; font-weight:600; }
-  .session-val { font-size:22px; font-weight:800; line-height:1.2; }
+  .hdr-right { display:table-cell; width:158px; vertical-align:top; text-align:center; }
+  .session-box { background:#0c1f4a; color:#fff !important; border-radius:6px; padding:7px 12px; display:block; min-width:140px; text-align:center; }
+  .session-lbl { display:block; color:#fff !important; font-size:9px; letter-spacing:1.5px; font-weight:600; }
+  .session-val { display:block; color:#fff !important; font-size:22px; font-weight:800; line-height:1.2; }
   .ms-title { font-family:'Archivo Black',sans-serif; font-size:31px; color:#0c1f4a; margin-top:6px; letter-spacing:1px; }
 
   /* ---------- info box ---------- */
@@ -429,7 +429,8 @@ function buildSingleMarksheetHtml(
   .irow .colon { font-weight:700; color:#c8a040; margin:0 4px; flex-shrink:0; }
   .irow .val { font-weight:700; color:#1a1a2e; white-space:nowrap; flex-shrink:1; overflow:hidden; text-overflow:ellipsis; }
   /* ---------- QR card ---------- */
-  .qr-card { margin-top:6px; border:2px solid #c8a040; border-radius:10px; padding:8px 10px; display:inline-flex; flex-direction:column; align-items:center; gap:4px; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
+  .qr-card { margin:6px auto 0; border:2px solid #c8a040; border-radius:10px; padding:8px 10px; display:block; width:112px; text-align:center; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
+  .qr-card img { display:block; width:88px; height:88px; margin:0 auto; }
   .qr-card span { font-size:9px; font-weight:700; color:#0c1f4a; letter-spacing:1.5px; text-transform:uppercase; }
 
   /* ---------- marks table ---------- */
@@ -536,11 +537,11 @@ function buildSingleMarksheetHtml(
       <div class="hdr-right">
         <div class="session-box">
           <div class="session-lbl">ACADEMIC SESSION</div>
-          <div class="session-val">${acYear}</div>
+          <div class="session-val">${escapeHtml(acYear)}</div>
         </div>
         <div class="ms-title">MARKSHEET</div>
         <div class="qr-card">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=88x88&color=0c1f4a&bgcolor=FFFFFF&data=${verifyData}" width="88" height="88" style="border-radius:4px;display:block" onerror="this.style.display='none'" alt="QR Code"/>
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=88x88&color=0c1f4a&bgcolor=FFFFFF&data=${verifyData}" width="88" height="88" style="border-radius:4px;display:block" alt="QR Code"/>
           <span>Scan to Verify</span>
         </div>
       </div>
@@ -817,8 +818,12 @@ function buildCombinedMarksheetHtml(
   // Combined annual sheets have the densest table. Keep a deliberate reserve
   // for the signature row and footer instead of allowing the page shell to
   // clip them after the summary cards.
-  const _innerContentH = 880 + subjectRows.length * 30;
-  const _innerZoomVal = Math.min(0.82, 940 / _innerContentH);
+  // Keep the combined header, summary cards and text close to the single
+  // marksheet scale. Only the dense marks table should need to be compacted.
+  // The old hard cap of 0.82 made every part of the combined document visibly
+  // smaller, even when there was enough vertical space.
+  const _innerContentH = 790 + subjectRows.length * 27;
+  const _innerZoomVal = Math.min(0.93, 940 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
   return `<!DOCTYPE html>
@@ -843,19 +848,20 @@ function buildCombinedMarksheetHtml(
    .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:visible; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; position:relative; }
   .inner-content { display:flex; flex:1 1 auto; min-height:0; overflow:visible; flex-direction:column; ${_innerZoomCss} }
   /* header */
-   .hdr { display:flex; align-items:flex-start; gap:8px; padding-bottom:5px; border-bottom:3px solid #0c1f4a; }
-  .hdr-center { flex:1; text-align:center; }
-   .school-h1 { font-family:'Archivo Black',sans-serif; font-size:22px; color:#0c1f4a; line-height:1.15; letter-spacing:0; white-space:nowrap; transform:scaleX(0.94); transform-origin:center; }
+   .hdr { display:table; width:100%; table-layout:fixed; padding-bottom:7px; border-bottom:3px solid #0c1f4a; }
+   .hdr > div:first-child { display:table-cell; width:132px; vertical-align:top; }
+   .hdr-center { display:table-cell; width:auto; vertical-align:top; text-align:center; }
+     .school-h1 { font-family:'Archivo Black',sans-serif; font-size:22px; color:#0c1f4a; line-height:1.15; letter-spacing:0; white-space:nowrap; transform:scaleX(0.94); transform-origin:center; }
   .tagline-row { display:flex; align-items:center; gap:6px; margin:3px 0 2px; }
   .tline { flex:1; height:1.5px; background:#c8a040; }
-  .tagline-txt { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:3px; white-space:nowrap; }
-  .addr { font-size:10px; font-weight:600; color:#0c1f4a; display:flex; align-items:center; justify-content:center; gap:4px; }
-  .hdr-right { flex-shrink:0; text-align:center; }
-  .session-box { background:#0c1f4a; color:#fff; border-radius:6px; padding:4px 12px; display:inline-block; }
-  .session-lbl { font-size:9px; letter-spacing:1.5px; font-weight:600; }
-  .session-val { font-size:18px; font-weight:800; line-height:1.1; }
+   .tagline-txt { font-size:10.5px; font-weight:700; color:#0c1f4a; letter-spacing:3px; white-space:nowrap; }
+   .addr { font-size:11px; font-weight:600; color:#0c1f4a; display:flex; align-items:center; justify-content:center; gap:4px; }
+   .hdr-right { display:table-cell; width:158px; vertical-align:top; text-align:center; }
+   .session-box { background:#0c1f4a; color:#fff !important; border-radius:6px; padding:6px 12px; display:block; min-width:140px; text-align:center; }
+   .session-lbl { display:block; color:#fff !important; font-size:9px; letter-spacing:1.5px; font-weight:600; }
+   .session-val { display:block; color:#fff !important; font-size:22px; font-weight:800; line-height:1.1; }
   .comb-title { margin-top:5px; }
-  .comb-title .t1 { font-family:'Archivo Black',sans-serif; font-size:13px; color:#c8a040; font-style:italic; letter-spacing:1px; }
+   .comb-title .t1 { font-family:'Archivo Black',sans-serif; font-size:11px; color:#c8a040; font-style:italic; letter-spacing:0.7px; white-space:nowrap; }
   .comb-title .t2 { font-family:'Archivo Black',sans-serif; font-size:22px; color:#c8a040; font-style:italic; letter-spacing:1px; line-height:1; }
   .comb-title .stars { font-size:11px; color:#c8a040; letter-spacing:5px; margin-top:2px; }
   /* info box */
@@ -874,8 +880,9 @@ function buildCombinedMarksheetHtml(
     .irow .colon { display:table-cell; width:20px; vertical-align:middle; text-align:center; font-weight:700; color:#c8a040; }
    .irow .val { display:table-cell; vertical-align:middle; font-weight:700; color:#1a1a2e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   /* ---------- QR card ---------- */
-  .qr-card { margin-top:4px; border:2px solid #c8a040; border-radius:8px; padding:4px 7px; display:inline-flex; flex-direction:column; align-items:center; gap:2px; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
-  .qr-card span { font-size:9px; font-weight:700; color:#0c1f4a; letter-spacing:1.5px; text-transform:uppercase; }
+   .qr-card { margin:6px auto 0; border:2px solid #c8a040; border-radius:8px; padding:6px 7px; display:block; width:104px; text-align:center; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
+   .qr-card img { display:block; width:84px; height:84px; margin:0 auto; }
+   .qr-card span { display:block; white-space:nowrap; font-size:8px; font-weight:700; color:#0c1f4a; letter-spacing:0.8px; text-transform:uppercase; }
   /* perf table */
   .perf-title { background:#0c1f4a; display:flex; align-items:center; gap:8px; padding:4px 10px; border-radius:6px 6px 0 0; margin-top:6px; }
   .pt-line { flex:1; height:1px; background:rgba(200,160,64,0.45); }
@@ -957,7 +964,7 @@ function buildCombinedMarksheetHtml(
       <div class="hdr-right">
         <div class="session-box">
           <div class="session-lbl">ACADEMIC SESSION</div>
-          <div class="session-val">${acYear}</div>
+          <div class="session-val">${escapeHtml(acYear)}</div>
         </div>
         <div class="comb-title">
           <div class="t1">COMBINED ANNUAL</div>
@@ -965,7 +972,7 @@ function buildCombinedMarksheetHtml(
           <div class="stars">★ ★ ★</div>
         </div>
         <div class="qr-card">
-           <img src="https://api.qrserver.com/v1/create-qr-code/?size=72x72&color=0c1f4a&bgcolor=FFFFFF&data=${verifyData}" width="72" height="72" style="border-radius:4px;display:block" onerror="this.style.display='none'" alt="QR Code"/>
+           <img src="https://api.qrserver.com/v1/create-qr-code/?size=84x84&color=0c1f4a&bgcolor=FFFFFF&data=${verifyData}" width="84" height="84" style="border-radius:4px;display:block" alt="QR Code"/>
           <span>Scan to Verify</span>
         </div>
       </div>

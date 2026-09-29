@@ -122,14 +122,17 @@ async function preEmbedQrCodes(
     try {
       const qs = url.split('?')[1] ?? '';
       const params = new URLSearchParams(qs);
-      const data = params.get('data');
-      if (!data) { console.warn('[PDF] QR URL has no ?data= param:', url.slice(0, 80)); continue; }
+       // URLSearchParams already decodes the data query parameter. Decoding it
+       // a second time can corrupt student names that contain percent-like
+       // sequences and makes QR generation fail silently.
+       const data = params.get('data');
+       if (!data) { console.warn('[PDF] QR URL has no ?data= param:', url.slice(0, 80)); continue; }
 
       const rawSize = parseInt(params.get('size')?.split('x')[0] ?? '90', 10) || 90;
       const colorRaw = params.get('color') ?? '000000';
       const dark = colorRaw.startsWith('#') ? colorRaw : `#${colorRaw}`;
 
-      const dataUrl = await QRCode.toDataURL(decodeURIComponent(data), {
+       const dataUrl = await QRCode.toDataURL(data, {
          width: Math.max(Math.round(rawSize * resolutionMultiplier), rawSize),
         margin: 1,
         color: { dark, light: '#FFFFFF' },
@@ -138,7 +141,7 @@ async function preEmbedQrCodes(
 
       // Replace every occurrence of this URL in the HTML string
       html = html.split(url).join(dataUrl);
-      console.log('[PDF] QR embedded for:', decodeURIComponent(data).slice(0, 50));
+       console.log('[PDF] QR embedded for:', data.slice(0, 50));
     } catch (e) {
       console.warn('[PDF] QR embed failed for', url.slice(0, 80), '—', e);
     }
@@ -1085,16 +1088,23 @@ export async function printMultipleHtmlsAsPdf(
 
 /** Open the system print dialog for an HTML document string. */
 export async function printHtml(html: string): Promise<void> {
+  // Print dialogs do not reliably fetch remote QR images, especially on
+  // Android. Embed the QR before opening either the browser print window or
+  // the native print WebView so both paths use the same self-contained HTML.
+  const qrModule = await import('qrcode');
+  const QRCode = (qrModule.default ?? qrModule) as unknown as QRCodeStatic;
+  const preparedHtml = await preEmbedQrCodes(html, QRCode, Platform.OS === 'web' ? 3 : 1);
+
   if (Platform.OS === 'web') {
     const w = window.open('', '_blank');
-    if (w) { w.document.write(html); w.document.close(); w.print(); }
+    if (w) { w.document.write(preparedHtml); w.document.close(); w.print(); }
   } else {
     // The combined marksheet uses a fixed A4 page with a dense table. Apply
     // the same bounded native-print layout used by the PDF download path so
     // Android cannot paginate the fixed-height sheet onto a second page.
-    const printableHtml = html.includes('combined-page')
-      ? applyNativePrintMargins(html, 8)
-      : html;
+    const printableHtml = preparedHtml.includes('combined-page')
+      ? applyNativePrintMargins(preparedHtml, 8)
+      : preparedHtml;
     await Print.printAsync({ html: printableHtml });
   }
 }
