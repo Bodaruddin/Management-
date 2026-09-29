@@ -206,8 +206,8 @@ export function buildFinancialReportHtml(
     @page { size: A4 portrait; margin: 10mm; }
     html, body { margin: 0; padding: 0; background: #f4f7fb; color: #17233d; font-family: Arial, sans-serif; }
     body { font-size: 11px; }
-    .page { width: 100%; max-width: 760px; margin: 0 auto; padding: 24px; background: #fff; border-top: 8px solid #0b2b55; page-break-after: always; break-after: page; }
-    .page:not(:first-child) { padding: 0 12px; }
+    .page { width: 100%; max-width: 760px; margin: 0 auto; padding: 18px 24px 0; background: #fff; border-top: 8px solid #0b2b55; page-break-after: always; break-after: page; }
+    .page:not(:first-child) { padding: 18px 24px 0; }
     .page:last-child { page-break-after: auto; break-after: auto; }
     .header { display: flex; align-items: center; gap: 16px; padding-bottom: 15px; border-bottom: 2px solid #d9a832; }
     .logo { width: 72px; height: 72px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; }
