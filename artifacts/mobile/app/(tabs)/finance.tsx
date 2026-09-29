@@ -1200,7 +1200,7 @@ export default function FinanceScreen() {
           data={filteredStudents}
           keyExtractor={i => i.id}
           contentContainerStyle={{ padding: 16, paddingBottom: botPad, flexGrow: 1 }}
-          ListHeaderComponent={() => (
+          ListHeaderComponent={
             <View style={{ marginBottom: 12 }}>
               <TouchableOpacity
                 style={[s.reportShortcut, { borderColor: colors.primary + '45', backgroundColor: colors.primary + '0D', marginBottom: 12 }]}
@@ -1243,7 +1243,8 @@ export default function FinanceScreen() {
                 ))}
               </ScrollView>
             </View>
-          )}
+          }
+          keyboardShouldPersistTaps="handled"
           ListEmptyComponent={<EmptyState icon="dollar-sign" title="No Students" subtitle={feeSearch || feeClassFilter !== 'All' ? 'No students match your filter' : 'Add students to manage fees'} />}
           renderItem={({ item: st }) => {
             const last = getStudentLastFee(st.id);
