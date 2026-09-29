@@ -1,0 +1,25 @@
+{
+  "activeId": "94478416-91bf-4a62-895a-6e7c9c73ee5d",
+  "connections": [
+    {
+      "dbType": "postgresql",
+      "id": "env",
+      "name": "Environment Database",
+      "encryptedUrl": "80c50a12d0f94282a19031993d24a040:afe7d9a04d5af639554b7be71a9fe2a80d7375f91dc3917487fb423a174e93d19f986984aa29a49d39ce52a7b0e35d57f18673ae3a877cb972e8223b29861e5c",
+      "host": "helium",
+      "dbName": "heliumdb",
+      "createdAt": "2026-09-29T08:02:52.869Z",
+      "updatedAt": "2026-09-29T08:02:52.894Z"
+    },
+    {
+      "dbType": "postgresql",
+      "id": "94478416-91bf-4a62-895a-6e7c9c73ee5d",
+      "name": "supabas",
+      "encryptedUrl": "228bfa404dc77c817aa6f8937189c1bc:7658d4a1dff226d11dbbd244e6aa5807aee595b34081acc55cef77c623e8dc30579ecf7b2afd48af4e8d5e0d54d3ebe76314829827f19b35d1219b13fd0ccebfe53cd780ceba91ce8a0005ce262eb750bbba84e94d8d9beea310d50df67e43ee71c19b806c373d32b98ccb99310755059bf11df3aa870de65929bee7e309fb29",
+      "host": "aws-0-ap-southeast-1.pooler.supabase.com:6543",
+      "dbName": "postgres",
+      "createdAt": "2026-09-29T08:04:22.197Z",
+      "updatedAt": "2026-09-29T08:04:22.197Z"
+    }
+  ]
+}

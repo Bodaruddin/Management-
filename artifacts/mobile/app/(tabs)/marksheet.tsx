@@ -84,16 +84,16 @@ function fmtDate(d: string): string {
   const raw = String(d ?? '').trim();
   if (!raw) return '—';
   const isoParts = raw.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/);
-  if (isoParts) return `${isoParts[3]}/${isoParts[2]}/${isoParts[1]}`;
+  if (isoParts) return `${isoParts[3]} / ${isoParts[2]} / ${isoParts[1]}`;
   const localParts = raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
   if (localParts) {
-    return `${localParts[1].padStart(2, '0')}/${localParts[2].padStart(2, '0')}/${localParts[3]}`;
+    return `${localParts[1].padStart(2, '0')} / ${localParts[2].padStart(2, '0')} / ${localParts[3]}`;
   }
   const date = /^\d{4}-\d{2}-\d{2}$/.test(raw)
     ? new Date(`${raw}T00:00:00`)
     : new Date(raw);
   if (Number.isNaN(date.getTime())) return '—';
-  return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+  return `${String(date.getDate()).padStart(2, '0')} / ${String(date.getMonth() + 1).padStart(2, '0')} / ${date.getFullYear()}`;
 }
 
 function escapeHtml(value: unknown): string {
@@ -103,6 +103,15 @@ function escapeHtml(value: unknown): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function displayNameHtml(value: unknown): string {
+  return escapeHtml(String(value ?? '').trim().replace(/\s+/g, ' ').toUpperCase())
+    .replace(/ /g, '&nbsp;');
+}
+
+function displayDateHtml(value: string): string {
+  return escapeHtml(fmtDate(value));
 }
 
 function getInitials(name: string): string {
@@ -332,7 +341,7 @@ function buildSingleMarksheetHtml(
   const { student, exam, result, total, maxTotal, percentage, grade, rank, totalStudents, passed } = data;
   const acYear  = academicSession;
   const pctFmt  = percentage.toFixed(2);
-  const issueDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const issueDate = displayDateHtml(new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }));
   const verifyData = encodeURIComponent(
     `${student.name}|Roll:${student.rollNumber}|Class:${exam.class}|Exam:${exam.name}|Marks:${total}/${maxTotal}|Grade:${grade}|${passed ? 'PASS' : 'FAIL'}`
   );
@@ -427,7 +436,8 @@ function buildSingleMarksheetHtml(
   .irow .ic { width:18px; height:17px; display:flex; align-items:center; justify-content:center; flex-shrink:0; font-size:11px; }
   .irow .lbl { font-weight:600; color:#0c1f4a; min-width:88px; flex-shrink:0; }
   .irow .colon { font-weight:700; color:#c8a040; margin:0 4px; flex-shrink:0; }
-  .irow .val { font-weight:700; color:#1a1a2e; white-space:nowrap; flex-shrink:1; overflow:hidden; text-overflow:ellipsis; }
+   .irow .val { font-weight:700; color:#1a1a2e; white-space:nowrap; flex-shrink:1; overflow:hidden; text-overflow:ellipsis; }
+   .irow .name-value { word-spacing:2px; }
   /* ---------- QR card ---------- */
   .qr-card { margin:6px auto 0; border:2px solid #c8a040; border-radius:10px; padding:8px 10px; display:block; width:112px; text-align:center; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
   .qr-card img { display:block; width:88px; height:88px; margin:0 auto; }
@@ -550,16 +560,16 @@ function buildSingleMarksheetHtml(
     <!-- ══ STUDENT INFO ══ -->
     <div class="info-box">
       <div class="info-col">
-        <div class="irow"><span class="ic">👤</span><span class="lbl">Student Name</span><span class="colon">:</span><span class="val">${student.name.toUpperCase()}</span></div>
-        <div class="irow"><span class="ic">👨</span><span class="lbl">Father's Name</span><span class="colon">:</span><span class="val">${(student.fatherName||'—').toUpperCase()}</span></div>
-        <div class="irow"><span class="ic">👩</span><span class="lbl">Mother's Name</span><span class="colon">:</span><span class="val">${(student.motherName||'—').toUpperCase()}</span></div>
+        <div class="irow"><span class="ic">👤</span><span class="lbl">Student Name</span><span class="colon">:</span><span class="val name-value">${displayNameHtml(student.name)}</span></div>
+        <div class="irow"><span class="ic">👨</span><span class="lbl">Father's Name</span><span class="colon">:</span><span class="val name-value">${displayNameHtml(student.fatherName||'—')}</span></div>
+        <div class="irow"><span class="ic">👩</span><span class="lbl">Mother's Name</span><span class="colon">:</span><span class="val name-value">${displayNameHtml(student.motherName||'—')}</span></div>
         <div class="irow"><span class="ic">🎓</span><span class="lbl">Class</span><span class="colon">:</span><span class="val">${exam.class}</span></div>
         <div class="irow"><span class="ic">📘</span><span class="lbl">Section</span><span class="colon">:</span><span class="val">${student.section?.trim() || '—'}</span></div>
       </div>
       <div class="info-col">
         <div class="irow"><span class="ic">🪪</span><span class="lbl">Adm. No.</span><span class="colon">:</span><span class="val">${student.admissionNo||'—'}</span></div>
         <div class="irow"><span class="ic">📋</span><span class="lbl">Roll No.</span><span class="colon">:</span><span class="val">${student.rollNumber}</span></div>
-        <div class="irow"><span class="ic">📅</span><span class="lbl">D.O.B.</span><span class="colon">:</span><span class="val">${fmtDate(student.dateOfBirth)}</span></div>
+        <div class="irow"><span class="ic">📅</span><span class="lbl">D.O.B.</span><span class="colon">:</span><span class="val">${displayDateHtml(student.dateOfBirth)}</span></div>
         <div class="irow"><span class="ic">📝</span><span class="lbl">Exam Type</span><span class="colon">:</span><span class="val">Regular</span></div>
         <div class="irow"><span class="ic">📅</span><span class="lbl">Issue Date</span><span class="colon">:</span><span class="val">${issueDate}</span></div>
       </div>
@@ -732,7 +742,7 @@ function buildCombinedMarksheetHtml(
     rank, totalStudents, passed } = data;
   const acYear  = academicSession;
   const pctFmt  = percentage.toFixed(2);
-  const issueDate = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const issueDate = displayDateHtml(new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }));
 
   const verifyData = encodeURIComponent(
     `${student.name}|Roll:${student.rollNumber}|Class:${data.className}|Combined Annual|Total:${grandTotal}/${grandMax}|Grade:${grade}|${passed ? 'PASS' : 'FAIL'}`
@@ -878,7 +888,8 @@ function buildCombinedMarksheetHtml(
      .irow .ic { display:table-cell; width:18px; height:17px; vertical-align:middle; text-align:center; font-size:11px; }
      .irow .lbl { display:table-cell; width:88px; vertical-align:middle; font-weight:600; color:#0c1f4a; white-space:nowrap; }
     .irow .colon { display:table-cell; width:20px; vertical-align:middle; text-align:center; font-weight:700; color:#c8a040; }
-   .irow .val { display:table-cell; vertical-align:middle; font-weight:700; color:#1a1a2e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .irow .val { display:table-cell; vertical-align:middle; font-weight:700; color:#1a1a2e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .irow .name-value { word-spacing:2px; }
   /* ---------- QR card ---------- */
    .qr-card { margin:6px auto 0; border:2px solid #c8a040; border-radius:8px; padding:6px 7px; display:block; width:104px; text-align:center; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
    .qr-card img { display:block; width:84px; height:84px; margin:0 auto; }
@@ -981,16 +992,16 @@ function buildCombinedMarksheetHtml(
     <!-- ══ STUDENT INFO ══ -->
     <div class="info-box">
       <div class="info-col">
-        <div class="irow"><span class="ic">👤</span><span class="lbl">Student Name</span><span class="colon">:</span><span class="val">${escapeHtml(student.name).toUpperCase()}</span></div>
-        <div class="irow"><span class="ic">👨</span><span class="lbl">Father's Name</span><span class="colon">:</span><span class="val">${escapeHtml(student.fatherName || '—').toUpperCase()}</span></div>
-        <div class="irow"><span class="ic">👩</span><span class="lbl">Mother's Name</span><span class="colon">:</span><span class="val">${escapeHtml(student.motherName || '—').toUpperCase()}</span></div>
+        <div class="irow"><span class="ic">👤</span><span class="lbl">Student Name</span><span class="colon">:</span><span class="val name-value">${displayNameHtml(student.name)}</span></div>
+        <div class="irow"><span class="ic">👨</span><span class="lbl">Father's Name</span><span class="colon">:</span><span class="val name-value">${displayNameHtml(student.fatherName || '—')}</span></div>
+        <div class="irow"><span class="ic">👩</span><span class="lbl">Mother's Name</span><span class="colon">:</span><span class="val name-value">${displayNameHtml(student.motherName || '—')}</span></div>
         <div class="irow"><span class="ic">🎓</span><span class="lbl">Class</span><span class="colon">:</span><span class="val">${escapeHtml(data.className)}</span></div>
         <div class="irow"><span class="ic">📘</span><span class="lbl">Section</span><span class="colon">:</span><span class="val">${escapeHtml(student.section?.trim() || '—')}</span></div>
       </div>
       <div class="info-col">
         <div class="irow"><span class="ic">🪪</span><span class="lbl">Adm. No.</span><span class="colon">:</span><span class="val">${escapeHtml(student.admissionNo || '—')}</span></div>
         <div class="irow"><span class="ic">📋</span><span class="lbl">Roll No.</span><span class="colon">:</span><span class="val">${escapeHtml(student.rollNumber)}</span></div>
-        <div class="irow"><span class="ic">📅</span><span class="lbl">D.O.B.</span><span class="colon">:</span><span class="val">${escapeHtml(fmtDate(student.dateOfBirth))}</span></div>
+        <div class="irow"><span class="ic">📅</span><span class="lbl">D.O.B.</span><span class="colon">:</span><span class="val">${displayDateHtml(student.dateOfBirth)}</span></div>
         <div class="irow"><span class="ic">📝</span><span class="lbl">Exam Type</span><span class="colon">:</span><span class="val">Regular</span></div>
         <div class="irow"><span class="ic">📅</span><span class="lbl">Issue Date</span><span class="colon">:</span><span class="val">${issueDate}</span></div>
       </div>
