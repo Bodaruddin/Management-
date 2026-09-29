@@ -416,7 +416,7 @@ function buildSingleMarksheetHtml(
   .session-box { background:#0c1f4a; color:#fff !important; border-radius:6px; padding:7px 12px; display:block; min-width:140px; text-align:center; }
   .session-lbl { display:block; color:#fff !important; font-size:9px; letter-spacing:1.5px; font-weight:600; }
   .session-val { display:block; color:#fff !important; font-size:22px; font-weight:800; line-height:1.2; }
-  .ms-title { font-family:'Archivo Black',sans-serif; font-size:31px; color:#0c1f4a; margin-top:6px; letter-spacing:1px; }
+  .ms-title { font-family:'Archivo Black',sans-serif; font-size:24px; color:#0c1f4a; margin-top:6px; letter-spacing:0.5px; white-space:nowrap; }
 
   /* ---------- info box ---------- */
   .info-box { border:1.5px solid #c8a040; border-radius:8px; display:flex; gap:0; margin-top:8px; overflow:hidden; background:#fdfcf5; }
@@ -851,7 +851,7 @@ function buildCombinedMarksheetHtml(
    .hdr { display:table; width:100%; table-layout:fixed; padding-bottom:7px; border-bottom:3px solid #0c1f4a; }
    .hdr > div:first-child { display:table-cell; width:132px; vertical-align:top; }
    .hdr-center { display:table-cell; width:auto; vertical-align:top; text-align:center; }
-     .school-h1 { font-family:'Archivo Black',sans-serif; font-size:22px; color:#0c1f4a; line-height:1.15; letter-spacing:0; white-space:nowrap; transform:scaleX(0.94); transform-origin:center; }
+     .school-h1 { font-family:'Archivo Black',sans-serif; font-size:22px; font-weight:900; color:#0c1f4a; line-height:1.08; letter-spacing:0; white-space:nowrap; transform:scaleX(0.94); transform-origin:center; }
   .tagline-row { display:flex; align-items:center; gap:6px; margin:3px 0 2px; }
   .tline { flex:1; height:1.5px; background:#c8a040; }
    .tagline-txt { font-size:10.5px; font-weight:700; color:#0c1f4a; letter-spacing:3px; white-space:nowrap; }
@@ -861,8 +861,8 @@ function buildCombinedMarksheetHtml(
    .session-lbl { display:block; color:#fff !important; font-size:9px; letter-spacing:1.5px; font-weight:600; }
    .session-val { display:block; color:#fff !important; font-size:22px; font-weight:800; line-height:1.1; }
   .comb-title { margin-top:5px; }
-   .comb-title .t1 { font-family:'Archivo Black',sans-serif; font-size:11px; color:#c8a040; font-style:italic; letter-spacing:0.7px; white-space:nowrap; }
-  .comb-title .t2 { font-family:'Archivo Black',sans-serif; font-size:22px; color:#c8a040; font-style:italic; letter-spacing:1px; line-height:1; }
+   .comb-title .t1 { font-family:'Archivo Black',sans-serif; font-size:11px; font-weight:900; color:#c8a040; font-style:italic; letter-spacing:0.7px; white-space:nowrap; }
+   .comb-title .t2 { font-family:'Archivo Black',sans-serif; font-size:22px; font-weight:900; color:#c8a040; font-style:italic; letter-spacing:1px; line-height:1; }
   .comb-title .stars { font-size:11px; color:#c8a040; letter-spacing:5px; margin-top:2px; }
   /* info box */
    /*
@@ -956,7 +956,7 @@ function buildCombinedMarksheetHtml(
       </div>
       <!-- School name -->
       <div class="hdr-center">
-        <div class="school-h1">${SCHOOL_INFO.name}</div>
+        <div class="school-h1">${escapeHtml(SCHOOL_INFO.name.replace(/\s+VIDYALAYA\s*$/i, ''))}<br>VIDYALAYA</div>
         <div class="tagline-row"><div class="tline"></div><span class="tagline-txt">DISCIPLINE &nbsp;•&nbsp; KNOWLEDGE &nbsp;•&nbsp; VALUES</span><div class="tline"></div></div>
         <div class="addr">📍 ${SCHOOL_INFO.address}</div>
       </div>
