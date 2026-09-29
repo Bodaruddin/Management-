@@ -575,7 +575,7 @@ function buildPremiumHtml(
       </div>
     </div>
     <div style="margin-top:24px;display:flex;justify-content:space-between;align-items:end;position:relative">
-      <div><div style="font-size:11px;color:#C8D4E4;letter-spacing:1.4px">${exam.name} · ${acYear}</div><div style="font-size:29px;font-weight:800;margin-top:7px">ADMIT CARD</div></div>
+      <div><div style="font-size:14px;font-weight:800;color:#C8D4E4;letter-spacing:1.2px">${exam.name} · ${acYear}</div><div style="font-size:29px;font-weight:800;margin-top:7px">ADMIT CARD</div></div>
     </div>
   </header>
   <div style="height:6px;background:#D9BD70"></div>
