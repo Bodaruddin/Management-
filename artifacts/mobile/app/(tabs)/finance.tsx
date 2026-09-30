@@ -15,6 +15,7 @@ import EmptyState from '@/components/EmptyState';
 import { printFeeReceipt, printSalarySlip, shareReceiptWhatsApp, shareSalaryReceiptWhatsApp } from '@/utils/receipt';
 import { buildReminderMessage, sendReminderSMS, shareReminderImage } from '@/utils/reminder';
 import ReminderCard from '@/components/ReminderCard';
+import PDFSavedModal from '@/components/PDFSavedModal';
 import { downloadHtmlAsPdf } from '@/utils/pdfExport';
 import { buildFinancialReportHtml } from '@/utils/financialReport';
 
@@ -143,6 +144,7 @@ export default function FinanceScreen() {
   const [feeReportStart, setFeeReportStart] = useState(new Date().toISOString().split('T')[0]);
   const [feeReportEnd, setFeeReportEnd] = useState(new Date().toISOString().split('T')[0]);
   const [isDownloadingFinancialReport, setIsDownloadingFinancialReport] = useState(false);
+  const [pdfSaved, setPdfSaved] = useState<{ filename: string; fileUri: string } | null>(null);
   const [showFinancialReportFeePicker, setShowFinancialReportFeePicker] = useState(false);
   const [selectedFinancialReportFeeTypes, setSelectedFinancialReportFeeTypes] = useState<string[]>(['All']);
 
@@ -247,7 +249,17 @@ export default function FinanceScreen() {
         totalExpenses,
         netBalance: reportTotalFees - totalSalaryPaid - totalExpenses,
       }, documentBranding);
-      await downloadHtmlAsPdf(reportHtml, `financial-report-${todayStr}`);
+      const onSaved = Platform.OS !== 'web'
+        ? (filename: string, fileUri: string) => setPdfSaved({ filename, fileUri })
+        : undefined;
+      await downloadHtmlAsPdf(
+        reportHtml,
+        `financial-report-${todayStr}`,
+        '.page',
+        'img[alt="QR Code"]',
+        true,
+        onSaved,
+      );
     } catch (error) {
       console.error('[Finance] Financial report download failed:', error);
       Alert.alert('Download failed', 'The financial report could not be generated. Please try again.');
@@ -679,6 +691,12 @@ export default function FinanceScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: '#F1F5F9' }]}>
+      <PDFSavedModal
+        visible={!!pdfSaved}
+        filename={pdfSaved?.filename ?? ''}
+        fileUri={pdfSaved?.fileUri}
+        onDismiss={() => setPdfSaved(null)}
+      />
 
       {/* ── Premium Gradient Header ─────────────────────────────────────── */}
       <LinearGradient
