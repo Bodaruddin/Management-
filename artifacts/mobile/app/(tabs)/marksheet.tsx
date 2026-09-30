@@ -855,7 +855,13 @@ function buildCombinedMarksheetHtml(
   .corner.tr { top:5px; right:5px; transform:rotate(90deg); transform-origin:50% 50%; }
   .corner.bl { bottom:5px; left:5px; transform:rotate(-90deg); transform-origin:50% 50%; }
   .corner.br { bottom:5px; right:5px; transform:rotate(180deg); transform-origin:50% 50%; }
-   .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:visible; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; position:relative; }
+   /*
+    * Keep a real layout lane for the signatures. The footer is pinned to the
+    * bottom of the inner frame, so the extra bottom padding prevents the
+    * signature row from being painted on top of it when native print scales
+    * the page.
+    */
+   .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px 8px 48px; overflow:hidden; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; position:relative; }
   .inner-content { display:flex; flex:1 1 auto; min-height:0; overflow:visible; flex-direction:column; ${_innerZoomCss} }
   /* header */
    .hdr { display:table; width:100%; table-layout:fixed; padding-bottom:7px; border-bottom:3px solid #0c1f4a; }
@@ -925,8 +931,12 @@ function buildCombinedMarksheetHtml(
    .rem { display:table; width:100%; table-layout:fixed; margin-top:5px; border-radius:6px; overflow:hidden; border:1.5px solid #d0d8ea; }
    .rem-tag { display:table-cell; width:110px; vertical-align:middle; background:#0c1f4a; color:#fff; padding:5px 12px 5px 9px; font-size:10px; font-weight:700; letter-spacing:0.4px; clip-path:polygon(0 0,100% 0,90% 100%,0 100%); padding-right:24px; }
    .rem-txt { display:table-cell; vertical-align:middle; padding:5px 10px; font-size:10.5px; line-height:1.25; color:#222; font-weight:500; word-break:normal; }
-  /* signatures — flex-shrink:0 keeps them out of the scrolling inner area */
-   .sigs { position:absolute; left:0; right:0; bottom:44px; display:flex; justify-content:space-around; margin:0; padding-top:8px; min-height:82px; align-items:flex-end; text-align:center; z-index:12; }
+   /*
+    * Signatures must stay after the remarks in document flow. They used to be
+    * absolutely positioned near the footer, which allowed the remarks text to
+    * extend underneath the signature images in downloaded PDFs.
+    */
+    .sigs { position:relative; left:auto; right:auto; bottom:auto; display:flex; flex:0 0 62px; justify-content:space-around; margin:0; padding:2px 0 0; min-height:62px; align-items:flex-end; text-align:center; z-index:12; }
   .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
   .sig-block .role { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:0.2px; }
   /* footer — flex-shrink:0 always pins it at page bottom */
@@ -1141,9 +1151,9 @@ function buildCombinedMarksheetHtml(
       <div class="rem-txt">${escapeHtml(remark)}</div>
     </div>
 
-   </div><!-- /inner-content -->
-
-  <!-- ══ SIGNATURES ══ -->
+  <!-- ══ SIGNATURES ══
+       Keep this inside the scaled content wrapper so native print measures the
+       remarks, signatures, and table as one fixed A4 layout. -->
   <div class="sigs">
     <div class="sig-block">
       ${marksheetSignatureHtml('teacher', branding)}
@@ -1154,6 +1164,9 @@ function buildCombinedMarksheetHtml(
       <div class="role">Principal</div>
     </div>
   </div>
+
+   </div><!-- /inner-content -->
+
   <div class="footer">
     <div class="footer-quote">Education is the most powerful weapon which you can use to change the world.</div>
   </div>
