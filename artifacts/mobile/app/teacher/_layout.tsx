@@ -11,6 +11,7 @@ export default function TeacherLayout() {
       <Stack.Screen name="admin-attendance" />
       <Stack.Screen name="marks" />
       <Stack.Screen name="salary" />
+      <Stack.Screen name="payable-salary" />
       <Stack.Screen name="fees" />
       <Stack.Screen name="classes" />
       <Stack.Screen name="students" />
