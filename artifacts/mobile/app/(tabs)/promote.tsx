@@ -58,12 +58,12 @@ export default function PromoteScreen() {
   const togglePromotePermission = (teacherId: string) => {
     const teacher = teachers.find(t => t.id === teacherId);
     if (!teacher) return;
-    updateTeacher(teacherId, {
+    void updateTeacher(teacherId, {
       permissions: {
         ...teacher.permissions,
         promoteStudents: !teacher.permissions.promoteStudents,
       },
-    });
+    }).catch(console.error);
   };
 
   const botPad = Platform.OS === 'web' ? 84 : insets.bottom + 80;

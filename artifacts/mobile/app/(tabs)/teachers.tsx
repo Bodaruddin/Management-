@@ -44,8 +44,14 @@ function parseDisplayDate(value: string): string | null {
   return `${yearText}-${monthText}-${dayText}`;
 }
 
+function formatStoredDateForInput(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!match) return '';
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
 const BLANK = {
-  name: '', subject: '', mobileNumber: '', salary: '', username: '', password: '',
+  name: '', subject: '', mobileNumber: '', salary: '', username: '', password: '', joinDate: '',
   permissions: { addStudent: false, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false }, photo: undefined as string | undefined
 };
 
@@ -86,10 +92,10 @@ export default function TeachersScreen() {
 
   const getCurrentSalary = (teacherId: string) => getSalaryRecord(teacherId, curMonth, curYear);
 
-  const openAdd = () => { setEditing(null); setForm({ ...BLANK }); setShowModal(true); };
+  const openAdd = () => { setEditing(null); setForm({ ...BLANK, joinDate: displayDateFromDate(new Date()) }); setShowModal(true); };
   const openEdit = (t: Teacher) => {
     setEditing(t);
-    setForm({ name: t.name, subject: t.subject, mobileNumber: t.mobileNumber, salary: t.salary > 0 ? String(t.salary) : '', username: t.username, password: t.password, permissions: { ...t.permissions }, photo: t.photo });
+    setForm({ name: t.name, subject: t.subject, mobileNumber: t.mobileNumber, salary: t.salary > 0 ? String(t.salary) : '', username: t.username, password: t.password, joinDate: formatStoredDateForInput(t.joinDate), permissions: { ...t.permissions }, photo: t.photo });
     setShowModal(true);
   };
 
@@ -103,11 +109,16 @@ export default function TeachersScreen() {
       Alert.alert('Validation', 'Enter a valid monthly salary greater than ₹0, or leave it blank');
       return;
     }
+    const joinDate = parseDisplayDate(form.joinDate);
+    if (!joinDate) {
+      Alert.alert('Validation', 'Enter a valid joining date in DD/MM/YYYY format');
+      return;
+    }
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const data = { name: form.name.trim(), subject: form.subject.trim(), mobileNumber: form.mobileNumber.trim(), salary: monthlySalary, username: form.username.trim(), password: form.password, joinDate: editing?.joinDate ?? new Date().toISOString().split('T')[0], permissions: form.permissions, photo: form.photo };
+    const data = { name: form.name.trim(), subject: form.subject.trim(), mobileNumber: form.mobileNumber.trim(), salary: monthlySalary, username: form.username.trim(), password: form.password, joinDate, permissions: form.permissions, photo: form.photo };
     try {
       if (editing) {
-        updateTeacher(editing.id, data);
+        await updateTeacher(editing.id, data);
       } else {
         await addTeacher(data);
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -344,8 +355,12 @@ export default function TeachersScreen() {
                           onValueChange={async (val) => {
                             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             const updated = { ...detailTeacher, permissions: { ...detailTeacher.permissions, [perm.key]: val } };
-                            updateTeacher(detailTeacher.id, { permissions: updated.permissions });
-                            setDetailTeacher(updated);
+                            try {
+                              const saved = await updateTeacher(detailTeacher.id, { permissions: updated.permissions });
+                              setDetailTeacher(saved);
+                            } catch (error: any) {
+                              Alert.alert('Save failed', error?.message ?? 'Could not update teacher permissions.');
+                            }
                           }}
                           trackColor={{ true: colors.primary, false: colors.border }}
                           thumbColor="#fff"
@@ -526,6 +541,7 @@ export default function TeachersScreen() {
                 { key: 'name', label: 'Full Name *', placeholder: 'Teacher full name' },
                 { key: 'subject', label: 'Subject *', placeholder: 'e.g. Mathematics' },
                 { key: 'mobileNumber', label: 'Mobile Number', placeholder: '10-digit number', keyboard: 'phone-pad' as const },
+                { key: 'joinDate', label: 'Joining Date *', placeholder: 'DD/MM/YYYY', keyboard: 'number-pad' as const },
                 { key: 'salary', label: 'Monthly Salary (₹)', placeholder: 'Optional — e.g. 25000', keyboard: 'number-pad' as const },
                 { key: 'username', label: 'Username *', placeholder: 'Login username' },
                 { key: 'password', label: 'Password *', placeholder: 'Login password' },
@@ -535,7 +551,7 @@ export default function TeachersScreen() {
                   <TextInput
                     style={[inp.input, { backgroundColor: colors.muted, color: colors.text, borderColor: colors.border }]}
                     value={(form as any)[f.key]}
-                    onChangeText={v => setForm(p => ({ ...p, [f.key]: f.key === 'salary' ? v.replace(/\D/g, '') : v }))}
+                    onChangeText={v => setForm(p => ({ ...p, [f.key]: f.key === 'salary' ? v.replace(/\D/g, '') : f.key === 'joinDate' ? formatDateInput(v) : v }))}
                     placeholder={f.placeholder}
                     placeholderTextColor={colors.mutedForeground}
                     keyboardType={f.keyboard}

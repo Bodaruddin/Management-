@@ -8,8 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useApp, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
 import { printSalarySlip } from '@/utils/receipt';
-
-const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+import { getTeacherSalaryBreakdown } from '@/utils/teacherSalary';
 
 export default function TeacherSalary() {
   const colors = useColors();
@@ -17,53 +16,19 @@ export default function TeacherSalary() {
   const { user } = useAuth();
   const {
     salaryRecords, teachers, documentBranding, teacherAttendanceRecords,
-    teacherHolidays, teacherLeaves,
+    teacherHolidays, teacherLeaves, teacherAttendanceSettings,
   } = useApp();
 
   const myRecords = useMemo(() =>
-    salaryRecords.filter(s => s.teacherId === user?.id).sort(compareSalaryRecordsNewestFirst),
+    salaryRecords
+      .filter(s => s.teacherId === user?.id && s.status === 'paid')
+      .sort(compareSalaryRecordsNewestFirst),
     [salaryRecords, user]
   );
 
-  const now = new Date();
-  const curMonth = monthNames[now.getMonth()];
-  const curYear = now.getFullYear();
-
-  const currentMonthRecord = myRecords.find(r => r.month === curMonth && r.year === curYear);
   const myTeacher = teachers.find(t => t.id === user?.id);
-
-  const getBreakdown = (record: typeof myRecords[number]) => {
-    const monthIndex = monthNames.indexOf(record.month);
-    const monthKey = `${record.year}-${String(monthIndex + 1).padStart(2, '0')}`;
-    const holidayDates = new Set(
-      teacherHolidays.filter(holiday => holiday.date.startsWith(monthKey)).map(holiday => holiday.date),
-    );
-    const leaveDates = new Set<string>();
-    teacherLeaves.filter(leave => leave.teacherId === user?.id && leave.status === 'approved').forEach(leave => {
-      const cursor = new Date(`${leave.startDate}T12:00:00Z`);
-      const end = new Date(`${leave.endDate}T12:00:00Z`);
-      while (cursor <= end) {
-        const date = cursor.toISOString().slice(0, 10);
-        if (date.startsWith(monthKey)) leaveDates.add(date);
-        cursor.setUTCDate(cursor.getUTCDate() + 1);
-      }
-    });
-    const daysInMonth = new Date(Date.UTC(record.year, monthIndex + 1, 0)).getUTCDate();
-    const workingDays = Array.from({ length: daysInMonth }, (_, index) => {
-      const date = `${monthKey}-${String(index + 1).padStart(2, '0')}`;
-      const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
-      return weekday !== 0 && weekday !== 6 && !holidayDates.has(date) && !leaveDates.has(date);
-    }).filter(Boolean).length;
-    const rows = teacherAttendanceRecords.filter(item => item.teacherId === user?.id && item.date.startsWith(monthKey));
-    const present = rows.filter(item => item.status === 'present').length;
-    const late = rows.filter(item => item.status === 'late').length;
-    const absent = Math.max(0, workingDays - present - late);
-    return {
-      present, late, absent, holidays: holidayDates.size, leave: leaveDates.size,
-      deduction: Math.max(0, (myTeacher?.salary ?? record.amount) - record.amount),
-      payable: record.amount,
-    };
-  };
+  const latestPaidRecord = myRecords[0];
+  const currentYear = new Date().getFullYear();
 
   const handlePrintReceipt = (record: any) => {
     if (myTeacher) {
@@ -72,7 +37,7 @@ export default function TeacherSalary() {
   };
 
   const s = styles(colors);
-  const topPad = Platform.OS === 'web' ? 12 : insets.top;
+  const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const botPad = Platform.OS === 'web' ? 84 : insets.bottom + 20;
 
   return (
@@ -86,42 +51,33 @@ export default function TeacherSalary() {
       </View>
 
       <View style={[s.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <View style={[s.currentCard, { borderColor: currentMonthRecord?.status === 'paid' ? colors.success : colors.border }]}>
-          <View style={[s.currentIconWrap, { backgroundColor: currentMonthRecord?.status === 'paid' ? colors.success + '20' : colors.muted }]}>
-            <Feather name="credit-card" size={28} color={currentMonthRecord?.status === 'paid' ? colors.success : colors.mutedForeground} />
+        <View style={[s.currentCard, { borderColor: colors.success }]}>
+          <View style={[s.currentIconWrap, { backgroundColor: colors.success + '20' }]}>
+            <Feather name="check-circle" size={26} color={colors.success} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={[s.currentMonth, { color: colors.mutedForeground }]}>{curMonth} {curYear}</Text>
-            <Text style={[s.currentAmount, { color: colors.text }]}>₹{(currentMonthRecord?.amount ?? myTeacher?.salary ?? 0).toLocaleString('en-IN')}</Text>
-            <View style={[s.statusBadge, { backgroundColor: currentMonthRecord?.status === 'paid' ? colors.success + '20' : colors.muted }]}>
-              <Feather name={currentMonthRecord?.status === 'paid' ? 'check-circle' : 'minus-circle'} size={13} color={currentMonthRecord?.status === 'paid' ? colors.success : colors.mutedForeground} />
-              <Text style={[s.statusText, { color: currentMonthRecord?.status === 'paid' ? colors.success : colors.mutedForeground }]}>
-                {currentMonthRecord?.status === 'paid' ? `Paid on ${currentMonthRecord.paidDate ?? ''}` : 'Not paid yet'}
+            <Text style={[s.currentMonth, { color: colors.mutedForeground }]}>Total salary paid</Text>
+            <Text style={[s.currentAmount, { color: colors.text }]}>
+              ₹{myRecords.reduce((sum, record) => sum + (Number(record.amount) || 0), 0).toLocaleString('en-IN')}
+            </Text>
+            {latestPaidRecord ? (
+              <Text style={[s.statusText, { color: colors.success }]}>
+                Latest: {latestPaidRecord.month} {latestPaidRecord.year}
+                {latestPaidRecord.paidDate ? ` · Paid ${latestPaidRecord.paidDate}` : ''}
               </Text>
-            </View>
-            {currentMonthRecord && (
-              <View style={[s.breakdown, { backgroundColor: colors.muted }]}>
-                {(() => {
-                  const breakdown = getBreakdown(currentMonthRecord);
-                  return (
-                    <>
-                      <Text style={[s.breakdownTitle, { color: colors.text }]}>Attendance breakdown</Text>
-                      <Text style={[s.breakdownText, { color: colors.mutedForeground }]}>Present {breakdown.present} · Late {breakdown.late} · Absent {breakdown.absent}</Text>
-                      <Text style={[s.breakdownText, { color: colors.mutedForeground }]}>Holiday {breakdown.holidays} · Approved leave {breakdown.leave}</Text>
-                      <Text style={[s.breakdownText, { color: colors.destructive }]}>Deduction ₹{breakdown.deduction.toLocaleString('en-IN')} · Payable ₹{breakdown.payable.toLocaleString('en-IN')}</Text>
-                    </>
-                  );
-                })()}
-              </View>
+            ) : (
+              <Text style={[s.statusText, { color: colors.mutedForeground }]}>
+                Payments recorded by admin will appear here.
+              </Text>
             )}
           </View>
         </View>
 
         <View style={s.summaryRow}>
           {[
-            { label: 'Total Salary', value: `₹${myRecords.reduce((sum, r) => sum + (r.amount ?? 0), 0).toLocaleString('en-IN')}`, color: colors.primary },
-            { label: 'Paid This Year', value: myRecords.filter(r => r.year === curYear && r.status === 'paid').length, color: colors.success },
-            { label: 'Total Records', value: myRecords.length, color: colors.info },
+            { label: 'Payments', value: myRecords.length, color: colors.primary },
+            { label: 'Paid This Year', value: myRecords.filter(r => r.year === currentYear).length, color: colors.success },
+            { label: 'Latest Payment', value: latestPaidRecord ? latestPaidRecord.month.slice(0, 3) : '—', color: colors.info },
           ].map(stat => (
             <View key={stat.label} style={[s.sumCard, { backgroundColor: stat.color + '15' }]}>
               <Text style={[s.sumVal, { color: stat.color }]}>{stat.value}</Text>
@@ -129,6 +85,24 @@ export default function TeacherSalary() {
             </View>
           ))}
         </View>
+
+        <TouchableOpacity
+          style={[s.payableLink, { backgroundColor: colors.primary + '12' }]}
+          onPress={() => router.replace('/teacher/payable-salary')}
+          accessibilityRole="button"
+          accessibilityLabel="View payable salary and monthly breakdown"
+        >
+          <View style={[s.payableIcon, { backgroundColor: colors.primary + '20' }]}>
+            <Feather name="clock" size={17} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[s.payableLinkTitle, { color: colors.text }]}>Payable Salary</Text>
+            <Text style={[s.payableLinkSubtitle, { color: colors.mutedForeground }]}>
+              View unpaid months and salary breakdown
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
       <Text style={[s.histTitle, { color: colors.text }]}>Salary History</Text>
@@ -136,7 +110,7 @@ export default function TeacherSalary() {
         data={myRecords}
         keyExtractor={i => i.id}
          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: Math.max(botPad, 36), flexGrow: 1 }}
-        ListEmptyComponent={<EmptyState icon="credit-card" title="No Salary Records" subtitle="Your salary history will appear here" />}
+        ListEmptyComponent={<EmptyState icon="credit-card" title="No Paid Salary Yet" subtitle="Salary payments recorded by the admin will appear here" />}
         renderItem={({ item }) => (
           <View style={[s.histRow, { backgroundColor: colors.card }]}>
             <View style={[s.histIcon, { backgroundColor: colors.success + '20' }]}>
@@ -146,8 +120,20 @@ export default function TeacherSalary() {
               <Text style={[s.histMonth, { color: colors.text }]}>{item.month} {item.year}</Text>
               {item.paidDate && <Text style={[s.histMeta, { color: colors.mutedForeground }]}>Paid: {item.paidDate}</Text>}
               {(() => {
-                const breakdown = getBreakdown(item);
-                return <Text style={[s.histMeta, { color: colors.mutedForeground }]}>P {breakdown.present} · L {breakdown.late} · A {breakdown.absent} · Deduction ₹{breakdown.deduction.toLocaleString('en-IN')}</Text>;
+                const breakdown = getTeacherSalaryBreakdown(
+                  item,
+                  item.teacherId,
+                  myTeacher?.salary ?? item.amount,
+                  teacherAttendanceRecords,
+                  teacherHolidays,
+                  teacherLeaves,
+                  teacherAttendanceSettings,
+                );
+                return (
+                  <Text style={[s.histMeta, { color: colors.mutedForeground }]}>
+                    P {breakdown.present} · L {breakdown.late} · A {breakdown.absent} · Deduction ₹{breakdown.deduction.toLocaleString('en-IN')}
+                  </Text>
+                );
               })()}
             </View>
             <View style={{ alignItems: 'flex-end', gap: 6 }}>
@@ -174,15 +160,15 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   currentIconWrap: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   currentMonth: { fontSize: 13, fontWeight: '500', marginBottom: 4 },
   currentAmount: { fontSize: 26, fontWeight: '800', marginBottom: 8 },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 20, alignSelf: 'flex-start' },
   statusText: { fontSize: 12, fontWeight: '600' },
-  breakdown: { borderRadius: 10, padding: 10, marginTop: 12 },
-  breakdownTitle: { fontSize: 12, fontWeight: '800', marginBottom: 4 },
-  breakdownText: { fontSize: 11, lineHeight: 17 },
   summaryRow: { flexDirection: 'row', gap: 10 },
   sumCard: { flex: 1, borderRadius: 12, padding: 12, alignItems: 'center', gap: 4 },
   sumVal: { fontSize: 16, fontWeight: '800' },
   sumLabel: { fontSize: 10, fontWeight: '600', textAlign: 'center' },
+  payableLink: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 13, marginTop: 14 },
+  payableIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  payableLinkTitle: { fontSize: 13, fontWeight: '700' },
+  payableLinkSubtitle: { fontSize: 11, marginTop: 2 },
   histTitle: { fontSize: 16, fontWeight: '700', padding: 16, paddingBottom: 8 },
   histRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, padding: 14, marginBottom: 10, gap: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
   histIcon: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

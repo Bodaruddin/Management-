@@ -464,7 +464,7 @@ interface AppContextType extends AppState {
   updateStudent: (id: string, s: Partial<Student>) => Promise<void>;
   deleteStudent: (id: string) => void;
   addTeacher: (t: Omit<Teacher, 'id'>) => Promise<Teacher>;
-  updateTeacher: (id: string, t: Partial<Teacher>) => void;
+  updateTeacher: (id: string, t: Partial<Teacher>) => Promise<Teacher>;
   refreshTeachers: () => Promise<void>;
   deleteTeacher: (id: string) => void;
   addClass: (name: string) => Promise<void>;
@@ -1069,11 +1069,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const updateTeacher = useCallback((id: string, t: Partial<Teacher>) => {
-    setState(prev => ({ ...prev, teachers: prev.teachers.map(x => x.id === id ? { ...x, ...t } : x) }));
-    apiPut(`/teachers/${id}`, t).then(row => {
-      setState(prev => ({ ...prev, teachers: prev.teachers.map(x => x.id === id ? mapTeacher(row as any) : x) }));
-    }).catch(console.error);
+  const updateTeacher = useCallback(async (id: string, t: Partial<Teacher>): Promise<Teacher> => {
+    const row = await apiPut<any>(`/teachers/${id}`, t);
+    const updated = mapTeacher(row);
+    setState(prev => ({ ...prev, teachers: prev.teachers.map(x => x.id === id ? updated : x) }));
+    return updated;
   }, []);
 
   const refreshTeachers = useCallback(async (): Promise<void> => {
