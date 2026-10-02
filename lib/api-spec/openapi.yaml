@@ -8,6 +8,10 @@ servers:
   - url: /api
     description: Base API path
 tags:
+  - name: authentication
+    description: Sign-in and active-session operations
+  - name: teachers
+    description: Teacher account operations
   - name: health
     description: Health operations
   - name: teacher-attendance
@@ -19,6 +23,92 @@ tags:
   - name: student-attendance
     description: Student attendance holiday rules
 paths:
+  /teachers/login:
+    post:
+      operationId: loginTeacher
+      tags: [teachers]
+      summary: Verify teacher credentials and start a server session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherLoginRequest"
+      responses:
+        "200":
+          description: Teacher profile and new session token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherLoginResponse"
+        "401":
+          description: Invalid teacher credentials
+        "503":
+          description: Database unavailable
+  /settings/admin-credentials/verify:
+    post:
+      operationId: verifyAdminCredentials
+      tags: [authentication]
+      summary: Verify administrator credentials and start a server session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginRequest"
+      responses:
+        "200":
+          description: Credential verification result and session token when valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
+  /auth/session:
+    get:
+      operationId: validateAuthSession
+      tags: [authentication]
+      security:
+        - BearerSessionAuth: []
+      responses:
+        "200":
+          description: The session is active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSessionStatus"
+        "401":
+          description: The session has expired or was revoked
+  /auth/logout:
+    post:
+      operationId: logoutAuthSession
+      tags: [authentication]
+      security:
+        - BearerSessionAuth: []
+      responses:
+        "204":
+          description: Session revoked
+  /teachers/{id}/force-logout:
+    post:
+      operationId: forceLogoutTeacher
+      tags: [teachers]
+      summary: Revoke all active sessions for a teacher
+      security:
+        - BearerSessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      responses:
+        "200":
+          description: Teacher sessions revoked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherForceLogoutResult"
+        "401":
+          description: An active administrator session is required
+        "403":
+          description: The caller is not an administrator
+        "404":
+          description: Teacher not found
   /healthz:
     get:
       operationId: healthCheck
@@ -476,6 +566,10 @@ paths:
               schema:
                 $ref: "#/components/schemas/TeacherProfile"
 components:
+  securitySchemes:
+    BearerSessionAuth:
+      type: http
+      scheme: bearer
   parameters:
     TeacherId:
       name: teacherId
@@ -503,6 +597,53 @@ components:
       required: true
       schema: { type: string }
   schemas:
+    TeacherLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+    TeacherLoginResponse:
+      type: object
+      required: [id, name, username, sessionToken]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        username: { type: string }
+        sessionToken: { type: string }
+        permissions: { type: object, additionalProperties: true }
+      additionalProperties: true
+    AdminLoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+    AdminLoginResponse:
+      type: object
+      required: [valid]
+      properties:
+        valid: { type: boolean }
+        admin:
+          oneOf:
+            - $ref: "#/components/schemas/AdminUser"
+            - type: "null"
+        sessionToken: { type: string }
+        expiresAt: { type: integer }
+    AuthSessionStatus:
+      type: object
+      required: [valid, userId, role, expiresAt]
+      properties:
+        valid: { type: boolean, const: true }
+        userId: { type: string }
+        role: { type: string, enum: [admin, teacher] }
+        expiresAt: { type: string, format: date-time }
+    TeacherForceLogoutResult:
+      type: object
+      required: [success, revokedSessions]
+      properties:
+        success: { type: boolean }
+        revokedSessions: { type: integer }
     HealthStatus:
       type: object
       properties:

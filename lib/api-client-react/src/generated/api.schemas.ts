@@ -5,8 +5,25 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
+export interface TeacherLoginRequest {
+  username: string;
+  password: string;
+}
+
+export type TeacherLoginResponsePermissions = { [key: string]: unknown };
+
+export interface TeacherLoginResponse {
+  id: string;
+  name: string;
+  username: string;
+  sessionToken: string;
+  permissions?: TeacherLoginResponsePermissions;
+  [key: string]: unknown;
+ }
+
+export interface AdminLoginRequest {
+  username: string;
+  password: string;
 }
 
 export interface AdminUser {
@@ -16,6 +33,37 @@ export interface AdminUser {
   /** @nullable */
   linkedTeacherId?: string | null;
   createdAt?: string;
+}
+
+export interface AdminLoginResponse {
+  valid: boolean;
+  admin?: AdminUser | null;
+  sessionToken?: string;
+  expiresAt?: number;
+}
+
+export type AuthSessionStatusRole = typeof AuthSessionStatusRole[keyof typeof AuthSessionStatusRole];
+
+
+export const AuthSessionStatusRole = {
+  admin: 'admin',
+  teacher: 'teacher',
+} as const;
+
+export interface AuthSessionStatus {
+  valid: true;
+  userId: string;
+  role: AuthSessionStatusRole;
+  expiresAt: string;
+}
+
+export interface TeacherForceLogoutResult {
+  success: boolean;
+  revokedSessions: number;
+}
+
+export interface HealthStatus {
+  status: string;
 }
 
 export interface AdminUserCreate {

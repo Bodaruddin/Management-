@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
 import bootstrapRouter from "./bootstrap";
 import dbConnectionsRouter from "./dbConnections";
 import studentsRouter from "./students";
@@ -25,6 +26,7 @@ import teacherAttendanceRouter from "./teacherAttendance";
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(authRouter);
 router.use(bootstrapRouter);
 router.use(dbConnectionsRouter);
 router.use(studentsRouter);

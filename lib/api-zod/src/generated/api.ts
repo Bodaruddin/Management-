@@ -9,6 +9,69 @@ import * as zod from 'zod';
 
 
 /**
+ * @summary Verify teacher credentials and start a server session
+ */
+export const LoginTeacherBody = zod.object({
+  "username": zod.string(),
+  "password": zod.string()
+})
+
+export const LoginTeacherResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "sessionToken": zod.string(),
+  "permissions": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+
+/**
+ * @summary Verify administrator credentials and start a server session
+ */
+export const VerifyAdminCredentialsBody = zod.object({
+  "username": zod.string(),
+  "password": zod.string()
+})
+
+export const VerifyAdminCredentialsResponse = zod.object({
+  "valid": zod.boolean(),
+  "admin": zod.union([zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "username": zod.string(),
+  "linkedTeacherId": zod.string().nullish(),
+  "createdAt": zod.coerce.date().optional()
+}),zod.null()]).optional(),
+  "sessionToken": zod.string().optional(),
+  "expiresAt": zod.number().int().optional()
+})
+
+
+export const ValidateAuthSessionResponse = zod.object({
+  "valid": zod.literal(true),
+  "userId": zod.string(),
+  "role": zod.enum(['admin', 'teacher']),
+  "expiresAt": zod.coerce.date()
+})
+
+
+export const LogoutAuthSessionResponse = zod.void()
+
+
+/**
+ * @summary Revoke all active sessions for a teacher
+ */
+export const ForceLogoutTeacherParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ForceLogoutTeacherResponse = zod.object({
+  "success": zod.boolean(),
+  "revokedSessions": zod.number().int()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */

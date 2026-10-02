@@ -1,13 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
-  Modal, ScrollView, Alert, Switch, Platform, Image
+  Modal, ScrollView, Alert, Switch, Platform, Image, ActivityIndicator
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useColors } from '@/hooks/useColors';
+import { useAuth } from '@/context/AuthContext';
 import { useApp, Teacher, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
 import SalarySuccessModal from '@/components/SalarySuccessModal';
@@ -51,6 +52,7 @@ const BLANK = {
 export default function TeachersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { user, forceLogoutTeacher } = useAuth();
   const { teachers, addTeacher, updateTeacher, deleteTeacher, salaryRecords, addSalaryRecord, deleteSalaryRecord, documentBranding } = useApp();
 
   const [showModal, setShowModal] = useState(false);
@@ -68,6 +70,9 @@ export default function TeachersScreen() {
   const [salaryStatus] = useState<'paid'>('paid');
   const [showMonthPicker, setShowMonthPicker] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Teacher | null>(null);
+  const [logoutTarget, setLogoutTarget] = useState<Teacher | null>(null);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+  const [logoutAlert, setLogoutAlert] = useState<{ variant: 'success' | 'warning'; title: string; message: string } | null>(null);
   const [confirmDeleteSalaryId, setConfirmDeleteSalaryId] = useState<string | null>(null);
   const [salarySuccess, setSalarySuccess] = useState<{ name: string; month: string; year: string; amount: number; paidDate: string; rec: any; teacher: Teacher } | null>(null);
   const [showTeacherSuccess, setShowTeacherSuccess] = useState(false);
@@ -124,6 +129,35 @@ export default function TeachersScreen() {
     deleteTeacher(confirmDelete.id);
     setDetailTeacher(null);
     setConfirmDelete(null);
+  };
+
+  const confirmForceLogout = async () => {
+    if (!logoutTarget) return;
+    setLogoutBusy(true);
+    try {
+      const result = await forceLogoutTeacher(logoutTarget.id);
+      if (!result.success) {
+        setLogoutAlert({
+          variant: 'warning',
+          title: 'Could not sign out teacher',
+          message: result.error ?? 'Please try again.',
+        });
+        return;
+      }
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setLogoutAlert({
+        variant: 'success',
+        title: result.revokedSessions
+          ? 'Teacher signed out'
+          : 'No active session found',
+        message: result.revokedSessions
+          ? `${logoutTarget.name} will be signed out on their active devices. They will need to sign in again.`
+          : `${logoutTarget.name} does not have an active teacher session right now.`,
+      });
+    } finally {
+      setLogoutBusy(false);
+      setLogoutTarget(null);
+    }
   };
 
   const handlePickImage = async () => {
@@ -379,19 +413,89 @@ export default function TeachersScreen() {
                       </View>
                     ))}
                   </ScrollView>
-                  <View style={[m.footer, { borderTopColor: colors.border }]}>
-                    <TouchableOpacity style={[m.footBtn, { borderColor: colors.destructive }]} onPress={() => handleDelete(detailTeacher)} activeOpacity={0.8}>
-                      <Feather name="trash-2" size={16} color={colors.destructive} />
-                      <Text style={{ color: colors.destructive, fontWeight: '600' }}>Delete</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={[m.footBtn, { flex: 2, backgroundColor: colors.primary }]} onPress={() => { setDetailTeacher(null); openEdit(detailTeacher); }} activeOpacity={0.8}>
-                      <Feather name="edit-2" size={16} color="#fff" />
-                      <Text style={{ color: '#fff', fontWeight: '600' }}>Edit Teacher</Text>
-                    </TouchableOpacity>
+                  <View style={[m.detailFooter, { borderTopColor: colors.border }]}>
+                    {user?.role === 'admin' && (
+                      <TouchableOpacity
+                        testID="teacher-force-logout-button"
+                        accessibilityRole="button"
+                        accessibilityLabel={`Sign out ${detailTeacher.name} on all devices`}
+                        style={[
+                          detail.accessAction,
+                          { backgroundColor: colors.secondary, borderColor: `${colors.primary}35` },
+                          logoutBusy && { opacity: 0.6 },
+                        ]}
+                        onPress={() => setLogoutTarget(detailTeacher)}
+                        activeOpacity={0.82}
+                        disabled={logoutBusy}
+                      >
+                        <View style={[detail.accessIcon, { backgroundColor: `${colors.primary}16` }]}>
+                          <Feather name="log-out" size={18} color={colors.primary} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[detail.accessTitle, { color: colors.text }]}>Sign out teacher</Text>
+                          <Text style={[detail.accessDescription, { color: colors.mutedForeground }]}>End their active session across devices</Text>
+                        </View>
+                        <Feather name="chevron-right" size={18} color={colors.primary} />
+                      </TouchableOpacity>
+                    )}
+                    <View style={m.footerActions}>
+                      <TouchableOpacity style={[m.footBtn, { borderColor: colors.destructive }]} onPress={() => handleDelete(detailTeacher)} activeOpacity={0.8}>
+                        <Feather name="trash-2" size={16} color={colors.destructive} />
+                        <Text style={{ color: colors.destructive, fontWeight: '600' }}>Delete</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[m.footBtn, { flex: 2, backgroundColor: colors.primary }]} onPress={() => { setDetailTeacher(null); openEdit(detailTeacher); }} activeOpacity={0.8}>
+                        <Feather name="edit-2" size={16} color="#fff" />
+                        <Text style={{ color: '#fff', fontWeight: '600' }}>Edit Teacher</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </>
               );
             })()}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Confirm remote teacher sign-out */}
+      <Modal
+        visible={!!logoutTarget}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => { if (!logoutBusy) setLogoutTarget(null); }}
+      >
+        <View style={m.logoutOverlay}>
+          <View style={[m.logoutCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[m.logoutIcon, { backgroundColor: `${colors.destructive}14` }]}>
+              <Feather name="log-out" size={22} color={colors.destructive} />
+            </View>
+            <Text style={[m.logoutTitle, { color: colors.text }]}>Sign out this teacher?</Text>
+            <Text style={[m.logoutMessage, { color: colors.mutedForeground }]}>
+              {logoutTarget?.name} will be signed out on their active devices and will need to sign in again.
+            </Text>
+            <View style={m.logoutActions}>
+              <TouchableOpacity
+                style={[m.logoutCancel, { backgroundColor: colors.muted }]}
+                onPress={() => setLogoutTarget(null)}
+                disabled={logoutBusy}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: colors.text, fontWeight: '700' }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="teacher-force-logout-confirm"
+                accessibilityRole="button"
+                style={[m.logoutConfirm, { backgroundColor: colors.destructive }, logoutBusy && { opacity: 0.75 }]}
+                onPress={confirmForceLogout}
+                disabled={logoutBusy}
+                activeOpacity={0.85}
+              >
+                {logoutBusy
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Feather name="log-out" size={16} color="#fff" />}
+                <Text style={{ color: '#fff', fontWeight: '700' }}>{logoutBusy ? 'Signing out…' : 'Sign out'}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -575,6 +679,13 @@ export default function TeachersScreen() {
         message="The new teacher account is ready in your school records."
         onDismiss={() => setShowTeacherSuccess(false)}
       />
+      <PremiumAlert
+        visible={!!logoutAlert}
+        variant={logoutAlert?.variant ?? 'success'}
+        title={logoutAlert?.title ?? ''}
+        message={logoutAlert?.message ?? ''}
+        onDismiss={() => setLogoutAlert(null)}
+      />
 
       {/* Month Picker */}
       <Modal visible={showMonthPicker} animationType="slide" transparent>
@@ -625,6 +736,10 @@ const detail = StyleSheet.create({
   permRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: 1 },
   histRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, gap: 10 },
   histIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  accessAction: { flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 10 },
+  accessIcon: { width: 40, height: 40, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  accessTitle: { fontSize: 14, fontWeight: '700' },
+  accessDescription: { fontSize: 11, lineHeight: 15, marginTop: 2 },
 });
 const inp = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15 },
@@ -642,7 +757,17 @@ const m = StyleSheet.create({
   title: { fontSize: 18, fontWeight: '700' },
   sectionLabel: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
   footer: { flexDirection: 'row', gap: 12, padding: 20, borderTopWidth: 1 },
+  detailFooter: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14, gap: 10, borderTopWidth: 1 },
+  footerActions: { flexDirection: 'row', gap: 12 },
   footBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingVertical: 14 },
+  logoutOverlay: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24, backgroundColor: 'rgba(5,16,42,0.62)' },
+  logoutCard: { width: '100%', maxWidth: 400, alignItems: 'center', borderWidth: 1, borderRadius: 24, padding: 24, shadowColor: '#061536', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.24, shadowRadius: 24, elevation: 12 },
+  logoutIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  logoutTitle: { fontSize: 19, fontWeight: '800', textAlign: 'center', marginTop: 16 },
+  logoutMessage: { fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 8 },
+  logoutActions: { alignSelf: 'stretch', flexDirection: 'row', gap: 10, marginTop: 22 },
+  logoutCancel: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14 },
+  logoutConfirm: { flex: 1, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14 },
   photoUpload: { width: 100, height: 100, borderRadius: 50, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   photoUploadText: { fontSize: 12, fontWeight: '600', marginTop: 8 },
   photoImage: { width: '100%', height: '100%' },

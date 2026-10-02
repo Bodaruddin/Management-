@@ -1,5 +1,11 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
+import {
+  bearerToken,
+  createAuthSession,
+  findAuthSession,
+  revokeTeacherSessions,
+} from "../lib/authSessions.js";
 
 const router = Router();
 
@@ -35,7 +41,32 @@ router.post("/teachers/login", async (req, res) => {
   }
   // Never send the password back to the client
   const { password: _pw, ...safeTeacher } = teacher;
-  res.json(safeTeacher);
+  const session = await createAuthSession(String(teacher.id), "teacher");
+  res.json({ ...safeTeacher, ...session });
+});
+
+router.post("/teachers/:id/force-logout", async (req, res) => {
+  const session = await findAuthSession(bearerToken(req.get("authorization")));
+  if (!session) {
+    res.status(401).json({ error: "ADMIN_SESSION_REQUIRED" });
+    return;
+  }
+  if (session.role !== "admin") {
+    res.status(403).json({ error: "Only an administrator can sign out a teacher" });
+    return;
+  }
+
+  const teacherId = req.params.id;
+  const teacher = (await getAdapter().teachers.list()).find(
+    (row: any) => String(row.id) === teacherId,
+  );
+  if (!teacher) {
+    res.status(404).json({ error: "Teacher not found" });
+    return;
+  }
+
+  const revokedSessions = await revokeTeacherSessions(teacherId);
+  res.json({ success: true, revokedSessions });
 });
 
 router.post("/teachers", async (req, res) => {

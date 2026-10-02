@@ -21,9 +21,12 @@ import type {
 
 import type {
   AdminAction,
+  AdminLoginRequest,
+  AdminLoginResponse,
   AdminUser,
   AdminUserCreate,
   AdminUserUpdate,
+  AuthSessionStatus,
   DeleteStudentAttendanceHolidayParams,
   DeleteTeacherHolidayParams,
   DeleteTeacherLeaveParams,
@@ -46,11 +49,14 @@ import type {
   TeacherCheckOut,
   TeacherFaceEnroll,
   TeacherFaceStatus,
+  TeacherForceLogoutResult,
   TeacherHoliday,
   TeacherHolidayCreate,
   TeacherLeave,
   TeacherLeaveCreate,
   TeacherLeaveUpdate,
+  TeacherLoginRequest,
+  TeacherLoginResponse,
   TeacherProfile
 } from './api.schemas';
 
@@ -80,6 +86,395 @@ const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKe
   }
   return result;
 };
+
+export const getLoginTeacherUrl = () => {
+
+
+
+
+  return `/api/teachers/login`
+}
+
+/**
+ * @summary Verify teacher credentials and start a server session
+ */
+export const loginTeacher = async (teacherLoginRequest: TeacherLoginRequest, options?: Parameters<typeof customFetch>[1]): Promise<TeacherLoginResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<TeacherLoginResponse>(getLoginTeacherUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(teacherLoginRequest)
+  }
+);}
+
+
+
+
+
+export const getLoginTeacherMutationKey = () => ['loginTeacher'] as const;
+
+export const getLoginTeacherMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginTeacher>>, TError,LoginTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof loginTeacher>>, TError,LoginTeacherMutationVariables, TContext> => {
+
+const mutationKey = getLoginTeacherMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof loginTeacher>>, LoginTeacherMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  loginTeacher(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LoginTeacherMutationResult = NonNullable<Awaited<ReturnType<typeof loginTeacher>>>
+    export type LoginTeacherMutationBody = BodyType<TeacherLoginRequest>
+    export type LoginTeacherMutationError = ErrorType<void>
+    export type LoginTeacherMutationVariables = {data: BodyType<TeacherLoginRequest>}
+
+    /**
+ * @summary Verify teacher credentials and start a server session
+ */
+export const useLoginTeacher = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginTeacher>>, TError,LoginTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof loginTeacher>>,
+        TError,
+        LoginTeacherMutationVariables,
+        TContext
+      > => {
+      return useMutation(getLoginTeacherMutationOptions(options));
+    }
+
+export const getVerifyAdminCredentialsUrl = () => {
+
+
+
+
+  return `/api/settings/admin-credentials/verify`
+}
+
+/**
+ * @summary Verify administrator credentials and start a server session
+ */
+export const verifyAdminCredentials = async (adminLoginRequest: AdminLoginRequest, options?: Parameters<typeof customFetch>[1]): Promise<AdminLoginResponse> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AdminLoginResponse>(getVerifyAdminCredentialsUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(adminLoginRequest)
+  }
+);}
+
+
+
+
+
+export const getVerifyAdminCredentialsMutationKey = () => ['verifyAdminCredentials'] as const;
+
+export const getVerifyAdminCredentialsMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAdminCredentials>>, TError,VerifyAdminCredentialsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof verifyAdminCredentials>>, TError,VerifyAdminCredentialsMutationVariables, TContext> => {
+
+const mutationKey = getVerifyAdminCredentialsMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyAdminCredentials>>, VerifyAdminCredentialsMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  verifyAdminCredentials(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type VerifyAdminCredentialsMutationResult = NonNullable<Awaited<ReturnType<typeof verifyAdminCredentials>>>
+    export type VerifyAdminCredentialsMutationBody = BodyType<AdminLoginRequest>
+    export type VerifyAdminCredentialsMutationError = ErrorType<unknown>
+    export type VerifyAdminCredentialsMutationVariables = {data: BodyType<AdminLoginRequest>}
+
+    /**
+ * @summary Verify administrator credentials and start a server session
+ */
+export const useVerifyAdminCredentials = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAdminCredentials>>, TError,VerifyAdminCredentialsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof verifyAdminCredentials>>,
+        TError,
+        VerifyAdminCredentialsMutationVariables,
+        TContext
+      > => {
+      return useMutation(getVerifyAdminCredentialsMutationOptions(options));
+    }
+
+export const getValidateAuthSessionUrl = () => {
+
+
+
+
+  return `/api/auth/session`
+}
+
+export const validateAuthSession = async ( options?: Parameters<typeof customFetch>[1]): Promise<AuthSessionStatus> => {
+
+  return customFetch<AuthSessionStatus>(getValidateAuthSessionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getValidateAuthSessionQueryKey = () => {
+    return [
+    `/api/auth/session`
+    ] as const;
+    }
+
+
+export const getValidateAuthSessionQueryOptions = <TData = Awaited<ReturnType<typeof validateAuthSession>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateAuthSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getValidateAuthSessionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof validateAuthSession>>> = ({ signal }) => validateAuthSession({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof validateAuthSession>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ValidateAuthSessionQueryResult = NonNullable<Awaited<ReturnType<typeof validateAuthSession>>>
+export type ValidateAuthSessionQueryError = ErrorType<void>
+
+
+
+export function useValidateAuthSession<TData = Awaited<ReturnType<typeof validateAuthSession>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateAuthSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getValidateAuthSessionQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getLogoutAuthSessionUrl = () => {
+
+
+
+
+  return `/api/auth/logout`
+}
+
+export const logoutAuthSession = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getLogoutAuthSessionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getLogoutAuthSessionMutationKey = () => ['logoutAuthSession'] as const;
+
+export const getLogoutAuthSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAuthSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof logoutAuthSession>>, TError,void, TContext> => {
+
+const mutationKey = getLogoutAuthSessionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutAuthSession>>, void> = () => {
+
+
+          return  logoutAuthSession(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type LogoutAuthSessionMutationResult = NonNullable<Awaited<ReturnType<typeof logoutAuthSession>>>
+
+    export type LogoutAuthSessionMutationError = ErrorType<unknown>
+
+
+    export const useLogoutAuthSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAuthSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof logoutAuthSession>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getLogoutAuthSessionMutationOptions(options));
+    }
+
+export const getForceLogoutTeacherUrl = (id: string,) => {
+
+
+
+
+  return `/api/teachers/${id}/force-logout`
+}
+
+/**
+ * @summary Revoke all active sessions for a teacher
+ */
+export const forceLogoutTeacher = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<TeacherForceLogoutResult> => {
+
+  return customFetch<TeacherForceLogoutResult>(getForceLogoutTeacherUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getForceLogoutTeacherMutationKey = () => ['forceLogoutTeacher'] as const;
+
+export const getForceLogoutTeacherMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof forceLogoutTeacher>>, TError,ForceLogoutTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof forceLogoutTeacher>>, TError,ForceLogoutTeacherMutationVariables, TContext> => {
+
+const mutationKey = getForceLogoutTeacherMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof forceLogoutTeacher>>, ForceLogoutTeacherMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  forceLogoutTeacher(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ForceLogoutTeacherMutationResult = NonNullable<Awaited<ReturnType<typeof forceLogoutTeacher>>>
+
+    export type ForceLogoutTeacherMutationError = ErrorType<void>
+    export type ForceLogoutTeacherMutationVariables = {id: string}
+
+    /**
+ * @summary Revoke all active sessions for a teacher
+ */
+export const useForceLogoutTeacher = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof forceLogoutTeacher>>, TError,ForceLogoutTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof forceLogoutTeacher>>,
+        TError,
+        ForceLogoutTeacherMutationVariables,
+        TContext
+      > => {
+      return useMutation(getForceLogoutTeacherMutationOptions(options));
+    }
 
 export const getHealthCheckUrl = () => {
 

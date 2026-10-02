@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
+import { createAuthSession } from "../lib/authSessions.js";
 
 const router = Router();
 const TEACHER_EDIT_KEY = "allow_teacher_edit";
@@ -96,7 +97,12 @@ router.post("/settings/admin-credentials/verify", async (req, res) => {
     candidate.username.trim().toLowerCase() === String(username).trim().toLowerCase()
       && candidate.password === password
   );
-  res.json({ valid: Boolean(user), admin: user ? safeAdminUser(user) : undefined });
+  const session = user ? await createAuthSession(String(user.id), "admin") : undefined;
+  res.json({
+    valid: Boolean(user),
+    admin: user ? safeAdminUser(user) : undefined,
+    ...session,
+  });
 });
 
 /** GET /api/settings/admin-credentials → { username } */
