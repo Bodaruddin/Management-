@@ -90,8 +90,9 @@ export default function AdminTeacherAttendance() {
   const [holidayName, setHolidayName] = useState('');
   const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null);
   const [month, setMonth] = useState(MONTHS[new Date().getMonth()]);
-  const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [year, setYear] = useState(new Date().getFullYear());
   const [payroll, setPayroll] = useState<any>(null);
+  const [calculatingPayroll, setCalculatingPayroll] = useState(false);
   const [saving, setSaving] = useState(false);
   const [leaveView, setLeaveView] = useState<'pending' | 'history'>('pending');
   const [historyFilter, setHistoryFilter] = useState<'all' | 'approved' | 'rejected'>('all');
@@ -178,10 +179,45 @@ export default function AdminTeacherAttendance() {
 
   const removeHoliday = (id: string) => save(() => deleteTeacherHoliday(id));
 
-  const runPayroll = () => save(async () => {
-    const report = await calculateTeacherPayroll(month, Number(year));
-    setPayroll(report);
-  });
+  const runPayrollFor = async (targetMonth: string, targetYear: number) => {
+    setCalculatingPayroll(true);
+    try {
+      await save(async () => {
+        const report = await calculateTeacherPayroll(targetMonth, targetYear);
+        setPayroll(report);
+      });
+    } finally {
+      setCalculatingPayroll(false);
+    }
+  };
+
+  const runPayroll = () => {
+    const today = new Date();
+    const selectedPeriod = new Date(year, MONTHS.indexOf(month), 1);
+    const currentPeriod = new Date(today.getFullYear(), today.getMonth(), 1);
+    const calculate = () => {
+      void runPayrollFor(month, year);
+    };
+
+    if (selectedPeriod > currentPeriod) {
+      Alert.alert('Month not available yet', 'Payroll can only be calculated for the current month or an earlier month.');
+      return;
+    }
+
+    if (selectedPeriod < currentPeriod) {
+      Alert.alert(
+        `Calculate ${month} ${year}?`,
+        'This recalculates payroll for all teachers. Existing records for that month may be updated, set to Pending, and have paid dates or receipt numbers cleared.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Calculate', onPress: calculate },
+        ],
+      );
+      return;
+    }
+
+    calculate();
+  };
 
   const performResetAttendance = async (teacherId?: string) => {
     setSaving(true);
@@ -202,6 +238,9 @@ export default function AdminTeacherAttendance() {
   const s = styles(colors);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom + 24;
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonthIndex = today.getMonth();
   const pendingLeaves = teacherLeaves.filter(leave => leave.status === 'pending');
   const reportMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const monthlyRecords = teacherAttendanceRecords.filter(record => record.date.startsWith(reportMonthKey));
@@ -423,9 +462,88 @@ export default function AdminTeacherAttendance() {
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity style={[s.secondaryButton, { borderColor: colors.primary }]} onPress={runPayroll} disabled={saving}>
+          <View style={[s.payrollPeriodPicker, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={s.payrollPeriodHeader}>
+              <Text style={[s.payrollPeriodTitle, { color: colors.text }]}>Payroll month</Text>
+              <View style={s.payrollYearSelector}>
+                <TouchableOpacity
+                  style={[s.payrollYearButton, { borderColor: colors.border }]}
+                  onPress={() => {
+                    setYear(value => value - 1);
+                    setPayroll(null);
+                  }}
+                  disabled={year <= 2000}
+                  testID="payroll-year-previous"
+                  accessibilityRole="button"
+                  accessibilityLabel="Previous year"
+                >
+                  <Feather name="chevron-left" size={17} color={year <= 2000 ? colors.mutedForeground : colors.text} />
+                </TouchableOpacity>
+                <Text style={[s.payrollYearText, { color: colors.text }]}>{year}</Text>
+                <TouchableOpacity
+                  style={[s.payrollYearButton, { borderColor: colors.border }]}
+                  onPress={() => {
+                    const nextYear = year + 1;
+                    setYear(nextYear);
+                    if (nextYear === currentYear && MONTHS.indexOf(month) > currentMonthIndex) {
+                      setMonth(MONTHS[currentMonthIndex]);
+                    }
+                    setPayroll(null);
+                  }}
+                  disabled={year >= currentYear}
+                  testID="payroll-year-next"
+                  accessibilityRole="button"
+                  accessibilityLabel="Next year"
+                >
+                  <Feather name="chevron-right" size={17} color={year >= currentYear ? colors.mutedForeground : colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={s.monthGrid}>
+              {MONTHS.map((monthName, index) => {
+                const isFutureMonth = year === currentYear && index > currentMonthIndex;
+                const isSelected = month === monthName;
+                return (
+                  <TouchableOpacity
+                    key={monthName}
+                    style={[
+                      s.monthOption,
+                      {
+                        backgroundColor: isSelected ? colors.primary : colors.card,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                        opacity: isFutureMonth ? 0.45 : 1,
+                      },
+                    ]}
+                    onPress={() => {
+                      setMonth(monthName);
+                      setPayroll(null);
+                    }}
+                    disabled={isFutureMonth}
+                    testID={`payroll-month-${monthName.toLowerCase()}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${monthName} ${year}`}
+                    accessibilityState={{ selected: isSelected, disabled: isFutureMonth }}
+                  >
+                    <Text style={[s.monthOptionText, { color: isSelected ? colors.primaryForeground : colors.text }]}>
+                      {monthName.slice(0, 3)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[s.secondaryButton, { borderColor: colors.primary }]}
+            onPress={runPayroll}
+            disabled={saving}
+            testID="calculate-selected-month-payroll"
+            accessibilityRole="button"
+            accessibilityLabel={`Calculate payroll for ${month} ${year}`}
+          >
             <Feather name="bar-chart-2" size={16} color={colors.primary} />
-            <Text style={[s.secondaryText, { color: colors.primary }]}>{saving ? 'Calculating…' : `Calculate ${month} ${year}`}</Text>
+            <Text style={[s.secondaryText, { color: colors.primary }]}>
+              {calculatingPayroll ? 'Calculating…' : `Calculate ${month} ${year}`}
+            </Text>
           </TouchableOpacity>
           {payroll && (
             <View style={[s.payrollBox, { backgroundColor: colors.muted }]}>
@@ -856,6 +974,15 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   choiceRow: { gap: 8, marginBottom: 14, marginTop: 3 },
   choice: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 11, borderRadius: 10, borderWidth: 1 },
   choiceText: { fontSize: 13, fontWeight: '600' },
+  payrollPeriodPicker: { borderWidth: 1, borderRadius: 12, padding: 11, marginTop: 2, marginBottom: 14 },
+  payrollPeriodHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  payrollPeriodTitle: { fontSize: 12, fontWeight: '700' },
+  payrollYearSelector: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  payrollYearButton: { width: 30, height: 30, borderWidth: 1, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  payrollYearText: { fontSize: 14, fontWeight: '800', minWidth: 48, textAlign: 'center' },
+  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 7 },
+  monthOption: { width: '22%', minHeight: 35, borderRadius: 9, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  monthOptionText: { fontSize: 12, fontWeight: '700' },
   secondaryButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1.5, marginBottom: 12 },
   secondaryText: { fontSize: 14, fontWeight: '800' },
   dangerButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1.5 },

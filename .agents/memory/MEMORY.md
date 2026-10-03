@@ -1,1 +1,2 @@
 - [Expo preview startup](expo-preview-startup.md) — use the managed Expo artifact workflow; Replit host overrides can make the web preview stall.
+- [Payroll period selection](payroll-period-selection.md) — admins need to choose the payroll month/year, not just use fixed current or previous-month actions.
