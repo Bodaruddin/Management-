@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
+  ActivityIndicator, View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput,
   ScrollView, Platform, Modal, Alert, Switch
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,9 +8,33 @@ import { Feather } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import EmptyState from '@/components/EmptyState';
 
 type ReportMode = 'daily' | 'monthly' | 'class' | 'student';
+
+function getLocalDateString(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isValidDateString(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return false;
+
+  const [, yearValue, monthValue, dayValue] = match;
+  const year = Number(yearValue);
+  const month = Number(monthValue);
+  const day = Number(dayValue);
+  const date = new Date(year, month - 1, day);
+
+  return year >= 1000
+    && date.getFullYear() === year
+    && date.getMonth() === month - 1
+    && date.getDate() === day;
+}
 
 // ─── Student Attendance Detail Modal ─────────────────────────────────────────
 function StudentAttendanceDetailModal({
@@ -228,23 +252,25 @@ export default function AttendanceScreen() {
   const { user } = useAuth();
   const {
     attendanceRecords, students, classes, studentAttendanceHolidaySettings,
-    updateStudentSundayHoliday, addStudentHoliday, deleteStudentHoliday,
+    updateStudentSundayHoliday, addStudentHoliday, updateStudentHoliday, deleteStudentHoliday,
   } = useApp();
 
   const [mode, setMode] = useState<ReportMode>('daily');
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [filterDate, setFilterDate] = useState(getLocalDateString);
   const [filterClass, setFilterClass] = useState('All');
   const [filterStatus, setFilterStatus] = useState<'all' | 'present' | 'absent' | 'holiday' | 'inactive'>('all');
-  const [filterMonth, setFilterMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
+  const [filterMonth, setFilterMonth] = useState(getLocalDateString().slice(0, 7)); // YYYY-MM
   const [searchStudent, setSearchStudent] = useState('');
 
   const [showClassPicker, setShowClassPicker] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
 
   const [detailStudent, setDetailStudent] = useState<{ id: string; name: string; cls: string } | null>(null);
-  const [holidayDate, setHolidayDate] = useState('');
+  const [holidayDate, setHolidayDate] = useState(getLocalDateString);
   const [holidayName, setHolidayName] = useState('');
   const [savingHoliday, setSavingHoliday] = useState(false);
+  const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null);
+  const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null);
   const [showHolidayPanel, setShowHolidayPanel] = useState(false);
 
   const getFilteredRecords = () => {
@@ -285,20 +311,52 @@ export default function AttendanceScreen() {
   const botPad = Platform.OS === 'web' ? 84 : insets.bottom + 80;
   const isAdmin = user?.role === 'admin';
 
-  const createHoliday = async () => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(holidayDate) || !holidayName.trim()) {
-      Alert.alert('Add holiday', 'Enter a date as YYYY-MM-DD and a holiday name.');
+  const resetHolidayForm = () => {
+    setEditingHolidayId(null);
+    setHolidayDate(getLocalDateString());
+    setHolidayName('');
+  };
+
+  const saveHoliday = async () => {
+    const name = holidayName.trim();
+    if (!isValidDateString(holidayDate.trim()) || !name) {
+      Alert.alert('Holiday details needed', 'Enter a valid date as YYYY-MM-DD and a holiday name.');
       return;
     }
+
     setSavingHoliday(true);
     try {
-      await addStudentHoliday({ date: holidayDate, name: holidayName.trim() });
-      setHolidayDate('');
-      setHolidayName('');
+      if (editingHolidayId) {
+        await updateStudentHoliday(editingHolidayId, { date: holidayDate.trim(), name });
+      } else {
+        await addStudentHoliday({ date: holidayDate.trim(), name });
+      }
+      resetHolidayForm();
     } catch (error: any) {
-      Alert.alert('Could not add holiday', error?.message ?? 'Please try again.');
+      Alert.alert(
+        editingHolidayId ? 'Could not update holiday' : 'Could not add holiday',
+        error?.message ?? 'Please try again.',
+      );
     } finally {
       setSavingHoliday(false);
+    }
+  };
+
+  const beginEditHoliday = (holiday: (typeof studentAttendanceHolidaySettings.holidays)[number]) => {
+    setEditingHolidayId(holiday.id);
+    setHolidayDate(holiday.date);
+    setHolidayName(holiday.name);
+  };
+
+  const removeHoliday = async (id: string) => {
+    setDeletingHolidayId(id);
+    try {
+      await deleteStudentHoliday(id);
+      if (editingHolidayId === id) resetHolidayForm();
+    } catch (error: any) {
+      Alert.alert('Could not delete holiday', error?.message ?? 'Please try again.');
+    } finally {
+      setDeletingHolidayId(null);
     }
   };
 
@@ -407,7 +465,10 @@ export default function AttendanceScreen() {
           {isAdmin && (
             <TouchableOpacity
               style={[s.manageHolidaysBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => setShowHolidayPanel(true)}
+              onPress={() => {
+                if (!editingHolidayId) setHolidayDate(getLocalDateString());
+                setShowHolidayPanel(true);
+              }}
               activeOpacity={0.8}
             >
               <View style={s.manageHolidaysLabel}>
@@ -421,6 +482,12 @@ export default function AttendanceScreen() {
       )}
 
       {isAdmin && showHolidayPanel && (
+        <KeyboardAwareScrollViewCompat
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: botPad }}
+          bottomOffset={20}
+          keyboardDismissMode="interactive"
+        >
         <View style={[s.holidayPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={s.holidayHeader}>
             <View style={{ flex: 1 }}>
@@ -458,6 +525,9 @@ export default function AttendanceScreen() {
               onChangeText={setHolidayDate}
               placeholder="YYYY-MM-DD"
               placeholderTextColor={colors.mutedForeground}
+              keyboardType="numbers-and-punctuation"
+              accessibilityLabel="Holiday date in YYYY-MM-DD format"
+              testID="holiday-date-input"
             />
             <TextInput
               style={[s.holidayInput, { backgroundColor: colors.muted, color: colors.text }]}
@@ -465,10 +535,36 @@ export default function AttendanceScreen() {
               onChangeText={setHolidayName}
               placeholder="Holiday name"
               placeholderTextColor={colors.mutedForeground}
+              returnKeyType="done"
+              accessibilityLabel="Holiday name"
+              testID="holiday-name-input"
             />
-            <TouchableOpacity style={[s.addHolidayBtn, { backgroundColor: colors.primary }]} onPress={createHoliday} disabled={savingHoliday}>
-              <Feather name="plus" size={16} color="#fff" />
-            </TouchableOpacity>
+            <View style={s.holidayFormActions}>
+              <TouchableOpacity
+                style={[s.addHolidayBtn, { backgroundColor: colors.primary, opacity: savingHoliday ? 0.65 : 1 }]}
+                onPress={saveHoliday}
+                disabled={savingHoliday || deletingHolidayId !== null}
+                activeOpacity={0.8}
+                accessibilityLabel={editingHolidayId ? 'Save holiday changes' : 'Add holiday'}
+                testID={editingHolidayId ? 'save-holiday-button' : 'add-holiday-button'}
+              >
+                {savingHoliday
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Feather name={editingHolidayId ? 'check' : 'plus'} size={20} color="#fff" />}
+              </TouchableOpacity>
+              {editingHolidayId && (
+                <TouchableOpacity
+                  style={s.holidayIconButton}
+                  onPress={resetHolidayForm}
+                  disabled={savingHoliday}
+                  activeOpacity={0.7}
+                  accessibilityLabel="Cancel holiday edit"
+                  testID="cancel-holiday-edit-button"
+                >
+                  <Feather name="x" size={18} color={colors.mutedForeground} />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
           {studentAttendanceHolidaySettings.holidays.map(holiday => (
             <View key={holiday.id} style={[s.holidayRow, { borderTopColor: colors.border }]}>
@@ -476,12 +572,34 @@ export default function AttendanceScreen() {
                 <Text style={[s.holidayDate, { color: colors.text }]}>{holiday.date}</Text>
                 <Text style={[s.holidayName, { color: colors.mutedForeground }]}>{holiday.name}</Text>
               </View>
-              <TouchableOpacity onPress={() => deleteStudentHoliday(holiday.id).catch(error => Alert.alert('Could not delete holiday', error?.message ?? 'Please try again.'))}>
-                <Feather name="trash-2" size={16} color={colors.destructive} />
-              </TouchableOpacity>
+              <View style={s.holidayRowActions}>
+                <TouchableOpacity
+                  style={s.holidayIconButton}
+                  onPress={() => beginEditHoliday(holiday)}
+                  disabled={savingHoliday || deletingHolidayId !== null}
+                  activeOpacity={0.7}
+                  accessibilityLabel={`Edit ${holiday.name}`}
+                  testID={`edit-holiday-${holiday.id}`}
+                >
+                  <Feather name="edit-2" size={16} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.holidayIconButton, { opacity: deletingHolidayId === holiday.id ? 0.65 : 1 }]}
+                  onPress={() => removeHoliday(holiday.id)}
+                  disabled={savingHoliday || deletingHolidayId !== null}
+                  activeOpacity={0.7}
+                  accessibilityLabel={`Delete ${holiday.name}`}
+                  testID={`delete-holiday-${holiday.id}`}
+                >
+                  {deletingHolidayId === holiday.id
+                    ? <ActivityIndicator size="small" color={colors.destructive} />
+                    : <Feather name="trash-2" size={16} color={colors.destructive} />}
+                </TouchableOpacity>
+              </View>
             </View>
           ))}
         </View>
+        </KeyboardAwareScrollViewCompat>
       )}
 
       {!showHolidayPanel && (
@@ -626,8 +744,11 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   sundayText: { fontSize: 13, fontWeight: '600' },
   holidayForm: { flexDirection: 'row', gap: 8, marginTop: 12 },
   holidayInput: { flex: 1, minWidth: 0, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 9, fontSize: 12 },
-  addHolidayBtn: { width: 38, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  holidayRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, marginTop: 10, borderTopWidth: 1 },
+  addHolidayBtn: { width: 44, height: 44, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  holidayFormActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  holidayRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 10, marginTop: 10, borderTopWidth: 1 },
+  holidayRowActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  holidayIconButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   holidayDate: { fontSize: 12, fontWeight: '700' },
   holidayName: { fontSize: 12, marginTop: 2 },
 });

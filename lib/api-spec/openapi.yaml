@@ -185,6 +185,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeacherHoliday"
+        "404":
+          description: Holiday not found
     delete:
       operationId: deleteStudentAttendanceHoliday
       tags: [student-attendance]
@@ -194,6 +196,8 @@ paths:
       responses:
         "204":
           description: Holiday deleted
+        "404":
+          description: Holiday not found
   /settings/teacher-attendance:
     get:
       operationId: getTeacherAttendanceSettings

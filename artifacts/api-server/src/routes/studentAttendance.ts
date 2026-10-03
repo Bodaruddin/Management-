@@ -3,6 +3,7 @@ import { getAdapter } from "../lib/dbManager.js";
 import {
   getStudentHolidaySettings,
   syncStudentHolidayAttendance,
+  syncStudentHolidayAttendanceForDates,
   STUDENT_SUNDAY_HOLIDAY_KEY,
 } from "../lib/studentHolidayAttendance.js";
 
@@ -46,7 +47,7 @@ router.post("/student-attendance/holidays", async (req, res) => {
     date: req.body.date,
     name: String(req.body.name).trim(),
   });
-  await syncStudentHolidayAttendance(adapter);
+  await syncStudentHolidayAttendanceForDates(adapter, [row.date]);
   res.status(201).json(row);
 });
 
@@ -61,6 +62,11 @@ router.put("/student-attendance/holidays/:id", async (req, res) => {
   }
 
   const adapter = getAdapter();
+  const existing = await adapter.teacherHolidays.get(req.params.id);
+  if (!existing) {
+    res.status(404).json({ error: "Holiday not found" });
+    return;
+  }
   const row = await adapter.teacherHolidays.update(req.params.id, {
     date: req.body.date,
     name: String(req.body.name).trim(),
@@ -69,7 +75,7 @@ router.put("/student-attendance/holidays/:id", async (req, res) => {
     res.status(404).json({ error: "Holiday not found" });
     return;
   }
-  await syncStudentHolidayAttendance(adapter);
+  await syncStudentHolidayAttendanceForDates(adapter, [existing.date, row.date]);
   res.json(row);
 });
 
@@ -79,8 +85,13 @@ router.delete("/student-attendance/holidays/:id", async (req, res) => {
     return;
   }
   const adapter = getAdapter();
+  const existing = await adapter.teacherHolidays.get(req.params.id);
+  if (!existing) {
+    res.status(404).json({ error: "Holiday not found" });
+    return;
+  }
   await adapter.teacherHolidays.delete(req.params.id);
-  await syncStudentHolidayAttendance(adapter);
+  await syncStudentHolidayAttendanceForDates(adapter, [existing.date]);
   res.status(204).send();
 });
 

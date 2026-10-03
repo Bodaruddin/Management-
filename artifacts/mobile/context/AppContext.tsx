@@ -707,9 +707,18 @@ async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
-async function apiDelete<T = void>(path: string): Promise<T> {
+async function apiDelete<T = void>(path: string, allowNotFound = true): Promise<T> {
   const res = await fetch(`${getApiBase()}/api${path}`, { method: 'DELETE' });
-  if (!res.ok && res.status !== 404) throw new Error(`DELETE /api${path} failed: ${res.status}`);
+  if (!res.ok && !(allowNotFound && res.status === 404)) {
+    let detail = '';
+    try {
+      const errorBody = await res.json() as { error?: string };
+      detail = errorBody.error ? ` — ${errorBody.error}` : '';
+    } catch {
+      // Keep the status-only error when the server response is not JSON.
+    }
+    throw new Error(`DELETE /api${path} failed: ${res.status}${detail}`);
+  }
   if (res.status === 404 || res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }
@@ -1651,7 +1660,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteStudentHoliday = useCallback(async (id: string) => {
-    await apiDelete(`/student-attendance/holidays/${id}?adminId=admin`);
+    await apiDelete(`/student-attendance/holidays/${id}?adminId=admin`, false);
     setState(prev => ({
       ...prev,
       studentAttendanceHolidaySettings: {

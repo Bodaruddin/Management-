@@ -41,6 +41,8 @@ export interface DataAdapter {
   attendance: {
     list(): Promise<any[]>;
     bulkUpsert(date: string, cls: string, records: any[]): Promise<any[]>;
+    /** Replace only system-generated holiday rows for one date, preserving manual attendance. */
+    reconcileGeneratedHolidays(date: string, records: any[]): Promise<void>;
     clearGeneratedHolidaysExcept(dates: string[]): Promise<void>;
     /** After attendance upsert: count consecutive absents and mark students inactive if over limit. Returns newly inactivated student IDs. */
     checkAndMarkInactive(date: string, cls: string, absentStudentIds: string[]): Promise<string[]>;
@@ -101,6 +103,7 @@ export interface DataAdapter {
   };
   teacherHolidays: {
     list(): Promise<any[]>;
+    get(id: string): Promise<any | null>;
     create(data: any): Promise<any>;
     update(id: string, data: any): Promise<any | null>;
     delete(id: string): Promise<void>;

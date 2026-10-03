@@ -64,84 +64,130 @@ export async function getStudentHolidayStatus(adapter: DataAdapter, date: string
   };
 }
 
+function getSyncState(adapter: DataAdapter): SyncState {
+  const state = syncStates.get(adapter) ?? { fingerprint: null, promise: null };
+  syncStates.set(adapter, state);
+  return state;
+}
+
+async function runSerializedSync(
+  adapter: DataAdapter,
+  work: (state: SyncState) => Promise<void>,
+): Promise<void> {
+  const state = getSyncState(adapter);
+  const previous = state.promise;
+  const current = (previous ?? Promise.resolve())
+    .catch(() => undefined)
+    .then(() => work(state));
+  state.promise = current;
+
+  try {
+    await current;
+  } finally {
+    if (state.promise === current) state.promise = null;
+  }
+}
+
+function groupStudentsByClass(students: any[]): Map<string, any[]> {
+  const byClass = new Map<string, any[]>();
+  for (const student of students) {
+    const classStudents = byClass.get(student.class) ?? [];
+    classStudents.push(student);
+    byClass.set(student.class, classStudents);
+  }
+  return byClass;
+}
+
+function buildGeneratedHolidayRecords(
+  date: string,
+  settings: StudentHolidaySettings,
+  studentsByClass: Map<string, any[]>,
+): any[] {
+  const customHoliday = settings.holidays.find((holiday: any) => holiday.date === date);
+  const sunday = settings.sundayHoliday && isSunday(date);
+  if (!customHoliday && !sunday) return [];
+
+  const holidayName = customHoliday?.name ?? (sunday ? "Sunday" : "School holiday");
+  const records: any[] = [];
+  for (const [cls, classStudents] of studentsByClass) {
+    for (const student of classStudents) {
+      records.push({
+        studentId: student.id,
+        studentName: student.name,
+        class: cls,
+        date,
+        status: "holiday",
+        takenBy: `System — ${holidayName}`,
+      });
+    }
+  }
+  return records;
+}
+
+async function reconcileDates(
+  adapter: DataAdapter,
+  dates: string[],
+  settings: StudentHolidaySettings,
+  students: any[],
+): Promise<void> {
+  if (!dates.length) return;
+
+  const studentsByClass = groupStudentsByClass(students);
+  let nextDate = 0;
+  const worker = async () => {
+    while (nextDate < dates.length) {
+      const date = dates[nextDate++];
+      const records = buildGeneratedHolidayRecords(date, settings, studentsByClass);
+      await adapter.attendance.reconcileGeneratedHolidays(date, records);
+    }
+  };
+
+  const workerCount = Math.min(4, dates.length);
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+}
+
 /**
  * Materialize holiday rows for the current school year and all configured
  * custom dates. This keeps attendance reports complete without requiring a
  * separate calendar join in every client.
  */
 export async function syncStudentHolidayAttendance(adapter: DataAdapter): Promise<void> {
-  const settings = await getStudentHolidaySettings(adapter);
-  const dates = new Set<string>(settings.holidays.map((holiday: any) => holiday.date));
-  if (settings.sundayHoliday) {
-    getCurrentYearSundayDates().forEach((date) => dates.add(date));
-  }
-  const students = (await adapter.students.list()).filter((student: any) => student.status !== "inactive");
-  const fingerprint = JSON.stringify({
-    dates: Array.from(dates).sort(),
-    students: students
-      .map((student: any) => [student.id, student.name, student.class])
-      .sort(([a], [b]) => String(a).localeCompare(String(b))),
-    holidays: settings.holidays
-      .map((holiday: any) => [holiday.date, holiday.name])
-      .sort(([a], [b]) => String(a).localeCompare(String(b))),
-  });
-  const state = syncStates.get(adapter) ?? { fingerprint: null, promise: null };
-  syncStates.set(adapter, state);
-  if (state.fingerprint === fingerprint) return;
-  if (state.promise) return state.promise;
-
-  state.promise = (async () => {
-    await adapter.attendance.clearGeneratedHolidaysExcept(Array.from(dates));
-    if (!dates.size) return;
-
-    const byClass = new Map<string, any[]>();
-    for (const student of students) {
-      const list = byClass.get(student.class) ?? [];
-      list.push(student);
-      byClass.set(student.class, list);
+  await runSerializedSync(adapter, async (state) => {
+    const settings = await getStudentHolidaySettings(adapter);
+    const dates = new Set<string>(settings.holidays.map((holiday: any) => holiday.date));
+    if (settings.sundayHoliday) {
+      getCurrentYearSundayDates().forEach((date) => dates.add(date));
     }
+    const dateList = Array.from(dates).sort();
+    const students = (await adapter.students.list()).filter((student: any) => student.status !== "inactive");
+    const fingerprint = JSON.stringify({
+      dates: dateList,
+      students: students
+        .map((student: any) => [student.id, student.name, student.class])
+        .sort(([a], [b]) => String(a).localeCompare(String(b))),
+      holidays: settings.holidays
+        .map((holiday: any) => [holiday.date, holiday.name])
+        .sort(([a], [b]) => String(a).localeCompare(String(b))),
+    });
+    if (state.fingerprint === fingerprint) return;
 
-    // These writes target different date/class pairs. Run them concurrently;
-    // the PostgreSQL pool limits the actual database concurrency while
-    // avoiding hundreds of round trips in series on Supabase.
-    const writes: Array<() => Promise<unknown>> = [];
-    for (const date of dates) {
-      const holidayName = settings.holidays.find((holiday: any) => holiday.date === date)?.name
-        ?? (isSunday(date) ? "Sunday" : "School holiday");
-      for (const [cls, classStudents] of byClass) {
-        const records = classStudents.map((student: any) => ({
-          studentId: student.id,
-          studentName: student.name,
-          class: cls,
-          date,
-          status: "holiday",
-          takenBy: `System — ${holidayName}`,
-        }));
-        writes.push(() => adapter.attendance.bulkUpsert(date, cls, records));
-      }
-    }
-
-    // Keep a little headroom for the other bootstrap queries. Starting every
-    // write at once would queue hundreds of transactions behind the pool and
-    // make Supabase report "timeout exceeded when trying to connect".
-    let nextWrite = 0;
-    const worker = async () => {
-      while (nextWrite < writes.length) {
-        const write = writes[nextWrite++];
-        await write();
-      }
-    };
-    const workerCount = Math.min(4, writes.length);
-    await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  })();
-
-  try {
-    await state.promise;
-    state.fingerprint = fingerprint;
-  } catch (error) {
     state.fingerprint = null;
-    throw error;
-  } finally {
-    state.promise = null;
-  }
+    await adapter.attendance.clearGeneratedHolidaysExcept(dateList);
+    await reconcileDates(adapter, dateList, settings, students);
+    state.fingerprint = fingerprint;
+  });
+}
+
+export async function syncStudentHolidayAttendanceForDates(
+  adapter: DataAdapter,
+  dates: string[],
+): Promise<void> {
+  const dateList = Array.from(new Set(dates.filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date)))).sort();
+  if (!dateList.length) return;
+
+  await runSerializedSync(adapter, async (state) => {
+    const settings = await getStudentHolidaySettings(adapter);
+    const students = (await adapter.students.list()).filter((student: any) => student.status !== "inactive");
+    await reconcileDates(adapter, dateList, settings, students);
+  });
 }

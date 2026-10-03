@@ -829,7 +829,7 @@ return customFetch<TeacherHoliday>(getUpdateStudentAttendanceHolidayUrl(id),
 
 export const getUpdateStudentAttendanceHolidayMutationKey = () => ['updateStudentAttendanceHoliday'] as const;
 
-export const getUpdateStudentAttendanceHolidayMutationOptions = <TError = ErrorType<unknown>,
+export const getUpdateStudentAttendanceHolidayMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,UpdateStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,UpdateStudentAttendanceHolidayMutationVariables, TContext> => {
 
@@ -858,10 +858,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type UpdateStudentAttendanceHolidayMutationResult = NonNullable<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>>
     export type UpdateStudentAttendanceHolidayMutationBody = BodyType<StudentAttendanceHolidayCreate>
-    export type UpdateStudentAttendanceHolidayMutationError = ErrorType<unknown>
+    export type UpdateStudentAttendanceHolidayMutationError = ErrorType<void>
     export type UpdateStudentAttendanceHolidayMutationVariables = {id: string;data: BodyType<StudentAttendanceHolidayCreate>}
 
-    export const useUpdateStudentAttendanceHoliday = <TError = ErrorType<unknown>,
+    export const useUpdateStudentAttendanceHoliday = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,UpdateStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>,
@@ -906,7 +906,7 @@ export const deleteStudentAttendanceHoliday = async (id: string,
 
 export const getDeleteStudentAttendanceHolidayMutationKey = () => ['deleteStudentAttendanceHoliday'] as const;
 
-export const getDeleteStudentAttendanceHolidayMutationOptions = <TError = ErrorType<unknown>,
+export const getDeleteStudentAttendanceHolidayMutationOptions = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,DeleteStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,DeleteStudentAttendanceHolidayMutationVariables, TContext> => {
 
@@ -935,10 +935,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
     export type DeleteStudentAttendanceHolidayMutationResult = NonNullable<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>>
 
-    export type DeleteStudentAttendanceHolidayMutationError = ErrorType<unknown>
+    export type DeleteStudentAttendanceHolidayMutationError = ErrorType<void>
     export type DeleteStudentAttendanceHolidayMutationVariables = {id: string;params: DeleteStudentAttendanceHolidayParams}
 
-    export const useDeleteStudentAttendanceHoliday = <TError = ErrorType<unknown>,
+    export const useDeleteStudentAttendanceHoliday = <TError = ErrorType<void>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,DeleteStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>,

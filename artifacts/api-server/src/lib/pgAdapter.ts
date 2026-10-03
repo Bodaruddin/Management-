@@ -267,6 +267,60 @@ export function createPgAdapter(db: DB): DataAdapter {
           return tx.insert(attendanceRecordsTable).values(values).returning();
         });
       },
+      async reconcileGeneratedHolidays(date, records) {
+        await db.transaction(async (tx) => {
+          await tx.delete(attendanceRecordsTable).where(and(
+            eq(attendanceRecordsTable.date, date),
+            eq(attendanceRecordsTable.status, "holiday"),
+            drizzleSql`${attendanceRecordsTable.takenBy} LIKE 'System — %'`,
+          ));
+
+          const existingRows = await tx
+            .select({
+              studentId: attendanceRecordsTable.studentId,
+              class: attendanceRecordsTable.class,
+              status: attendanceRecordsTable.status,
+              takenBy: attendanceRecordsTable.takenBy,
+            })
+            .from(attendanceRecordsTable)
+            .where(eq(attendanceRecordsTable.date, date));
+          const occupied = new Set(
+            existingRows
+              .filter(row => !(
+                row.status === "holiday" &&
+                String(row.takenBy ?? "").startsWith("System — ")
+              ))
+              .map(row => JSON.stringify([row.studentId, row.class])),
+          );
+          const values: any[] = [];
+
+          for (const record of records) {
+            if (
+              record.date !== date ||
+              record.status !== "holiday" ||
+              !String(record.takenBy ?? "").startsWith("System — ")
+            ) {
+              continue;
+            }
+            const key = JSON.stringify([record.studentId, record.class]);
+            if (occupied.has(key)) continue;
+            occupied.add(key);
+            values.push({
+              ...(record.id ? { id: record.id } : {}),
+              studentId: record.studentId,
+              studentName: record.studentName,
+              class: record.class,
+              date: record.date,
+              status: record.status,
+              takenBy: record.takenBy,
+            });
+          }
+
+          if (values.length) {
+            await tx.insert(attendanceRecordsTable).values(values);
+          }
+        });
+      },
       async clearGeneratedHolidaysExcept(dates) {
         const predicates = [
           eq(attendanceRecordsTable.status, "holiday"),
@@ -833,6 +887,14 @@ export function createPgAdapter(db: DB): DataAdapter {
     teacherHolidays: {
       async list() {
         return db.select().from(teacherHolidaysTable).orderBy(asc(teacherHolidaysTable.date));
+      },
+      async get(id) {
+        const [row] = await db
+          .select()
+          .from(teacherHolidaysTable)
+          .where(eq(teacherHolidaysTable.id, id))
+          .limit(1);
+        return row ?? null;
       },
       async create(data) {
         const values: any = { date: data.date, name: data.name };
