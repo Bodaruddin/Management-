@@ -441,7 +441,7 @@ function buildSingleMarksheetHtml(
   /* ---------- QR card ---------- */
   .qr-card { margin:6px auto 0; border:2px solid #c8a040; border-radius:10px; padding:8px 10px; display:block; width:112px; text-align:center; background:#f5f7fc; box-shadow:0 3px 10px rgba(200,160,64,0.2); }
   .qr-card img { display:block; width:88px; height:88px; margin:0 auto; }
-  .qr-card span { font-size:9px; font-weight:700; color:#0c1f4a; letter-spacing:1.5px; text-transform:uppercase; }
+  .qr-card span { display:block; white-space:nowrap; font-size:8px; font-weight:700; color:#0c1f4a; letter-spacing:0.8px; text-transform:uppercase; }
 
   /* ---------- marks table ---------- */
   .perf-title { background:#0c1f4a; display:flex; align-items:center; gap:10px; padding:7px 14px; border-radius:6px 6px 0 0; margin-top:10px; }
