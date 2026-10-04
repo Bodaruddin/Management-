@@ -1,7 +1,7 @@
 kind = "mobile"
 previewPath = "/"
 title = "School Management App"
-description = "The existing school administration app from the provided GitHub repository, with admin and teacher tools for students, attendance, exams, fees, salary, and school records."
+description = "A mobile-first school administration app for managing students, teachers, attendance, exams, fees, salaries, alumni, and school documents."
 version = "1.0.0"
 id = "artifacts/mobile"
 router = "expo-domain"
