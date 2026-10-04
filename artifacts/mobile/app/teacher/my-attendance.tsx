@@ -1228,7 +1228,7 @@ export default function MyTeacherAttendance() {
               </Text>
               <Text style={s.heroCopy}>
                 {isTodayHoliday
-                  ? 'Attendance was submitted automatically. No check-in is needed today.'
+                  ? 'School is closed today.'
                   : `Your location must be within ${teacherAttendanceSettings.radiusMeters}m of school.`}
               </Text>
               <View style={s.heroFooter}>
@@ -1294,9 +1294,34 @@ export default function MyTeacherAttendance() {
             </View>
 
             {isTodayHoliday ? (
-              <View style={[s.complete, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-                <Feather name="calendar" size={18} color={colors.primary} />
-                <Text style={[s.completeText, { color: colors.primary }]}>Sunday holiday attendance was submitted automatically.</Text>
+              <View
+                style={[
+                  s.holidayNotice,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.accent + '50',
+                    shadowColor: colors.primary,
+                  },
+                ]}
+              >
+                <View style={[s.holidayIconWrap, { backgroundColor: colors.accent + '18' }]}>
+                  <Feather name="sun" size={22} color={colors.accent} />
+                </View>
+                <View style={s.holidayNoticeContent}>
+                  <View style={s.holidayNoticeMeta}>
+                    <Text style={[s.holidayNoticeKicker, { color: colors.primary }]}>SUNDAY HOLIDAY</Text>
+                    <View style={[s.holidayAutoBadge, { backgroundColor: colors.success + '18' }]}>
+                      <Feather name="check" size={10} color={colors.success} />
+                      <Text style={[s.holidayAutoBadgeText, { color: colors.primary }]}>AUTO-MARKED</Text>
+                    </View>
+                  </View>
+                  <Text style={[s.holidayNoticeTitle, { color: colors.text }]}>
+                    Attendance was submitted automatically
+                  </Text>
+                  <Text style={[s.holidayNoticeBody, { color: colors.mutedForeground }]}>
+                    No check-in is needed today.
+                  </Text>
+                </View>
               </View>
             ) : !todayRecord ? (
               <TouchableOpacity disabled={busy} onPress={handleCheckIn} activeOpacity={0.9}>
@@ -1330,28 +1355,30 @@ export default function MyTeacherAttendance() {
               </View>
             )}
 
-            <View style={[s.info, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[s.infoIcon, { backgroundColor: colors.secondary }]}>
-                <Feather name="lock" size={14} color={colors.primary} />
+            {(!isTodayHoliday || canReEnrollFace) && (
+              <View style={[s.info, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View style={[s.infoIcon, { backgroundColor: colors.secondary }]}>
+                  <Feather name="lock" size={14} color={colors.primary} />
+                </View>
+                <Text style={[s.infoText, { color: colors.mutedForeground }]}>
+                  {isTodayHoliday
+                    ? 'Manage face enrollment for future check-ins.'
+                    : 'Your private face template is matched securely in the camera flow. Original photos are never stored.'}
+                </Text>
+                {canReEnrollFace && (
+                  <TouchableOpacity
+                    onPress={startFaceReEnrollment}
+                    disabled={busy}
+                    style={[s.reEnrollButton, { borderColor: colors.border }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Re-enroll face"
+                  >
+                    <Feather name="refresh-cw" size={14} color={colors.primary} />
+                    <Text style={[s.reEnrollText, { color: colors.primary }]}>Re-enroll</Text>
+                  </TouchableOpacity>
+                )}
               </View>
-              <Text style={[s.infoText, { color: colors.mutedForeground }]}>
-                {isTodayHoliday
-                  ? 'Sunday attendance is marked automatically. No face check-in is required today.'
-                  : 'Your private face template is matched securely in the camera flow. Original photos are never stored.'}
-              </Text>
-              {canReEnrollFace && (
-                <TouchableOpacity
-                  onPress={startFaceReEnrollment}
-                  disabled={busy}
-                  style={[s.reEnrollButton, { borderColor: colors.border }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Re-enroll face"
-                >
-                  <Feather name="refresh-cw" size={14} color={colors.primary} />
-                  <Text style={[s.reEnrollText, { color: colors.primary }]}>Re-enroll</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            )}
           </ScrollView>
         )
       )}
@@ -1672,6 +1699,47 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   secondaryButtonText: { fontSize: 15, fontWeight: '800' },
   complete: { minHeight: 58, borderRadius: 17, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, marginBottom: 12 },
   completeText: { fontSize: 14, fontWeight: '700' },
+  holidayNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 13,
+    padding: 14,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginBottom: 12,
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 2,
+  },
+  holidayIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  holidayNoticeContent: { flex: 1, minWidth: 0 },
+  holidayNoticeMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  holidayNoticeKicker: { fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  holidayAutoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+    borderRadius: 999,
+  },
+  holidayAutoBadgeText: { fontSize: 8, fontWeight: '800', letterSpacing: 0.4 },
+  holidayNoticeTitle: { fontSize: 15, fontWeight: '800', lineHeight: 20, marginTop: 6 },
+  holidayNoticeBody: { fontSize: 12, lineHeight: 17, marginTop: 2 },
   info: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 16, borderWidth: 1 },
   infoIcon: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   infoText: { flex: 1, fontSize: 12, lineHeight: 17 },

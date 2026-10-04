@@ -1,0 +1,132 @@
+:root {
+  --attendance-primary: #1e3a8a;
+  --attendance-text: #0c1f4a;
+  --attendance-background: #f8fafc;
+  --attendance-card: #ffffff;
+  --attendance-secondary: #eff6ff;
+  --attendance-muted: #64748b;
+  --attendance-border: #d7dfee;
+  --attendance-accent: #c8a040;
+  --attendance-accent-soft: #f8f1dc;
+  --attendance-success: #10b981;
+  --attendance-success-soft: #e8f7f1;
+  --attendance-font: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.attendance-holiday-preview,
+.attendance-holiday-preview * {
+  box-sizing: border-box;
+}
+
+.attendance-holiday-preview {
+  width: 100%;
+  min-height: 230px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  color: var(--attendance-text);
+  background: var(--attendance-background);
+  font-family: var(--attendance-font);
+}
+
+.current-holiday-notice {
+  width: 100%;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid var(--attendance-border);
+  border-radius: 17px;
+  margin-bottom: 12px;
+  color: var(--attendance-primary);
+  background: var(--attendance-secondary);
+}
+
+.current-holiday-notice p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.premium-holiday-notice {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 15px;
+  border: 1px solid rgba(200, 160, 64, 0.34);
+  border-radius: 20px;
+  background: linear-gradient(125deg, #ffffff 0%, #fffaf0 100%);
+  box-shadow: 0 8px 22px rgba(12, 31, 74, 0.08);
+}
+
+.premium-holiday-icon {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(200, 160, 64, 0.2);
+  border-radius: 16px;
+  color: var(--attendance-accent);
+  background: var(--attendance-accent-soft);
+}
+
+.premium-holiday-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.premium-holiday-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.premium-holiday-kicker {
+  color: var(--attendance-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+}
+
+.premium-holiday-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  color: var(--attendance-text);
+  background: var(--attendance-success-soft);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.premium-holiday-badge svg {
+  color: var(--attendance-success);
+}
+
+.premium-holiday-title {
+  margin: 6px 0 0;
+  color: var(--attendance-text);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 20px;
+}
+
+.premium-holiday-detail {
+  margin: 2px 0 0;
+  color: var(--attendance-muted);
+  font-size: 12px;
+  line-height: 17px;
+}
