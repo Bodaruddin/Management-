@@ -8,7 +8,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useApp, compareSalaryRecordsNewestFirst } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
 import { printSalarySlip } from '@/utils/receipt';
-import { getTeacherSalaryBreakdown } from '@/utils/teacherSalary';
+import { calculateTeacherMonthlySalary, getTeacherSalaryBreakdown } from '@/utils/teacherSalary';
+
+const salaryMonthNames = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
 
 export default function TeacherSalary() {
   const colors = useColors();
@@ -28,7 +33,74 @@ export default function TeacherSalary() {
 
   const myTeacher = teachers.find(t => t.id === user?.id);
   const latestPaidRecord = myRecords[0];
-  const currentYear = new Date().getFullYear();
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonthIndex = today.getMonth();
+  const todayKey = `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const netSalaryTillNow = useMemo(() => {
+    if (!user || !myTeacher) return 0;
+
+    const joinedMonth = /^(\d{4})-(\d{2})/.exec(myTeacher.joinDate ?? '');
+    if (!joinedMonth) return 0;
+    const joinedMonthNumber = Number(joinedMonth[2]);
+    if (joinedMonthNumber < 1 || joinedMonthNumber > 12) return 0;
+    const startMonth = new Date(Number(joinedMonth[1]), joinedMonthNumber - 1, 1);
+    const currentMonthStart = new Date(currentYear, currentMonthIndex, 1);
+    if (startMonth > currentMonthStart) return 0;
+
+    const periodKey = (year: number, month: string) => `${year}-${month}`;
+    const paidPeriods = new Set(myRecords.map(record => periodKey(record.year, record.month)));
+    const startMonthIndex = startMonth.getFullYear() * 12 + startMonth.getMonth();
+    const candidates = new Map<string, { month: string; year: number }>();
+
+    for (const cursor = new Date(startMonth); cursor <= currentMonthStart; cursor.setMonth(cursor.getMonth() + 1)) {
+      const month = salaryMonthNames[cursor.getMonth()];
+      const key = periodKey(cursor.getFullYear(), month);
+      if (!paidPeriods.has(key)) candidates.set(key, { month, year: cursor.getFullYear() });
+    }
+
+    salaryRecords
+      .filter(record => record.teacherId === user.id && record.status === 'pending')
+      .forEach(record => {
+        const monthIndex = salaryMonthNames.indexOf(record.month);
+        const recordMonthIndex = Number(record.year) * 12 + monthIndex;
+        const key = periodKey(record.year, record.month);
+        if (monthIndex >= 0 && recordMonthIndex >= startMonthIndex && !paidPeriods.has(key)) {
+          candidates.set(key, { month: record.month, year: Number(record.year) });
+        }
+      });
+
+    return Array.from(candidates.values()).reduce((total, period) => {
+      const isCurrentMonth = period.year === currentYear && period.month === salaryMonthNames[currentMonthIndex];
+      return total + calculateTeacherMonthlySalary(
+        period.month,
+        period.year,
+        user.id,
+        Number(myTeacher.salary) || 0,
+        teacherAttendanceRecords,
+        teacherHolidays,
+        teacherLeaves,
+        teacherAttendanceSettings,
+        isCurrentMonth ? todayKey : undefined,
+      ).payable;
+    }, 0);
+  }, [
+    user,
+    myTeacher,
+    currentYear,
+    currentMonthIndex,
+    todayKey,
+    myRecords,
+    salaryRecords,
+    teacherAttendanceRecords,
+    teacherHolidays,
+    teacherLeaves,
+    teacherAttendanceSettings,
+  ]);
+  const paidThisYear = myRecords
+    .filter(record => Number(record.year) === currentYear)
+    .reduce((sum, record) => sum + (Number(record.amount) || 0), 0);
+  const payableSalary = Math.max(0, netSalaryTillNow - paidThisYear);
 
   const handlePrintReceipt = (record: any) => {
     if (myTeacher) {
@@ -75,12 +147,14 @@ export default function TeacherSalary() {
 
         <View style={s.summaryRow}>
           {[
-            { label: 'Payments', value: myRecords.length, color: colors.primary },
-            { label: 'Paid This Year', value: myRecords.filter(r => r.year === currentYear).length, color: colors.success },
-            { label: 'Latest Payment', value: latestPaidRecord ? latestPaidRecord.month.slice(0, 3) : '—', color: colors.info },
+            { label: 'Net Salary Till Now', value: netSalaryTillNow, color: colors.primary },
+            { label: 'Paid This Year', value: paidThisYear, color: colors.success },
+            { label: 'Payable Salary', value: payableSalary, color: colors.info },
           ].map(stat => (
             <View key={stat.label} style={[s.sumCard, { backgroundColor: stat.color + '15' }]}>
-              <Text style={[s.sumVal, { color: stat.color }]}>{stat.value}</Text>
+              <Text style={[s.sumVal, { color: stat.color }]}>
+                ₹{stat.value.toLocaleString('en-IN')}
+              </Text>
               <Text style={[s.sumLabel, { color: stat.color }]}>{stat.label}</Text>
             </View>
           ))}
