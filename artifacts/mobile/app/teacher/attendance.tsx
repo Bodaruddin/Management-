@@ -563,7 +563,7 @@ export default function TeacherAttendance() {
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <Text style={[s.controlLabel, { color: colors.text, marginBottom: 0 }]}>Date: {selectedDate}</Text>
-              {selectedClass && activeStudents.length > 0 && (
+              {!!selectedClass && activeStudents.length > 0 && (
                 <Text style={{ fontSize: 13, fontWeight: '600', color: pendingCount === 0 ? colors.success : colors.warning }}>
                   {pendingCount === 0 ? 'All marked' : `${pendingCount} pending`}
                 </Text>
@@ -571,7 +571,7 @@ export default function TeacherAttendance() {
             </View>
 
             {/* Inactive students count badge */}
-            {selectedClass && inactiveStudents.length > 0 && (
+            {!!selectedClass && inactiveStudents.length > 0 && (
               <View style={[s.inactiveBanner, { backgroundColor: colors.destructive + '12', borderColor: colors.destructive + '40' }]}>
                 <Feather name="lock" size={13} color={colors.destructive} />
                 <Text style={[s.inactiveBannerText, { color: colors.destructive }]}>
@@ -607,7 +607,7 @@ export default function TeacherAttendance() {
               </View>
             )}
 
-            {selectedClass && activeStudents.length > 0 && !alreadySubmitted && (
+            {!!selectedClass && activeStudents.length > 0 && !alreadySubmitted && (
               <View style={s.markAllBtns}>
                 <TouchableOpacity style={[s.markBtn, { backgroundColor: colors.success + '20' }]} onPress={() => markAll('present')} activeOpacity={0.8}>
                   <Text style={[s.markBtnText, { color: colors.success }]}>All P</Text>
