@@ -701,6 +701,7 @@ components:
         checkOutEnd: { type: string }
         requireFaceVerification: { type: boolean }
         allowLateCheckIn: { type: boolean }
+        sundayHoliday: { type: boolean }
         workingDaysPerMonth: { type: integer }
         lateGraceMinutes: { type: integer }
         lateDeductionAmount: { type: number }
@@ -740,7 +741,7 @@ components:
         teacherId: { type: string }
         teacherName: { type: string }
         date: { type: string }
-        status: { type: string, enum: [present, late, absent, leave] }
+        status: { type: string, enum: [present, late, absent, leave, holiday] }
         checkInAt: { type: [string, "null"], format: date-time }
         checkOutAt: { type: [string, "null"], format: date-time }
         checkInLatitude: { type: [number, "null"] }
@@ -875,6 +876,8 @@ components:
         month: { type: string }
         year: { type: integer }
         workingDays: { type: integer }
+        scheduledWorkingDays: { type: integer }
+        daysInMonth: { type: integer }
         result:
           type: array
           items:

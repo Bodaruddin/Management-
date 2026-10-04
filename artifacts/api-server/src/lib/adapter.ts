@@ -91,6 +91,9 @@ export interface DataAdapter {
     getByTeacherDate(teacherId: string, date: string): Promise<any | null>;
     create(data: any): Promise<any>;
     createIfAbsent(teacherId: string, date: string, data: any): Promise<{ row: any; created: boolean }>;
+    /** Replace only system-generated holiday rows for one date, preserving manual attendance. */
+    reconcileGeneratedHolidays(date: string, records: any[]): Promise<void>;
+    clearGeneratedHolidaysExcept(dates: string[]): Promise<void>;
     updateCheckOut(id: string, data: any): Promise<any | null>;
     reset(teacherId?: string): Promise<number>;
   };

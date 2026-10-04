@@ -14,4 +14,5 @@ export const TeacherAttendanceRecordStatus = {
   late: 'late',
   absent: 'absent',
   leave: 'leave',
+  holiday: 'holiday',
 } as const;

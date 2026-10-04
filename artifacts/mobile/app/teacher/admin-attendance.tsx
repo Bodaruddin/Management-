@@ -241,6 +241,7 @@ export default function AdminTeacherAttendance() {
   const today = new Date();
   const currentYear = today.getFullYear();
   const currentMonthIndex = today.getMonth();
+  const selectedMonthDays = new Date(Date.UTC(year, MONTHS.indexOf(month) + 1, 0)).getUTCDate();
   const pendingLeaves = teacherLeaves.filter(leave => leave.status === 'pending');
   const reportMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
   const monthlyRecords = teacherAttendanceRecords.filter(record => record.date.startsWith(reportMonthKey));
@@ -365,6 +366,13 @@ export default function AdminTeacherAttendance() {
             </View>
             <Switch value={settings.allowLateCheckIn} onValueChange={value => setSettings(previous => ({ ...previous, allowLateCheckIn: value }))} trackColor={{ true: colors.primary, false: colors.border }} thumbColor="#fff" />
           </View>
+          <View style={[s.switchRow, { borderTopColor: colors.border }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.label, { color: colors.text }]}>Automatically mark Sundays as holidays</Text>
+              <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Creates a holiday attendance record for each teacher and blocks Sunday check-in. Save attendance rules to apply.</Text>
+            </View>
+            <Switch value={settings.sundayHoliday} onValueChange={value => setSettings(previous => ({ ...previous, sundayHoliday: value }))} trackColor={{ true: colors.primary, false: colors.border }} thumbColor="#fff" />
+          </View>
           <TouchableOpacity style={[s.primaryButton, { backgroundColor: saving ? colors.muted : colors.primary }]} onPress={saveSettings} disabled={saving}>
             <Feather name="save" size={16} color="#fff" />
             <Text style={s.primaryText}>Save attendance rules</Text>
@@ -405,6 +413,10 @@ export default function AdminTeacherAttendance() {
             const late = rows.filter(record => record.status === 'late').length;
             const absent = rows.filter(record => record.status === 'absent').length;
             const leave = rows.filter(record => record.status === 'leave').length;
+            const holidays = new Set([
+              ...monthlyHolidays.map(holiday => holiday.date),
+              ...rows.filter(record => record.status === 'holiday').map(record => record.date),
+            ]).size;
             return (
               <TouchableOpacity
                 key={teacher.id}
@@ -414,7 +426,7 @@ export default function AdminTeacherAttendance() {
               >
                 <View style={{ flex: 1 }}>
                   <Text style={[s.historyTitle, { color: colors.text }]}>{teacher.name}</Text>
-                  <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Present {present} · Absent {absent} · Holidays {monthlyHolidays.length}</Text>
+                  <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Present {present} · Absent {absent} · Holidays {holidays}</Text>
                   <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Late {late} · Leave {leave} · Check-outs {rows.filter(record => record.checkOutAt).length}</Text>
                 </View>
                 <View style={s.reportActions}>
@@ -445,7 +457,13 @@ export default function AdminTeacherAttendance() {
             </View>
             <Feather name="credit-card" size={20} color={colors.success} />
           </View>
-          {field('Working-day divisor', 'workingDaysPerMonth', 'numeric')}
+          <View style={s.field}>
+            <Text style={[s.label, { color: colors.text }]}>Working-day divisor</Text>
+            <View style={[s.input, { backgroundColor: colors.muted, borderColor: colors.border, justifyContent: 'center' }]}>
+              <Text style={{ color: colors.text, fontSize: 15, fontWeight: '600' }}>{selectedMonthDays} calendar days</Text>
+            </View>
+            <Text style={[s.mutedText, { color: colors.mutedForeground }]}>Automatically follows {month} {year}.</Text>
+          </View>
           <View style={s.twoCol}>
             {field('Late check-in grace after closing (minutes)', 'lateGraceMinutes', 'numeric')}
             {field('Late deduction (₹)', 'lateDeductionAmount', 'numeric')}
@@ -453,7 +471,7 @@ export default function AdminTeacherAttendance() {
           <Text style={[s.label, { color: colors.text }]}>Absence deduction method</Text>
           <View style={s.choiceRow}>
             {([
-              ['daily_rate', 'Salary ÷ working days'],
+              ['daily_rate', 'Salary ÷ calendar days'],
               ['fixed', 'Fixed late amount'],
             ] as [TeacherAttendanceSettings['deductionType'], string][]).map(([value, label]) => (
               <TouchableOpacity key={value} onPress={() => setSettings(previous => ({ ...previous, deductionType: value }))} style={[s.choice, { borderColor: settings.deductionType === value ? colors.primary : colors.border, backgroundColor: settings.deductionType === value ? colors.primary + '12' : colors.card }]}>
@@ -547,7 +565,9 @@ export default function AdminTeacherAttendance() {
           </TouchableOpacity>
           {payroll && (
             <View style={[s.payrollBox, { backgroundColor: colors.muted }]}>
-              <Text style={[s.label, { color: colors.text }]}>{payroll.month} {payroll.year} · {payroll.workingDays} working days</Text>
+              <Text style={[s.label, { color: colors.text }]}>
+                {payroll.month} {payroll.year} · {payroll.daysInMonth ?? selectedMonthDays} calendar days · {payroll.scheduledWorkingDays ?? payroll.workingDays} school working days
+              </Text>
               {payroll.result.map((item: any) => (
                 <View key={item.teacherId} style={[s.payrollRow, { borderBottomColor: colors.border }]}>
                   <View style={{ flex: 1 }}>

@@ -5,6 +5,7 @@ import {
   getStudentHolidaySettings,
   syncStudentHolidayAttendance,
 } from "../lib/studentHolidayAttendance.js";
+import { syncTeacherSundayAttendance } from "../lib/teacherHolidayAttendance.js";
 
 const router = Router();
 const CLASS_ABSENT_LIMITS_KEY = "class_absent_limits";
@@ -29,6 +30,7 @@ const DEFAULT_TEACHER_ATTENDANCE_SETTINGS = {
   checkOutEnd: "18:00",
   requireFaceVerification: true,
   allowLateCheckIn: false,
+  sundayHoliday: true,
   workingDaysPerMonth: 26,
   lateGraceMinutes: 0,
   lateDeductionAmount: 0,
@@ -63,6 +65,7 @@ function readTeacherAttendanceSettings(value: unknown) {
   for (const key of TIME_SETTING_KEYS) {
     settings[key] = normalizeTime(settings[key]) ?? DEFAULT_TEACHER_ATTENDANCE_SETTINGS[key];
   }
+  settings.sundayHoliday = settings.sundayHoliday !== false;
   return settings;
 }
 
@@ -132,6 +135,7 @@ router.get("/bootstrap", async (_req, res) => {
     getStudentHolidaySettings(adapter),
   ]);
 
+  const teacherAttendanceSettings = readTeacherAttendanceSettings(teacherAttendanceSettingsSetting?.value);
   res.json({
     classes,
     sections,
@@ -155,7 +159,7 @@ router.get("/bootstrap", async (_req, res) => {
     teacherAttendance,
     teacherLeaves,
     teacherHolidays,
-    teacherAttendanceSettings: readTeacherAttendanceSettings(teacherAttendanceSettingsSetting?.value),
+    teacherAttendanceSettings,
     studentAttendanceHolidaySettings,
   });
 
@@ -164,6 +168,9 @@ router.get("/bootstrap", async (_req, res) => {
   // existing Supabase data.
   void syncStudentHolidayAttendance(adapter).catch((error) => {
     logger.warn({ error }, "Background student holiday attendance sync failed");
+  });
+  void syncTeacherSundayAttendance(adapter, teacherAttendanceSettings.sundayHoliday !== false).catch((error) => {
+    logger.warn({ error }, "Background teacher Sunday holiday attendance sync failed");
   });
 });
 

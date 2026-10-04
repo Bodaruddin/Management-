@@ -795,6 +795,63 @@ export function createPgAdapter(db: DB): DataAdapter {
           .where(and(eq(teacherAttendanceRecordsTable.teacherId, teacherId), eq(teacherAttendanceRecordsTable.date, date))).limit(1);
         return row ?? null;
       },
+      async reconcileGeneratedHolidays(date, records) {
+        await db.transaction(async (tx) => {
+          await tx.delete(teacherAttendanceRecordsTable).where(and(
+            eq(teacherAttendanceRecordsTable.date, date),
+            eq(teacherAttendanceRecordsTable.status, "holiday"),
+            eq(teacherAttendanceRecordsTable.faceVerificationMethod, "automatic_holiday"),
+          ));
+
+          const existingRows = await tx
+            .select({
+              teacherId: teacherAttendanceRecordsTable.teacherId,
+              status: teacherAttendanceRecordsTable.status,
+              faceVerificationMethod: teacherAttendanceRecordsTable.faceVerificationMethod,
+            })
+            .from(teacherAttendanceRecordsTable)
+            .where(eq(teacherAttendanceRecordsTable.date, date));
+          const occupied = new Set(
+            existingRows
+              .filter((row) => !(row.status === "holiday" && row.faceVerificationMethod === "automatic_holiday"))
+              .map((row) => String(row.teacherId)),
+          );
+          const values: any[] = [];
+
+          for (const record of records) {
+            if (
+              record.date !== date ||
+              record.status !== "holiday" ||
+              record.faceVerificationMethod !== "automatic_holiday"
+            ) continue;
+            const teacherId = String(record.teacherId ?? "");
+            if (!teacherId || occupied.has(teacherId)) continue;
+            occupied.add(teacherId);
+            values.push({
+              teacherId,
+              teacherName: record.teacherName ?? "",
+              date,
+              status: "holiday",
+              checkInAt: null,
+              faceVerified: "false",
+              faceVerificationMethod: "automatic_holiday",
+              note: record.note ?? "System — Sunday",
+            });
+          }
+
+          if (values.length) {
+            await tx.insert(teacherAttendanceRecordsTable).values(values);
+          }
+        });
+      },
+      async clearGeneratedHolidaysExcept(dates) {
+        const predicates = [
+          eq(teacherAttendanceRecordsTable.status, "holiday"),
+          eq(teacherAttendanceRecordsTable.faceVerificationMethod, "automatic_holiday"),
+        ];
+        if (dates.length) predicates.push(notInArray(teacherAttendanceRecordsTable.date, dates));
+        await db.delete(teacherAttendanceRecordsTable).where(and(...predicates));
+      },
       async create(data) {
         const values: any = {
           teacherId: data.teacherId, teacherName: data.teacherName ?? "", date: data.date,

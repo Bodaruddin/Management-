@@ -136,6 +136,7 @@ export interface TeacherAttendanceSettings {
   checkOutEnd: string;
   requireFaceVerification: boolean;
   allowLateCheckIn: boolean;
+  sundayHoliday: boolean;
   workingDaysPerMonth: number;
   lateGraceMinutes: number;
   lateDeductionAmount: number;
@@ -147,7 +148,7 @@ export interface TeacherAttendanceRecord {
   teacherId: string;
   teacherName: string;
   date: string;
-  status: 'present' | 'late' | 'absent' | 'leave';
+  status: 'present' | 'late' | 'absent' | 'leave' | 'holiday';
   checkInAt?: string;
   checkOutAt?: string;
   checkInLatitude?: number;
@@ -554,7 +555,14 @@ interface AppContextType extends AppState {
   updateStudentHoliday: (id: string, data: Omit<TeacherHoliday, 'id' | 'createdAt'>) => Promise<void>;
   deleteStudentHoliday: (id: string) => Promise<void>;
   updateTeacherAttendanceSettings: (settings: TeacherAttendanceSettings) => Promise<void>;
-  calculateTeacherPayroll: (month: string, year: number) => Promise<{ month: string; year: number; workingDays: number; result: TeacherPayrollResult[] }>;
+  calculateTeacherPayroll: (month: string, year: number) => Promise<{
+    month: string;
+    year: number;
+    workingDays: number;
+    scheduledWorkingDays: number;
+    daysInMonth: number;
+    result: TeacherPayrollResult[];
+  }>;
 }
 
 // ─── Seed data ───────────────────────────────────────────────────────────────
@@ -612,7 +620,7 @@ const DEFAULT_STATE: AppState = {
   teacherAttendanceSettings: {
     schoolLatitude: null, schoolLongitude: null, radiusMeters: 150,
     checkInStart: '08:00', checkInEnd: '09:30', checkOutStart: '15:00', checkOutEnd: '18:00',
-    requireFaceVerification: true, allowLateCheckIn: false, workingDaysPerMonth: 26, lateGraceMinutes: 0,
+    requireFaceVerification: true, allowLateCheckIn: false, sundayHoliday: true, workingDaysPerMonth: 26, lateGraceMinutes: 0,
     lateDeductionAmount: 0, deductionType: 'daily_rate',
   },
   documentBranding: {
@@ -1522,14 +1530,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       ...(teacherId ? { teacherId } : {}),
     });
     const deletedCount = Number(result.deletedCount ?? 0);
-    setState(prev => ({
-      ...prev,
-      teacherAttendanceRecords: teacherId
-        ? prev.teacherAttendanceRecords.filter(record => record.teacherId !== teacherId)
-        : [],
-    }));
+    await refreshTeacherAttendance();
     return deletedCount;
-  }, []);
+  }, [refreshTeacherAttendance]);
 
   const getTeacherFaceStatus = useCallback(async (teacherId: string) => {
     return apiGet<{ enrolled: boolean; canReEnroll: boolean }>(
@@ -1672,7 +1675,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateTeacherAttendanceSettings = useCallback(async (settings: TeacherAttendanceSettings) => {
     const saved = await apiPut<TeacherAttendanceSettings>('/settings/teacher-attendance', { ...settings, adminId: 'admin' });
-    setState(prev => ({ ...prev, teacherAttendanceSettings: saved }));
+    const records = await apiGet<any[]>('/teacher-attendance');
+    setState(prev => ({
+      ...prev,
+      teacherAttendanceSettings: saved,
+      teacherAttendanceRecords: records.map(mapTeacherAttendance),
+    }));
   }, []);
 
   const calculateTeacherPayroll = useCallback(async (month: string, year: number) => {
@@ -1690,7 +1698,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         ],
       }));
     }
-    return { month: report.month, year: report.year, workingDays: report.workingDays, result };
+    return {
+      month: report.month,
+      year: report.year,
+      workingDays: report.workingDays,
+      scheduledWorkingDays: report.scheduledWorkingDays ?? report.workingDays,
+      daysInMonth: report.daysInMonth,
+      result,
+    };
   }, []);
 
   // ── Promotions ──

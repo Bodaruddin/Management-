@@ -112,6 +112,7 @@ export interface TeacherAttendanceSettings {
   checkOutEnd?: string;
   requireFaceVerification?: boolean;
   allowLateCheckIn?: boolean;
+  sundayHoliday?: boolean;
   workingDaysPerMonth?: number;
   lateGraceMinutes?: number;
   lateDeductionAmount?: number;
@@ -152,6 +153,7 @@ export const TeacherAttendanceRecordStatus = {
   late: 'late',
   absent: 'absent',
   leave: 'leave',
+  holiday: 'holiday',
 } as const;
 
 export interface TeacherAttendanceRecord {
@@ -301,6 +303,8 @@ export interface PayrollReport {
   month?: string;
   year?: number;
   workingDays?: number;
+  scheduledWorkingDays?: number;
+  daysInMonth?: number;
   result?: PayrollReportResultItem[];
 }
 

@@ -909,6 +909,69 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
           .where("teacherId", "==", teacherId).where("date", "==", date).limit(1).get();
         return { row: winner.empty ? null : mapDoc(winner.docs[0]), created: false };
       },
+      async reconcileGeneratedHolidays(date, records) {
+        const snapshot = await col("teacher_attendance_records").where("date", "==", date).get();
+        const isGenerated = (record: any) =>
+          record.status === "holiday" && record.faceVerificationMethod === "automatic_holiday";
+        const generatedDocs = snapshot.docs.filter((doc) => isGenerated(doc.data()));
+        const occupied = new Set(
+          snapshot.docs
+            .filter((doc) => !isGenerated(doc.data()))
+            .map((doc) => String(doc.data().teacherId ?? "")),
+        );
+
+        for (let offset = 0; offset < generatedDocs.length; offset += 450) {
+          const batch = fs.batch();
+          generatedDocs.slice(offset, offset + 450).forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+        }
+
+        const generatedRows: Array<{ id: string; doc: any }> = [];
+        for (const record of records) {
+          if (
+            record.date !== date ||
+            !isGenerated(record)
+          ) continue;
+          const teacherId = String(record.teacherId ?? "");
+          if (!teacherId || occupied.has(teacherId)) continue;
+          occupied.add(teacherId);
+          const id = newId();
+          generatedRows.push({
+            id,
+            doc: stamp({
+              teacherId,
+              teacherName: record.teacherName ?? "",
+              date,
+              status: "holiday",
+              checkInAt: null,
+              faceVerified: "false",
+              faceVerificationMethod: "automatic_holiday",
+              note: record.note ?? "System — Sunday",
+            }),
+          });
+        }
+
+        for (let offset = 0; offset < generatedRows.length; offset += 450) {
+          const batch = fs.batch();
+          generatedRows.slice(offset, offset + 450).forEach(({ id, doc }) => {
+            batch.set(col("teacher_attendance_records").doc(id), doc);
+          });
+          await batch.commit();
+        }
+      },
+      async clearGeneratedHolidaysExcept(dates) {
+        const keep = new Set(dates);
+        const snapshot = await col("teacher_attendance_records").where("status", "==", "holiday").get();
+        const staleDocs = snapshot.docs.filter((doc) => {
+          const data = doc.data() as any;
+          return data.faceVerificationMethod === "automatic_holiday" && !keep.has(String(data.date ?? ""));
+        });
+        for (let offset = 0; offset < staleDocs.length; offset += 450) {
+          const batch = fs.batch();
+          staleDocs.slice(offset, offset + 450).forEach((doc) => batch.delete(doc.ref));
+          await batch.commit();
+        }
+      },
       async updateCheckOut(id, data) {
         const ref = col("teacher_attendance_records").doc(id);
         const existing = await ref.get();

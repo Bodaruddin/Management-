@@ -748,6 +748,17 @@ function formatIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function schoolDateString(date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kolkata',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const part = (type: string) => parts.find(item => item.type === type)?.value ?? '';
+  return `${part('year')}-${part('month')}-${part('day')}`;
+}
+
 function formatDisplayDate(isoDate: string): string {
   const [year, month, day] = isoDate.split('-');
   return day + '-' + month + '-' + year;
@@ -788,15 +799,15 @@ export default function MyTeacherAttendance() {
   const [faceResultMessage, setFaceResultMessage] = useState('');
   const [lastAttendanceAction, setLastAttendanceAction] = useState<'check-in' | 'check-out' | null>(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('monthly');
-  const [customStartDate, setCustomStartDate] = useState(() => formatDisplayDate(new Date().toISOString().slice(0, 10)));
-  const [customEndDate, setCustomEndDate] = useState(() => formatDisplayDate(new Date().toISOString().slice(0, 10)));
+  const [customStartDate, setCustomStartDate] = useState(() => formatDisplayDate(schoolDateString()));
+  const [customEndDate, setCustomEndDate] = useState(() => formatDisplayDate(schoolDateString()));
   const redirectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [leaveStart, setLeaveStart] = useState(new Date().toISOString().slice(0, 10));
-  const [leaveEnd, setLeaveEnd] = useState(new Date().toISOString().slice(0, 10));
+  const [leaveStart, setLeaveStart] = useState(schoolDateString());
+  const [leaveEnd, setLeaveEnd] = useState(schoolDateString());
   const [leaveReason, setLeaveReason] = useState('');
   const [editingLeaveId, setEditingLeaveId] = useState<string | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = schoolDateString();
   const myRecords = useMemo(
     () => teacherAttendanceRecords
       .filter(record => record.teacherId === user?.id)
@@ -805,6 +816,7 @@ export default function MyTeacherAttendance() {
   );
   const todayRecord = myRecords.find(record => record.date === today);
   const hasCheckedInToday = Boolean(todayRecord?.checkInAt);
+  const isTodayHoliday = todayRecord?.status === 'holiday';
   const myLeaves = useMemo(
     () => teacherLeaves.filter(leave => leave.teacherId === user?.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [teacherLeaves, user?.id],
@@ -835,13 +847,24 @@ export default function MyTeacherAttendance() {
     const records: HistoryEntry[] = historyRecords.map(record => ({
       id: record.id, date: record.date, status: record.status,
       checkInAt: record.checkInAt, checkOutAt: record.checkOutAt,
+      holidayName: record.status === 'holiday'
+        ? (record.note?.replace(/^System — /, '') || 'Holiday')
+        : undefined,
     }));
     const holidays: HistoryEntry[] = teacherHolidays
       .filter(holiday => holiday.date >= historyRange[0] && holiday.date <= historyRange[1])
       .map(holiday => ({
         id: `holiday-${holiday.id}`, date: holiday.date, status: 'holiday', holidayName: holiday.name,
       }));
-    return [...records, ...holidays].sort((a, b) => b.date.localeCompare(a.date));
+    const entriesByDate = new Map(records.map(entry => [entry.date, entry]));
+    for (const holiday of holidays) {
+      const existing = entriesByDate.get(holiday.date);
+      if (!existing) entriesByDate.set(holiday.date, holiday);
+      else if (existing.status === 'holiday' && !existing.holidayName) {
+        entriesByDate.set(holiday.date, { ...existing, holidayName: holiday.holidayName });
+      }
+    }
+    return [...entriesByDate.values()].sort((a, b) => b.date.localeCompare(a.date));
   }, [historyRange, historyRecords, teacherHolidays]);
   const historySummary = useMemo(() => ({
     present: historyEntries.filter(entry => entry.status === 'present').length,
@@ -1201,9 +1224,13 @@ export default function MyTeacherAttendance() {
               <Text style={s.heroTitle}>
                 {hasCheckedInToday
                   ? (todayRecord?.status === 'late' ? 'Checked in late' : 'Checked in')
-                  : todayRecord?.status === 'absent' ? 'Marked absent' : 'Ready to check in?'}
+                  : isTodayHoliday ? 'Sunday holiday' : todayRecord?.status === 'absent' ? 'Marked absent' : 'Ready to check in?'}
               </Text>
-              <Text style={s.heroCopy}>Your location must be within {teacherAttendanceSettings.radiusMeters}m of school.</Text>
+              <Text style={s.heroCopy}>
+                {isTodayHoliday
+                  ? 'Attendance was submitted automatically. No check-in is needed today.'
+                  : `Your location must be within ${teacherAttendanceSettings.radiusMeters}m of school.`}
+              </Text>
               <View style={s.heroFooter}>
                 <View style={s.heroFooterItem}>
                   <Feather name="map-pin" size={14} color="#BFD0FF" />
@@ -1218,25 +1245,25 @@ export default function MyTeacherAttendance() {
 
             <View style={[s.recordCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={s.recordRow}>
-                <View style={[s.recordIcon, { backgroundColor: hasCheckedInToday ? colors.success + '18' : todayRecord?.status === 'absent' ? colors.destructive + '18' : colors.muted }]}>
+                <View style={[s.recordIcon, { backgroundColor: hasCheckedInToday ? colors.success + '18' : isTodayHoliday ? colors.primary + '18' : todayRecord?.status === 'absent' ? colors.destructive + '18' : colors.muted }]}>
                   <Feather
-                    name={hasCheckedInToday ? 'check-circle' : todayRecord?.status === 'absent' ? 'x-circle' : 'clock'}
+                    name={hasCheckedInToday ? 'check-circle' : isTodayHoliday ? 'calendar' : todayRecord?.status === 'absent' ? 'x-circle' : 'clock'}
                     size={20}
-                    color={hasCheckedInToday ? colors.success : todayRecord?.status === 'absent' ? colors.destructive : colors.mutedForeground}
+                    color={hasCheckedInToday ? colors.success : isTodayHoliday ? colors.primary : todayRecord?.status === 'absent' ? colors.destructive : colors.mutedForeground}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={s.recordHeading}>
                     <Text style={[s.recordLabel, { color: colors.mutedForeground }]}>Today · {today}</Text>
-                    <View style={[s.statusPill, { backgroundColor: hasCheckedInToday ? colors.success + '18' : todayRecord?.status === 'absent' ? colors.destructive + '18' : colors.secondary }]}>
-                      <View style={[s.statusDot, { backgroundColor: hasCheckedInToday ? colors.success : todayRecord?.status === 'absent' ? colors.destructive : colors.primary }]} />
-                      <Text style={[s.statusPillText, { color: hasCheckedInToday ? colors.success : todayRecord?.status === 'absent' ? colors.destructive : colors.primary }]}>
-                        {hasCheckedInToday ? (todayRecord?.status === 'late' ? 'LATE' : 'PRESENT') : todayRecord?.status === 'absent' ? 'ABSENT' : 'PENDING'}
+                    <View style={[s.statusPill, { backgroundColor: hasCheckedInToday ? colors.success + '18' : isTodayHoliday ? colors.primary + '18' : todayRecord?.status === 'absent' ? colors.destructive + '18' : colors.secondary }]}>
+                      <View style={[s.statusDot, { backgroundColor: hasCheckedInToday ? colors.success : isTodayHoliday ? colors.primary : todayRecord?.status === 'absent' ? colors.destructive : colors.primary }]} />
+                      <Text style={[s.statusPillText, { color: hasCheckedInToday ? colors.success : isTodayHoliday ? colors.primary : todayRecord?.status === 'absent' ? colors.destructive : colors.primary }]}>
+                        {hasCheckedInToday ? (todayRecord?.status === 'late' ? 'LATE' : 'PRESENT') : isTodayHoliday ? 'HOLIDAY' : todayRecord?.status === 'absent' ? 'ABSENT' : 'PENDING'}
                       </Text>
                     </View>
                   </View>
                   <Text style={[s.recordValue, { color: colors.text }]}>
-                    {hasCheckedInToday ? (todayRecord?.status === 'late' ? 'Late' : 'Present') : todayRecord?.status === 'absent' ? 'Absent' : 'Not marked'}
+                    {hasCheckedInToday ? (todayRecord?.status === 'late' ? 'Late' : 'Present') : isTodayHoliday ? 'Holiday — Sunday' : todayRecord?.status === 'absent' ? 'Absent' : 'Not marked'}
                   </Text>
                 </View>
               </View>
@@ -1266,7 +1293,12 @@ export default function MyTeacherAttendance() {
               )}
             </View>
 
-            {!todayRecord ? (
+            {isTodayHoliday ? (
+              <View style={[s.complete, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
+                <Feather name="calendar" size={18} color={colors.primary} />
+                <Text style={[s.completeText, { color: colors.primary }]}>Sunday holiday attendance was submitted automatically.</Text>
+              </View>
+            ) : !todayRecord ? (
               <TouchableOpacity disabled={busy} onPress={handleCheckIn} activeOpacity={0.9}>
                 <LinearGradient
                   colors={busy ? [colors.muted, colors.muted] : ['#1E3A8A', '#315BCB']}
@@ -1303,7 +1335,9 @@ export default function MyTeacherAttendance() {
                 <Feather name="lock" size={14} color={colors.primary} />
               </View>
               <Text style={[s.infoText, { color: colors.mutedForeground }]}>
-                Your private face template is matched securely in the camera flow. Original photos are never stored.
+                {isTodayHoliday
+                  ? 'Sunday attendance is marked automatically. No face check-in is required today.'
+                  : 'Your private face template is matched securely in the camera flow. Original photos are never stored.'}
               </Text>
               {canReEnrollFace && (
                 <TouchableOpacity

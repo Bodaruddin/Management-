@@ -11,5 +11,7 @@ export interface PayrollReport {
   month?: string;
   year?: number;
   workingDays?: number;
+  scheduledWorkingDays?: number;
+  daysInMonth?: number;
   result?: PayrollReportResultItem[];
 }

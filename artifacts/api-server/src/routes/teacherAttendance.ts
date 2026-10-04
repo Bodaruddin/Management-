@@ -1,6 +1,11 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
 import { createFaceTemplate, faceMatchesAny } from "../lib/faceTemplate.js";
+import {
+  isSundayDate,
+  syncTeacherSundayAttendance,
+  syncTeacherSundayAttendanceForDate,
+} from "../lib/teacherHolidayAttendance.js";
 
 const router = Router();
 const SETTINGS_KEY = "teacher_attendance_settings";
@@ -19,6 +24,7 @@ const DEFAULT_SETTINGS = {
   checkOutEnd: "18:00",
   requireFaceVerification: true,
   allowLateCheckIn: false,
+  sundayHoliday: true,
   workingDaysPerMonth: 26,
   lateGraceMinutes: 0,
   lateDeductionAmount: 0,
@@ -107,6 +113,7 @@ async function getSettings() {
   for (const key of TIME_SETTING_KEYS) {
     settings[key] = normalizeTime(settings[key]) ?? DEFAULT_SETTINGS[key];
   }
+  settings.sundayHoliday = settings.sundayHoliday !== false;
   return settings;
 }
 
@@ -218,6 +225,8 @@ export async function markMissedTeacherAttendance() {
   absenceSweepInProgress = true;
   try {
     const settings = await getSettings();
+    const adapter = getAdapter();
+    await syncTeacherSundayAttendanceForDate(adapter, date, settings.sundayHoliday !== false);
     const absenceCutoff = settings.allowLateCheckIn ? settings.checkOutEnd : settings.checkInEnd;
     const absenceCutoffLabel = settings.allowLateCheckIn ? "check-out" : "check-in";
     if (currentTimeMinutes() < timeToMinutes(absenceCutoff)) {
@@ -225,15 +234,18 @@ export async function markMissedTeacherAttendance() {
     }
 
     const weekday = new Date(date + "T12:00:00Z").getUTCDay();
-    if (weekday === 0 || weekday === 6) {
+    if (weekday === 0 && settings.sundayHoliday) {
+      return { date, created: 0, skipped: true, reason: "sunday_holiday" };
+    }
+    if (weekday === 6) {
       return { date, created: 0, skipped: true, reason: "weekend" };
     }
 
     const [teachers, records, leaves, holidays] = await Promise.all([
-      getAdapter().teachers.list(),
-      getAdapter().teacherAttendance.list({ month: date.slice(0, 7) }),
-      getAdapter().teacherLeaveApplications.list({ status: "approved" }),
-      getAdapter().teacherHolidays.list(),
+      adapter.teachers.list(),
+      adapter.teacherAttendance.list({ month: date.slice(0, 7) }),
+      adapter.teacherLeaveApplications.list({ status: "approved" }),
+      adapter.teacherHolidays.list(),
     ]);
     if ((holidays as any[]).some((holiday) => String(holiday.date) === date)) {
       return { date, created: 0, skipped: true, reason: "holiday" };
@@ -255,7 +267,7 @@ export async function markMissedTeacherAttendance() {
       if (!teacherId || leaveDatesByTeacher.get(teacherId)?.has(date)) continue;
       const key = teacherId + ":" + date;
       if (existing.has(key)) continue;
-      const result = await getAdapter().teacherAttendance.createIfAbsent(teacherId, date, {
+      const result = await adapter.teacherAttendance.createIfAbsent(teacherId, date, {
         teacherName: teacher.name,
         status: "absent",
         checkInAt: null,
@@ -284,12 +296,13 @@ router.put("/settings/teacher-attendance", async (req, res) => {
     return;
   }
   const body = req.body ?? {};
+  const currentSettings = await getSettings();
   const checkInStart = normalizeTime(body.checkInStart);
   const checkInEnd = normalizeTime(body.checkInEnd);
   const checkOutStart = normalizeTime(body.checkOutStart);
   const checkOutEnd = normalizeTime(body.checkOutEnd);
   const settings = {
-    ...await getSettings(),
+    ...currentSettings,
     schoolLatitude: body.schoolLatitude === null || body.schoolLatitude === undefined ? null : Number(body.schoolLatitude),
     schoolLongitude: body.schoolLongitude === null || body.schoolLongitude === undefined ? null : Number(body.schoolLongitude),
     radiusMeters: Number(body.radiusMeters),
@@ -299,6 +312,7 @@ router.put("/settings/teacher-attendance", async (req, res) => {
     checkOutEnd: checkOutEnd ?? "",
     requireFaceVerification: Boolean(body.requireFaceVerification),
     allowLateCheckIn: Boolean(body.allowLateCheckIn),
+    sundayHoliday: typeof body.sundayHoliday === "boolean" ? body.sundayHoliday : currentSettings.sundayHoliday,
     workingDaysPerMonth: Number(body.workingDaysPerMonth),
     lateGraceMinutes: Number(body.lateGraceMinutes),
     lateDeductionAmount: Number(body.lateDeductionAmount),
@@ -325,14 +339,19 @@ router.put("/settings/teacher-attendance", async (req, res) => {
     res.status(400).json({ error: "Check-out closing time must be later than the check-out start time." });
     return;
   }
-  await getAdapter().appSettings.set(SETTINGS_KEY, settings);
+  const adapter = getAdapter();
+  await adapter.appSettings.set(SETTINGS_KEY, settings);
+  await syncTeacherSundayAttendance(adapter, settings.sundayHoliday);
   res.json(settings);
 });
 
 router.get("/teacher-attendance", async (req, res) => {
   const teacherId = typeof req.query.teacherId === "string" ? req.query.teacherId : undefined;
   const month = typeof req.query.month === "string" ? req.query.month : undefined;
-  res.json(await getAdapter().teacherAttendance.list({ teacherId, month }));
+  const adapter = getAdapter();
+  const settings = await getSettings();
+  await syncTeacherSundayAttendance(adapter, settings.sundayHoliday !== false);
+  res.json(await adapter.teacherAttendance.list({ teacherId, month }));
 });
 
 router.post("/teacher-attendance/reset", async (req, res) => {
@@ -343,7 +362,10 @@ router.post("/teacher-attendance/reset", async (req, res) => {
   const teacherId = typeof req.body?.teacherId === "string" && req.body.teacherId.trim()
     ? req.body.teacherId.trim()
     : undefined;
-  const deletedCount = await getAdapter().teacherAttendance.reset(teacherId);
+  const adapter = getAdapter();
+  const deletedCount = await adapter.teacherAttendance.reset(teacherId);
+  const settings = await getSettings();
+  await syncTeacherSundayAttendance(adapter, settings.sundayHoliday !== false, undefined, true);
   res.json({ deletedCount, teacherId: teacherId ?? null });
 });
 
@@ -419,6 +441,16 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
     return;
   }
   const settings = await getSettings();
+  const adapter = getAdapter();
+  if (settings.sundayHoliday && isSundayDate(date)) {
+    await syncTeacherSundayAttendanceForDate(adapter, date, true);
+    const record = await adapter.teacherAttendance.getByTeacherDate(teacherId, date);
+    res.status(409).json({
+      error: "Sunday is a holiday. Attendance has been submitted automatically.",
+      record,
+    });
+    return;
+  }
   const latitude = Number(body.latitude);
   const longitude = Number(body.longitude);
   if (!isValidCoordinate(latitude, -90, 90) || !isValidCoordinate(longitude, -180, 180)) {
@@ -462,7 +494,7 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
   // A check-in inside the configured window is on time. Grace applies only after closing.
   const late = nowMinutes > checkInEnd + settings.lateGraceMinutes;
    try {
-     const result = await getAdapter().teacherAttendance.createIfAbsent(teacherId, date, {
+      const result = await adapter.teacherAttendance.createIfAbsent(teacherId, date, {
        id: body.id, teacherId, teacherName, date,
        status: late ? "late" : "present",
        checkInAt: body.checkInAt ?? new Date().toISOString(),
@@ -480,7 +512,7 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
      res.status(201).json(result.row);
    } catch (error: any) {
      if (error?.code === "23505") {
-       const existing = await getAdapter().teacherAttendance.getByTeacherDate(teacherId, date);
+        const existing = await adapter.teacherAttendance.getByTeacherDate(teacherId, date);
        res.status(409).json({ error: "Attendance has already been checked in for today", record: existing });
        return;
      }
@@ -656,21 +688,28 @@ router.post("/teacher-attendance/payroll/calculate", async (req, res) => {
   const monthIndex = ["January","February","March","April","May","June","July","August","September","October","November","December"].indexOf(month);
   const monthKey = `${year}-${String(monthIndex + 1).padStart(2, "0")}`;
   const settings = await getSettings();
+  const adapter = getAdapter();
   const [teachers, records, leaves, holidays] = await Promise.all([
-    getAdapter().teachers.list(), getAdapter().teacherAttendance.list({ month: monthKey }),
-    getAdapter().teacherLeaveApplications.list({ status: "approved" }), getAdapter().teacherHolidays.list(),
+    adapter.teachers.list(), adapter.teacherAttendance.list({ month: monthKey }),
+    adapter.teacherLeaveApplications.list({ status: "approved" }), adapter.teacherHolidays.list(),
   ]);
   const holidayDates = new Set(holidays.filter((h: any) => String(h.date).startsWith(monthKey)).map((h: any) => h.date));
   const approvedLeaveDates = new Set(leaves.flatMap((leave: any) =>
     dateRange(leave.startDate, leave.endDate).filter(date => date.startsWith(monthKey)),
   ));
   const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+  if (settings.sundayHoliday) {
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = `${monthKey}-${String(day).padStart(2, "0")}`;
+      if (isSundayDate(date)) holidayDates.add(date);
+    }
+  }
   const workingDates = Array.from({ length: daysInMonth }, (_, index) => {
     const date = `${monthKey}-${String(index + 1).padStart(2, "0")}`;
     const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
-    return weekday !== 0 && weekday !== 6 && !holidayDates.has(date) && !approvedLeaveDates.has(date) ? date : null;
+    return weekday !== 6 && !holidayDates.has(date) && !approvedLeaveDates.has(date) ? date : null;
   }).filter((date): date is string => Boolean(date));
-  const dailyRateDivisor = settings.workingDaysPerMonth || workingDates.length || 26;
+  const dailyRateDivisor = daysInMonth;
   const result = [];
   for (const teacher of teachers as any[]) {
     const teacherRecords = records.filter((record: any) => record.teacherId === teacher.id);
@@ -685,7 +724,7 @@ router.post("/teacher-attendance/payroll/calculate", async (req, res) => {
       : absentDates.length * (Number(teacher.salary ?? 0) / dailyRateDivisor);
     const lateDeduction = lateRecords.length * settings.lateDeductionAmount;
     const amount = Math.max(0, Math.round(Number(teacher.salary ?? 0) - absentDeduction - lateDeduction));
-    const salary = await getAdapter().salaryRecords.upsertByTeacher(teacher.id, month, year, {
+    const salary = await adapter.salaryRecords.upsertByTeacher(teacher.id, month, year, {
       teacherName: teacher.name, amount, status: "pending",
     });
     result.push({
@@ -697,7 +736,14 @@ router.post("/teacher-attendance/payroll/calculate", async (req, res) => {
       payableAmount: amount, salaryRecord: salary.row,
     });
   }
-  res.json({ month, year, workingDays: workingDates.length, result });
+  res.json({
+    month,
+    year,
+    workingDays: workingDates.length,
+    scheduledWorkingDays: workingDates.length,
+    daysInMonth,
+    result,
+  });
 });
 
 export default router;
