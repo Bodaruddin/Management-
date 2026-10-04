@@ -1965,37 +1965,86 @@ export default function MarksheetScreen() {
                   return (
                     <View key={item.id} style={{ borderBottomWidth: idx < displayStudentList.length - 1 ? 1 : 0, borderBottomColor: '#F1F5F9' }}>
                       {isBulk ? (
-                        <TouchableOpacity
-                          style={[s.studentRow, isSelected && { backgroundColor: '#EFF6FF' }]}
-                          onPress={() => hasResult && toggleBulk(item.id)}
-                          activeOpacity={hasResult ? 0.7 : 1}
-                        >
-                          <View style={[s.checkbox, isSelected && { backgroundColor: '#2563EB', borderColor: '#2563EB' }]}>
-                            {isSelected && <Feather name="check" size={12} color="#fff" />}
-                          </View>
-                          <View style={[s.avatar, { backgroundColor: clr }]}>
-                            <Text style={s.avatarTxt}>{getInitials(item.name)}</Text>
-                          </View>
-                          <View style={{ flex: 1, opacity: hasResult ? 1 : 0.45 }}>
-                            <Text style={s.studentName}>{item.name}</Text>
-                            <Text style={s.studentSub}>Roll: {item.rollNumber} · {item.class}</Text>
-                            {data ? (
-                              <View style={s.badgeRow}>
-                                <View style={[s.badge, { backgroundColor: '#EFF6FF' }]}>
-                                  <Text style={[s.badgeTxt, { color: '#1e3a8a' }]}>{data.total}/{data.maxTotal}</Text>
-                                </View>
-                                <View style={[s.badge, { backgroundColor: data.passed ? '#DCFCE7' : '#FEE2E2' }]}>
-                                  <Text style={[s.badgeTxt, { color: data.passed ? '#15803D' : '#B91C1C' }]}>
-                                    {data.grade} · {data.passed ? 'Pass' : 'Fail'}
-                                  </Text>
-                                </View>
-                                <View style={[s.badge, { backgroundColor: '#FFF7ED' }]}>
-                                  <Text style={[s.badgeTxt, { color: '#C2410C' }]}>Rank #{data.rank}</Text>
-                                </View>
+                          <View style={[s.studentRow, isSelected && { backgroundColor: '#EFF6FF' }]}>
+                            <TouchableOpacity
+                              onPress={() => hasResult && toggleBulk(item.id)}
+                              activeOpacity={0.7}
+                              disabled={!hasResult}
+                              accessibilityRole="checkbox"
+                              accessibilityState={{ checked: isSelected, disabled: !hasResult }}
+                              accessibilityLabel={`Select ${item.name}`}
+                              testID={`marksheet-select-${item.id}`}
+                            >
+                              <View style={[s.checkbox, isSelected && { backgroundColor: '#2563EB', borderColor: '#2563EB' }]}>
+                                {isSelected && <Feather name="check" size={12} color="#fff" />}
                               </View>
-                            ) : <Text style={s.noResult}>No results entered</Text>}
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10, opacity: hasResult ? 1 : 0.45 }}
+                              onPress={() => hasResult && toggleBulk(item.id)}
+                              activeOpacity={hasResult ? 0.7 : 1}
+                              disabled={!hasResult}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Select ${item.name}`}
+                            >
+                              <View style={[s.avatar, { backgroundColor: clr }]}>
+                                <Text style={s.avatarTxt}>{getInitials(item.name)}</Text>
+                              </View>
+                              <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={s.studentName}>{item.name}</Text>
+                                <Text style={s.studentSub}>Roll: {item.rollNumber} · {item.class}</Text>
+                                {data ? (
+                                  <View style={s.badgeRow}>
+                                    <View style={[s.badge, { backgroundColor: '#EFF6FF' }]}>
+                                      <Text style={[s.badgeTxt, { color: '#1e3a8a' }]}>{data.total}/{data.maxTotal}</Text>
+                                    </View>
+                                    <View style={[s.badge, { backgroundColor: data.passed ? '#DCFCE7' : '#FEE2E2' }]}>
+                                      <Text style={[s.badgeTxt, { color: data.passed ? '#15803D' : '#B91C1C' }]}>
+                                        {data.grade} · {data.passed ? 'Pass' : 'Fail'}
+                                      </Text>
+                                    </View>
+                                    <View style={[s.badge, { backgroundColor: '#FFF7ED' }]}>
+                                      <Text style={[s.badgeTxt, { color: '#C2410C' }]}>Rank #{data.rank}</Text>
+                                    </View>
+                                  </View>
+                                ) : <Text style={s.noResult}>No results entered</Text>}
+                              </View>
+                            </TouchableOpacity>
+                            {hasResult && (
+                              <View style={s.actionCol}>
+                                <TouchableOpacity
+                                  style={s.actionBtn}
+                                  onPress={() => openPreview(item)}
+                                  activeOpacity={0.7}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`View marksheet for ${item.name}`}
+                                  testID={`marksheet-view-${item.id}`}
+                                >
+                                  <Feather name="eye" size={14} color="#2563EB" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[s.actionBtn, { backgroundColor: '#F0FDF4' }]}
+                                  onPress={() => downloadSingle(item)}
+                                  activeOpacity={0.7}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Download marksheet PDF for ${item.name}`}
+                                  testID={`marksheet-download-${item.id}`}
+                                >
+                                  <Feather name="download" size={14} color="#15803D" />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[s.actionBtn, { backgroundColor: '#FFF7ED' }]}
+                                  onPress={() => printSingle(item)}
+                                  activeOpacity={0.7}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Print marksheet for ${item.name}`}
+                                  testID={`marksheet-print-${item.id}`}
+                                >
+                                  <Feather name="printer" size={14} color="#C2410C" />
+                                </TouchableOpacity>
+                              </View>
+                            )}
                           </View>
-                        </TouchableOpacity>
                       ) : (
                         <View style={[s.studentRow, { opacity: hasResult ? 1 : 0.45 }]}>
                           <View style={[s.avatar, { backgroundColor: clr }]}>
