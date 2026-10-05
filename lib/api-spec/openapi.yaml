@@ -109,6 +109,34 @@ paths:
           description: The caller is not an administrator
         "404":
           description: Teacher not found
+  /teachers/{id}/faceless-attendance-permission:
+    put:
+      operationId: setTeacherFacelessAttendancePermission
+      tags: [teachers]
+      summary: Grant or revoke a teacher's face-free attendance permission
+      security:
+        - BearerSessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherFacelessAttendancePermissionUpdate"
+      responses:
+        "200":
+          description: Permission updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherFacelessAttendancePermission"
+        "401":
+          description: An active administrator session is required
+        "403":
+          description: The caller is not an administrator
+        "404":
+          description: Teacher not found
   /healthz:
     get:
       operationId: healthCheck
@@ -271,6 +299,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeacherFaceStatus"
+  /teacher-attendance/faceless-permission:
+    get:
+      operationId: getTeacherFacelessAttendancePermission
+      tags: [teacher-attendance]
+      summary: Check the signed-in teacher's face-free attendance permission
+      security:
+        - BearerSessionAuth: []
+      responses:
+        "200":
+          description: Whether face-free attendance has been granted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherFacelessAttendancePermission"
+        "401":
+          description: An active teacher session is required
+        "403":
+          description: The caller is not a teacher
+        "404":
+          description: Teacher not found
   /teacher-attendance/face-enroll:
     post:
       operationId: enrollTeacherFace
@@ -769,6 +817,17 @@ components:
         enrolled: { type: boolean }
         method: { type: string }
       required: [enrolled]
+    TeacherFacelessAttendancePermission:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
+        teacherId: { type: string }
+    TeacherFacelessAttendancePermissionUpdate:
+      type: object
+      required: [enabled]
+      properties:
+        enabled: { type: boolean }
     TeacherFaceEnroll:
       type: object
       required: [teacherId, faceImageBase64]
@@ -796,6 +855,9 @@ components:
         faceVerified: { type: boolean }
         faceVerificationMethod: { type: string }
         faceImageBase64: { type: string, description: "Camera selfie used to enroll or match the teacher face template" }
+        skipFaceVerification:
+          type: boolean
+          description: "Skip face matching only when an administrator has granted this teacher permission. The configured attendance time and school geofence still apply."
         faceSamplesBase64:
           type: array
           minItems: 1
@@ -810,6 +872,9 @@ components:
         latitude: { type: number }
         longitude: { type: number }
         faceImageBase64: { type: string, description: "Camera selfie used to match the enrolled teacher face template" }
+        skipFaceVerification:
+          type: boolean
+          description: "Skip face matching only when an administrator has granted this teacher permission. The configured attendance time and school geofence still apply."
         faceSamplesBase64:
           type: array
           minItems: 1

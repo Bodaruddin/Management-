@@ -21,12 +21,14 @@ export interface AuthUser {
     sendFeeReminder: boolean;
     allowMarkEdit: boolean;
     reEnrollFace: boolean;
+    facelessAttendance: boolean;
   };
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
+  authenticatedFetch: (path: string, init?: RequestInit) => Promise<Response>;
   login: (username: string, password: string, role: 'admin' | 'teacher') => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   changeAdminCredentials: (currentPassword: string, newUsername?: string, newPassword?: string) => Promise<{ success: boolean; error?: string }>;
@@ -98,6 +100,7 @@ async function loginTeacher(
         sendFeeReminder: false,
         allowMarkEdit: false,
         reEnrollFace: false,
+        facelessAttendance: false,
         ...(t.permissions ?? {}),
       },
     };
@@ -111,6 +114,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const authenticatedFetch = useCallback(async (path: string, init: RequestInit = {}) => {
+    if (!path.startsWith('/')) throw new Error('Authenticated API paths must be relative to /api.');
+    if (!sessionToken) throw new Error('Your session has expired. Please sign in again.');
+    const headers = {
+      ...(init.headers as Record<string, string> | undefined),
+      Authorization: `Bearer ${sessionToken}`,
+    };
+    return fetch(`${getApiBase()}/api${path}`, { ...init, headers });
+  }, [sessionToken]);
 
   const clearLocalSession = useCallback(async () => {
     await AsyncStorage.multiRemove([AUTH_KEY, ADMIN_SESSION_KEY, AUTH_TOKEN_KEY]);
@@ -371,7 +384,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         permissions: {
           addStudent: false, feeCollection: false, manageClasses: false, manageExams: false,
           manageResults: false, promoteStudents: false, sendFeeReminder: false,
-          allowMarkEdit: false, reEnrollFace: false, ...(teacher.permissions ?? {}),
+          allowMarkEdit: false, reEnrollFace: false, facelessAttendance: false,
+          ...(teacher.permissions ?? {}),
         },
       };
       await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(teacherUser));
@@ -399,7 +413,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      user, isLoading, login, logout, changeAdminCredentials, forceLogoutTeacher,
+      user, isLoading, authenticatedFetch, login, logout, changeAdminCredentials, forceLogoutTeacher,
       listAdminUsers, createAdminUser, updateAdminUser, switchToTeacher, switchToAdmin,
     }}>
       {children}

@@ -41,6 +41,8 @@ export * from './teacherAttendanceSettingsUpdate';
 export * from './teacherCheckIn';
 export * from './teacherCheckOut';
 export * from './teacherFaceEnroll';
+export * from './teacherFacelessAttendancePermission';
+export * from './teacherFacelessAttendancePermissionUpdate';
 export * from './teacherFaceStatus';
 export * from './teacherForceLogoutResult';
 export * from './teacherHoliday';

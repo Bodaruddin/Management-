@@ -12,6 +12,8 @@ export interface TeacherCheckOut {
   longitude: number;
   /** Camera selfie used to match the enrolled teacher face template */
   faceImageBase64?: string;
+  /** Skip face matching only when an administrator has granted this teacher permission. The configured attendance time and school geofence still apply. */
+  skipFaceVerification?: boolean;
   /**
      * Short burst of camera samples; the server verifies the strongest usable frame
      * @minItems 1

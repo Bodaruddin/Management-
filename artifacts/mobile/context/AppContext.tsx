@@ -103,6 +103,7 @@ export interface Teacher {
     sendFeeReminder: boolean;
     allowMarkEdit: boolean;
     reEnrollFace: boolean;
+    facelessAttendance: boolean;
   };
 }
 
@@ -534,14 +535,17 @@ interface AppContextType extends AppState {
   resetTeacherAttendance: (teacherId?: string) => Promise<number>;
   getTeacherFaceStatus: (teacherId: string) => Promise<{ enrolled: boolean; canReEnroll: boolean }>;
   enrollTeacherFace: (teacherId: string, faceSamplesBase64: string[], replaceExisting?: boolean) => Promise<void>;
+  getFacelessAttendancePermission: () => Promise<boolean>;
+  setTeacherFacelessAttendancePermission: (teacherId: string, enabled: boolean) => Promise<void>;
   checkInTeacher: (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
     faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string;
-    faceSamplesBase64?: string[]; date?: string;
+    faceSamplesBase64?: string[]; date?: string; skipFaceVerification?: boolean;
   }) => Promise<TeacherAttendanceRecord>;
   checkOutTeacher: (id: string, data: {
     teacherId: string; latitude: number; longitude: number;
     faceImageBase64?: string; faceSamplesBase64?: string[];
+    skipFaceVerification?: boolean;
   }) => Promise<TeacherAttendanceRecord>;
   applyTeacherLeave: (data: Omit<TeacherLeaveApplication, 'id' | 'status' | 'createdAt'>) => Promise<TeacherLeaveApplication>;
   updateTeacherLeave: (id: string, data: Pick<TeacherLeaveApplication, 'teacherId' | 'startDate' | 'endDate' | 'reason'>) => Promise<TeacherLeaveApplication>;
@@ -573,8 +577,8 @@ const monthNames = ['January','February','March','April','May','June','July','Au
 const SEED_CLASSES = ['Class 1','Class 2','Class 3','Class 4','Class 5','Class 6','Class 7','Class 8','Class 9','Class 10'];
 const SEED_SUBJECTS = ['Mathematics','Science','English','Hindi','Social Science','Sanskrit','Computer','Drawing','Physical Education','General Knowledge'];
 const SEED_TEACHERS: Teacher[] = [
-  { id: 't1', name: 'Rajesh Kumar', subject: 'Mathematics', mobileNumber: '9876543210', salary: 25000, username: 'teacher1', password: 'teacher123', joinDate: '2023-04-01', permissions: { addStudent: true, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false } },
-  { id: 't2', name: 'Priya Sharma', subject: 'Science', mobileNumber: '9876543211', salary: 22000, username: 'teacher2', password: 'teacher123', joinDate: '2023-06-01', permissions: { addStudent: false, feeCollection: true, manageClasses: false, manageExams: true, manageResults: true, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false } },
+  { id: 't1', name: 'Rajesh Kumar', subject: 'Mathematics', mobileNumber: '9876543210', salary: 25000, username: 'teacher1', password: 'teacher123', joinDate: '2023-04-01', permissions: { addStudent: true, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false, facelessAttendance: false } },
+  { id: 't2', name: 'Priya Sharma', subject: 'Science', mobileNumber: '9876543211', salary: 22000, username: 'teacher2', password: 'teacher123', joinDate: '2023-06-01', permissions: { addStudent: false, feeCollection: true, manageClasses: false, manageExams: true, manageResults: true, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false, facelessAttendance: false } },
 ];
 const SEED_STUDENTS: Student[] = [
   { id: 's1', name: 'Arjun Singh', fatherName: 'Vikram Singh', motherName: 'Sunita Singh', mobileNumber: '9812345670', class: 'Class 5', rollNumber: '01', dateOfBirth: todayStr },
@@ -715,6 +719,32 @@ async function apiPut<T>(path: string, body: unknown): Promise<T> {
   return res.json();
 }
 
+async function authenticatedApiJson<T>(
+  authenticatedFetch: (path: string, init?: RequestInit) => Promise<Response>,
+  path: string,
+  method: 'GET' | 'POST' | 'PUT',
+  body?: unknown,
+): Promise<T> {
+  const res = await authenticatedFetch(path, {
+    method,
+    ...(body === undefined ? {} : {
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }),
+  });
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const errorBody = await res.json() as { error?: string };
+      detail = errorBody.error ? ` — ${errorBody.error}` : '';
+    } catch {
+      // Keep the status-only error when the server response is not JSON.
+    }
+    throw new Error(`${method} /api${path} failed: ${res.status}${detail}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 async function apiDelete<T = void>(path: string, allowNotFound = true): Promise<T> {
   const res = await fetch(`${getApiBase()}/api${path}`, { method: 'DELETE' });
   if (!res.ok && !(allowNotFound && res.status === 404)) {
@@ -763,6 +793,7 @@ function mapTeacher(r: any): Teacher {
       sendFeeReminder: false,
       allowMarkEdit: false,
       reEnrollFace: false,
+      facelessAttendance: false,
       ...(r.permissions ?? {}),
     },
   };
@@ -924,7 +955,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AppState>(DEFAULT_STATE);
   const loadedRef = React.useRef(false);
   const loadInFlightRef = React.useRef<Promise<boolean> | null>(null);
-  const { user } = useAuth();
+  const { user, authenticatedFetch } = useAuth();
   const { isSetupComplete } = useDbSetup();
 
   const loadAllData = React.useCallback(async (): Promise<boolean> => {
@@ -1087,11 +1118,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateTeacher = useCallback(async (id: string, t: Partial<Teacher>): Promise<Teacher> => {
-    const row = await apiPut<any>(`/teachers/${id}`, t);
+    const changes: Record<string, unknown> = { ...t };
+    if (t.permissions) {
+      const permissions = { ...t.permissions };
+      delete (permissions as Partial<Teacher['permissions']>).facelessAttendance;
+      changes.permissions = permissions;
+    }
+    const row = await apiPut<any>(`/teachers/${id}`, changes);
     const updated = mapTeacher(row);
     setState(prev => ({ ...prev, teachers: prev.teachers.map(x => x.id === id ? updated : x) }));
     return updated;
   }, []);
+
+  const setTeacherFacelessAttendancePermission = useCallback(async (teacherId: string, enabled: boolean) => {
+    await authenticatedApiJson<{ teacherId: string; enabled: boolean }>(
+      authenticatedFetch,
+      `/teachers/${encodeURIComponent(teacherId)}/faceless-attendance-permission`,
+      'PUT',
+      { enabled },
+    );
+    setState(prev => ({
+      ...prev,
+      teachers: prev.teachers.map(teacher => teacher.id === teacherId
+        ? { ...teacher, permissions: { ...teacher.permissions, facelessAttendance: enabled } }
+        : teacher),
+    }));
+  }, [authenticatedFetch]);
 
   const refreshTeachers = useCallback(async (): Promise<void> => {
     const rows = await apiGet<any[]>(`/teachers?refresh=${Date.now()}`);
@@ -1556,26 +1608,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const getFacelessAttendancePermission = useCallback(async () => {
+    const result = await authenticatedApiJson<{ enabled?: boolean }>(
+      authenticatedFetch,
+      '/teacher-attendance/faceless-permission',
+      'GET',
+    );
+    return result.enabled === true;
+  }, [authenticatedFetch]);
+
   const checkInTeacher = useCallback(async (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
     faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string;
-    faceSamplesBase64?: string[]; date?: string;
+    faceSamplesBase64?: string[]; date?: string; skipFaceVerification?: boolean;
   }) => {
-    const row = await apiPost<any>('/teacher-attendance/check-in', data);
+    const row = await authenticatedApiJson<any>(
+      authenticatedFetch,
+      '/teacher-attendance/check-in',
+      'POST',
+      data,
+    );
     const record = mapTeacherAttendance(row);
     setState(prev => ({ ...prev, teacherAttendanceRecords: [record, ...prev.teacherAttendanceRecords.filter(item => item.id !== record.id)] }));
     return record;
-  }, []);
+  }, [authenticatedFetch]);
 
   const checkOutTeacher = useCallback(async (id: string, data: {
     teacherId: string; latitude: number; longitude: number;
     faceImageBase64?: string; faceSamplesBase64?: string[];
+    skipFaceVerification?: boolean;
   }) => {
-    const row = await apiPost<any>(`/teacher-attendance/${id}/check-out`, data);
+    const row = await authenticatedApiJson<any>(
+      authenticatedFetch,
+      `/teacher-attendance/${encodeURIComponent(id)}/check-out`,
+      'POST',
+      data,
+    );
     const record = mapTeacherAttendance(row);
     setState(prev => ({ ...prev, teacherAttendanceRecords: prev.teacherAttendanceRecords.map(item => item.id === id ? record : item) }));
     return record;
-  }, []);
+  }, [authenticatedFetch]);
 
   const applyTeacherLeave = useCallback(async (data: Omit<TeacherLeaveApplication, 'id' | 'status' | 'createdAt'>) => {
     const row = await apiPost<any>('/teacher-leaves', data);
@@ -1903,7 +1975,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     <AppContext.Provider value={{
       ...state,
       addStudent, updateStudent, deleteStudent,
-      addTeacher, updateTeacher, refreshTeachers, deleteTeacher,
+       addTeacher, updateTeacher, refreshTeachers, deleteTeacher,
+       setTeacherFacelessAttendancePermission,
       addClass, updateClass, deleteClass,
       addSection, updateSection, deleteSection,
       addSubject, deleteSubject,
@@ -1921,7 +1994,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       refreshInactivationRequests, loadInactivationRequestDocument, setStudentStatus, setClassAbsentLimit, updateDocumentBranding,
       addAlumni, updateAlumni, deleteAlumni, bulkAddAlumni,
        refreshTeacherAttendance, resetTeacherAttendance, getTeacherFaceStatus, enrollTeacherFace,
-       checkInTeacher, checkOutTeacher, applyTeacherLeave,
+       getFacelessAttendancePermission, checkInTeacher, checkOutTeacher, applyTeacherLeave,
       updateTeacherLeave, deleteTeacherLeave,
       reviewTeacherLeave, addTeacherHoliday, updateTeacherHoliday, deleteTeacherHoliday,
       updateStudentSundayHoliday, addStudentHoliday, updateStudentHoliday, deleteStudentHoliday,

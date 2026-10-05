@@ -75,18 +75,87 @@ router.post("/teachers", async (req, res) => {
     res.status(400).json({ error: "name and username are required; monthly salary must be a non-negative integer when provided" });
     return;
   }
+  if (body.permissions?.facelessAttendance === true) {
+    const session = await findAuthSession(bearerToken(req.get("authorization")));
+    if (!session) {
+      res.status(401).json({ error: "A valid administrator session is required to grant face-free attendance" });
+      return;
+    }
+    if (session.role !== "admin") {
+      res.status(403).json({ error: "Only administrators can grant face-free attendance" });
+      return;
+    }
+  }
   const row = await getAdapter().teachers.create(body);
   res.status(201).json(row);
 });
 
 router.put("/teachers/:id", async (req, res) => {
-  if (req.body.salary !== undefined && (!Number.isInteger(req.body.salary) || req.body.salary < 0)) {
+  const body = req.body ?? {};
+  if (body.salary !== undefined && (!Number.isInteger(body.salary) || body.salary < 0)) {
     res.status(400).json({ error: "monthly salary must be a non-negative integer" });
     return;
   }
-  const row = await getAdapter().teachers.update(req.params.id, req.body);
+  if (body.permissions && Object.prototype.hasOwnProperty.call(body.permissions, "facelessAttendance")) {
+    const session = await findAuthSession(bearerToken(req.get("authorization")));
+    if (!session) {
+      res.status(401).json({ error: "A valid administrator session is required to change face-free attendance permission" });
+      return;
+    }
+    if (session.role !== "admin") {
+      res.status(403).json({ error: "Only administrators can change face-free attendance permission" });
+      return;
+    }
+  }
+
+  // Keep the new, separately-administered permission when older profile-edit
+  // screens send an object containing only the established permission fields.
+  let changes = body;
+  if (body.permissions && body.permissions.facelessAttendance === undefined) {
+    const currentTeacher = (await getAdapter().teachers.list()).find(
+      (teacher: any) => String(teacher.id) === req.params.id,
+    );
+    if (currentTeacher) {
+      changes = {
+        ...body,
+        permissions: { ...(currentTeacher.permissions ?? {}), ...body.permissions },
+      };
+    }
+  }
+
+  const row = await getAdapter().teachers.update(req.params.id, changes);
   if (!row) { res.status(404).json({ error: "Teacher not found" }); return; }
   res.json(row);
+});
+
+router.put("/teachers/:id/faceless-attendance-permission", async (req, res) => {
+  const session = await findAuthSession(bearerToken(req.get("authorization")));
+  if (!session) {
+    res.status(401).json({ error: "A valid administrator session is required" });
+    return;
+  }
+  if (session.role !== "admin") {
+    res.status(403).json({ error: "Only administrators can change face-free attendance permission" });
+    return;
+  }
+
+  const enabled = req.body?.enabled;
+  if (typeof enabled !== "boolean") {
+    res.status(400).json({ error: "enabled must be a boolean" });
+    return;
+  }
+  const adapter = getAdapter();
+  const teacher = (await adapter.teachers.list()).find(
+    (row: any) => String(row.id) === req.params.id,
+  );
+  if (!teacher) {
+    res.status(404).json({ error: "Teacher not found" });
+    return;
+  }
+  await adapter.teachers.update(req.params.id, {
+    permissions: { ...(teacher.permissions ?? {}), facelessAttendance: enabled },
+  });
+  res.json({ teacherId: req.params.id, enabled });
 });
 
 router.delete("/teachers/:id", async (req, res) => {

@@ -781,7 +781,7 @@ export default function MyTeacherAttendance() {
   const { user } = useAuth();
   const {
     teacherAttendanceRecords, teacherLeaves, teacherHolidays, teacherAttendanceSettings,
-    refreshTeacherAttendance, getTeacherFaceStatus, enrollTeacherFace,
+    refreshTeacherAttendance, getTeacherFaceStatus, getFacelessAttendancePermission, enrollTeacherFace,
     checkInTeacher, checkOutTeacher, applyTeacherLeave,
     updateTeacherLeave, deleteTeacherLeave,
   } = useApp();
@@ -790,6 +790,7 @@ export default function MyTeacherAttendance() {
   const [error, setError] = useState('');
   const [faceEnrolled, setFaceEnrolled] = useState<boolean | null>(null);
   const [canReEnrollFace, setCanReEnrollFace] = useState(false);
+  const [canUseFacelessAttendance, setCanUseFacelessAttendance] = useState<boolean | null>(null);
   const [faceCaptureMode, setFaceCaptureMode] = useState<FaceCapturePurpose | null>(null);
   const [replaceFaceEnrollment, setReplaceFaceEnrollment] = useState(false);
   const [showReEnrollConfirm, setShowReEnrollConfirm] = useState(false);
@@ -797,7 +798,9 @@ export default function MyTeacherAttendance() {
   const [faceResult, setFaceResult] = useState<FaceResultKind | null>(null);
   const [faceResultPurpose, setFaceResultPurpose] = useState<'check-in' | 'check-out'>('check-in');
   const [faceResultMessage, setFaceResultMessage] = useState('');
-  const [lastAttendanceAction, setLastAttendanceAction] = useState<'check-in' | 'check-out' | null>(null);
+  const [lastAttendanceAction, setLastAttendanceAction] = useState<
+    'check-in' | 'check-out' | 'check-in-no-face' | 'check-out-no-face' | null
+  >(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('monthly');
   const [customStartDate, setCustomStartDate] = useState(() => formatDisplayDate(schoolDateString()));
   const [customEndDate, setCustomEndDate] = useState(() => formatDisplayDate(schoolDateString()));
@@ -912,6 +915,25 @@ export default function MyTeacherAttendance() {
       .finally(() => undefined);
     return () => { active = false; };
   }, [getTeacherFaceStatus, teacherAttendanceSettings.requireFaceVerification, user?.id]);
+
+  useEffect(() => {
+    let active = true;
+    setCanUseFacelessAttendance(null);
+    if (!user?.id || user.role !== 'teacher') {
+      setCanUseFacelessAttendance(false);
+      return;
+    }
+
+    getFacelessAttendancePermission()
+      .then(enabled => {
+        if (active) setCanUseFacelessAttendance(enabled);
+      })
+      .catch(() => {
+        // Fail closed: the server remains authoritative if permission lookup fails.
+        if (active) setCanUseFacelessAttendance(false);
+      });
+    return () => { active = false; };
+  }, [getFacelessAttendancePermission, user?.id, user?.role]);
 
   const runAction = async (
     action: () => Promise<void>,
@@ -1034,6 +1056,26 @@ export default function MyTeacherAttendance() {
     });
   };
 
+  const handleFacelessCheckIn = () => {
+    if (!canUseFacelessAttendance) {
+      setError('Face-free attendance is not enabled for your account. Ask an administrator to check your permission.');
+      return;
+    }
+    setLastAttendanceAction('check-in-no-face');
+    runAction(async () => {
+      if (!user) throw new Error('Please sign in again');
+      const coordinates = await readCurrentLocation({ allowCoarse: true });
+      await checkInTeacher({
+        teacherId: user.id,
+        teacherName: user.name,
+        ...coordinates,
+        faceVerified: false,
+        faceVerificationMethod: 'admin_authorized_without_face',
+        skipFaceVerification: true,
+      });
+    }, { onSuccess: () => setLastAttendanceAction(null) });
+  };
+
   const handleCheckOut = () => {
     if (!todayRecord?.checkInAt) {
       setLastAttendanceAction(null);
@@ -1052,6 +1094,27 @@ export default function MyTeacherAttendance() {
       const coordinates = await readCurrentLocation({ allowCoarse: true });
       await checkOutTeacher(todayRecord.id, { teacherId: user?.id ?? '', ...coordinates });
     });
+  };
+
+  const handleFacelessCheckOut = () => {
+    if (!canUseFacelessAttendance) {
+      setError('Face-free attendance is not enabled for your account. Ask an administrator to check your permission.');
+      return;
+    }
+    if (!todayRecord?.checkInAt) {
+      setError('No check-in found for today.');
+      return;
+    }
+    setLastAttendanceAction('check-out-no-face');
+    runAction(async () => {
+      if (!user) throw new Error('Please sign in again');
+      const coordinates = await readCurrentLocation({ allowCoarse: true });
+      await checkOutTeacher(todayRecord.id, {
+        teacherId: user.id,
+        ...coordinates,
+        skipFaceVerification: true,
+      });
+    }, { onSuccess: () => setLastAttendanceAction(null) });
   };
 
   const handleLeave = () => runAction(async () => {
@@ -1108,6 +1171,14 @@ export default function MyTeacherAttendance() {
   const retryAttendance = () => {
     setError('');
     if (!lastAttendanceAction) return;
+    if (lastAttendanceAction === 'check-in-no-face') {
+      handleFacelessCheckIn();
+      return;
+    }
+    if (lastAttendanceAction === 'check-out-no-face') {
+      handleFacelessCheckOut();
+      return;
+    }
     if (teacherAttendanceSettings.requireFaceVerification) {
       setFaceCaptureMode(lastAttendanceAction);
       return;
@@ -1122,6 +1193,17 @@ export default function MyTeacherAttendance() {
   const s = styles(colors);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom + 24;
+  const showFacelessAttendanceOption =
+    teacherAttendanceSettings.requireFaceVerification && canUseFacelessAttendance;
+  const showFaceAttendanceOption =
+    !teacherAttendanceSettings.requireFaceVerification || faceEnrolled === true;
+  const refreshAttendanceView = () => {
+    refreshTeacherAttendance(user?.id).catch(error => console.error('[TeacherAttendance]', error));
+    setCanUseFacelessAttendance(null);
+    getFacelessAttendancePermission()
+      .then(setCanUseFacelessAttendance)
+      .catch(() => setCanUseFacelessAttendance(false));
+  };
 
   return (
     <View style={[s.root, { backgroundColor: colors.background }]}>
@@ -1132,9 +1214,15 @@ export default function MyTeacherAttendance() {
         <View style={s.headerCopy}>
           <Text style={[s.eyebrow, { color: colors.primary }]}>SECURE ATTENDANCE</Text>
           <Text style={[s.title, { color: colors.cardForeground }]}>My Attendance</Text>
-          <Text style={[s.subtitle, { color: colors.mutedForeground }]}>GPS + face verification</Text>
+          <Text style={[s.subtitle, { color: colors.mutedForeground }]}>
+            {!teacherAttendanceSettings.requireFaceVerification
+              ? 'GPS-secured attendance'
+              : showFacelessAttendanceOption
+                ? 'GPS + admin-approved face-free option'
+                : 'GPS + face verification'}
+          </Text>
         </View>
-        <TouchableOpacity onPress={() => refreshTeacherAttendance(user?.id)} style={[s.iconButton, { backgroundColor: colors.secondary }]}>
+        <TouchableOpacity onPress={refreshAttendanceView} style={[s.iconButton, { backgroundColor: colors.secondary }]}>
           <Feather name="refresh-cw" size={18} color={colors.primary} />
         </TouchableOpacity>
       </View>
@@ -1155,12 +1243,12 @@ export default function MyTeacherAttendance() {
       </View>
 
       {tab === 'today' && (
-        faceEnrolled === null ? (
+        faceEnrolled === null || (teacherAttendanceSettings.requireFaceVerification && canUseFacelessAttendance === null) ? (
           <View style={s.loadingState}>
             <ActivityIndicator size="small" color={colors.primary} />
-            <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Preparing secure face verification…</Text>
+            <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Checking attendance options…</Text>
           </View>
-        ) : !faceEnrolled && teacherAttendanceSettings.requireFaceVerification ? (
+        ) : !faceEnrolled && teacherAttendanceSettings.requireFaceVerification && !canUseFacelessAttendance ? (
           <ScrollView contentContainerStyle={[s.setupScroll, { paddingBottom: bottomPad }]}>
             <View style={[s.setupPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[s.setupOrb, { backgroundColor: colors.secondary }]}>
@@ -1237,8 +1325,12 @@ export default function MyTeacherAttendance() {
                   <Text style={s.heroFooterText}>{teacherAttendanceSettings.radiusMeters}m geofence</Text>
                 </View>
                 <View style={s.heroFooterItem}>
-                  <Feather name="user-check" size={14} color="#BFD0FF" />
-                  <Text style={s.heroFooterText}>Face match on</Text>
+                  <Feather name={showFacelessAttendanceOption ? 'map-pin' : 'user-check'} size={14} color="#BFD0FF" />
+                  <Text style={s.heroFooterText}>
+                    {showFacelessAttendanceOption
+                      ? 'Face-free check-in enabled'
+                      : teacherAttendanceSettings.requireFaceVerification ? 'Face match on' : 'Face check off'}
+                  </Text>
                 </View>
               </View>
             </LinearGradient>
@@ -1324,23 +1416,73 @@ export default function MyTeacherAttendance() {
                 </View>
               </View>
             ) : !todayRecord ? (
-              <TouchableOpacity disabled={busy} onPress={handleCheckIn} activeOpacity={0.9}>
-                <LinearGradient
-                  colors={busy ? [colors.muted, colors.muted] : ['#1E3A8A', '#315BCB']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={s.primaryButton}
+              <>
+                <TouchableOpacity
+                  disabled={busy}
+                  onPress={showFacelessAttendanceOption ? handleFacelessCheckIn : handleCheckIn}
+                  activeOpacity={0.9}
                 >
-                  <View style={s.buttonIcon}><Feather name="camera" size={17} color={colors.primary} /></View>
-                  <Text style={s.primaryButtonText}>{busy ? 'Verifying…' : 'Verify face & check in'}</Text>
-                  {!busy && <Feather name="arrow-up-right" size={18} color={colors.primaryForeground} />}
-                </LinearGradient>
-              </TouchableOpacity>
+                  <LinearGradient
+                    colors={busy ? [colors.muted, colors.muted] : ['#1E3A8A', '#315BCB']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={s.primaryButton}
+                  >
+                    <View style={s.buttonIcon}>
+                      <Feather
+                        name={showFacelessAttendanceOption || !teacherAttendanceSettings.requireFaceVerification ? 'map-pin' : 'camera'}
+                        size={17}
+                        color={colors.primary}
+                      />
+                    </View>
+                    <Text style={s.primaryButtonText}>
+                      {busy
+                        ? showFacelessAttendanceOption ? 'Checking in…' : teacherAttendanceSettings.requireFaceVerification ? 'Verifying…' : 'Checking in…'
+                        : showFacelessAttendanceOption ? 'Check in without face' : teacherAttendanceSettings.requireFaceVerification ? 'Verify face & check in' : 'Check in'}
+                    </Text>
+                    {!busy && <Feather name="arrow-up-right" size={18} color={colors.primaryForeground} />}
+                  </LinearGradient>
+                </TouchableOpacity>
+                {showFacelessAttendanceOption && showFaceAttendanceOption && (
+                  <TouchableOpacity
+                    style={[s.secondaryButton, { borderColor: colors.primary }]}
+                    disabled={busy}
+                    onPress={handleCheckIn}
+                  >
+                    <Feather name="camera" size={17} color={colors.primary} />
+                    <Text style={[s.secondaryButtonText, { color: colors.primary }]}>Verify with face instead</Text>
+                  </TouchableOpacity>
+                )}
+              </>
             ) : hasCheckedInToday && !todayRecord.checkOutAt ? (
-              <TouchableOpacity style={[s.secondaryButton, { borderColor: colors.primary }]} disabled={busy} onPress={handleCheckOut}>
-                <Feather name="log-out" size={18} color={colors.primary} />
-                <Text style={[s.secondaryButtonText, { color: colors.primary }]}>{busy ? 'Verifying…' : 'Verify face & check out'}</Text>
-              </TouchableOpacity>
+              <>
+                <TouchableOpacity
+                  style={[s.secondaryButton, { borderColor: colors.primary }]}
+                  disabled={busy}
+                  onPress={showFacelessAttendanceOption ? handleFacelessCheckOut : handleCheckOut}
+                >
+                  <Feather
+                    name={showFacelessAttendanceOption || !teacherAttendanceSettings.requireFaceVerification ? 'map-pin' : 'log-out'}
+                    size={18}
+                    color={colors.primary}
+                  />
+                  <Text style={[s.secondaryButtonText, { color: colors.primary }]}>
+                    {busy
+                      ? showFacelessAttendanceOption ? 'Checking out…' : teacherAttendanceSettings.requireFaceVerification ? 'Verifying…' : 'Checking out…'
+                      : showFacelessAttendanceOption ? 'Check out without face' : teacherAttendanceSettings.requireFaceVerification ? 'Verify face & check out' : 'Check out'}
+                  </Text>
+                </TouchableOpacity>
+                {showFacelessAttendanceOption && showFaceAttendanceOption && (
+                  <TouchableOpacity
+                    style={[s.secondaryButton, { borderColor: colors.border }]}
+                    disabled={busy}
+                    onPress={handleCheckOut}
+                  >
+                    <Feather name="camera" size={17} color={colors.mutedForeground} />
+                    <Text style={[s.secondaryButtonText, { color: colors.mutedForeground }]}>Verify with face instead</Text>
+                  </TouchableOpacity>
+                )}
+              </>
             ) : !hasCheckedInToday ? (
               <View style={[s.complete, { backgroundColor: colors.muted, borderColor: colors.border }]}>
                 <Feather name="lock" size={18} color={colors.mutedForeground} />
@@ -1363,6 +1505,8 @@ export default function MyTeacherAttendance() {
                 <Text style={[s.infoText, { color: colors.mutedForeground }]}>
                   {isTodayHoliday
                     ? 'Manage face enrollment for future check-ins.'
+                    : showFacelessAttendanceOption
+                      ? 'Face-free attendance is enabled. Check-in still uses GPS and follows the school’s configured time and location rules.'
                     : 'Your private face template is matched securely in the camera flow. Original photos are never stored.'}
                 </Text>
                 {canReEnrollFace && (

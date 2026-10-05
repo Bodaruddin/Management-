@@ -52,14 +52,14 @@ function formatStoredDateForInput(value: string): string {
 
 const BLANK = {
   name: '', subject: '', mobileNumber: '', salary: '', username: '', password: '', joinDate: '',
-  permissions: { addStudent: false, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false }, photo: undefined as string | undefined
+  permissions: { addStudent: false, feeCollection: false, manageClasses: false, manageExams: false, manageResults: false, promoteStudents: false, sendFeeReminder: false, allowMarkEdit: false, reEnrollFace: false, facelessAttendance: false }, photo: undefined as string | undefined
 };
 
 export default function TeachersScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user, forceLogoutTeacher } = useAuth();
-  const { teachers, addTeacher, updateTeacher, deleteTeacher, salaryRecords, addSalaryRecord, deleteSalaryRecord, documentBranding } = useApp();
+  const { teachers, addTeacher, updateTeacher, setTeacherFacelessAttendancePermission, deleteTeacher, salaryRecords, addSalaryRecord, deleteSalaryRecord, documentBranding } = useApp();
 
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Teacher | null>(null);
@@ -344,6 +344,7 @@ export default function TeachersScreen() {
                       { key: 'allowMarkEdit' as const, label: 'Allow Mark Edit', desc: 'Can edit marks after submitting them' },
                       { key: 'promoteStudents' as const, label: 'Promote Students', desc: 'Can promote students to next class' },
                       { key: 'reEnrollFace' as const, label: 'Re-enroll Face Permission', desc: 'Allow one face profile replacement; revokes automatically after success' },
+                      { key: 'facelessAttendance' as const, label: 'Face-free Attendance', desc: 'Allow check-in and check-out without face matching; configured attendance hours and school location still apply' },
                     ]).map(perm => (
                       <View key={perm.key} style={[detail.permRow, { borderBottomColor: colors.border }]}>
                         <View style={{ flex: 1 }}>
@@ -356,6 +357,13 @@ export default function TeachersScreen() {
                             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                             const updated = { ...detailTeacher, permissions: { ...detailTeacher.permissions, [perm.key]: val } };
                             try {
+                              if (perm.key === 'facelessAttendance') {
+                                await setTeacherFacelessAttendancePermission(detailTeacher.id, val);
+                                setDetailTeacher(current => current
+                                  ? { ...current, permissions: { ...current.permissions, facelessAttendance: val } }
+                                  : current);
+                                return;
+                              }
                               const saved = await updateTeacher(detailTeacher.id, { permissions: updated.permissions });
                               setDetailTeacher(saved);
                             } catch (error: any) {

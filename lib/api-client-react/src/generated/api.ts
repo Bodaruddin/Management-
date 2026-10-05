@@ -49,6 +49,8 @@ import type {
   TeacherCheckOut,
   TeacherFaceEnroll,
   TeacherFaceStatus,
+  TeacherFacelessAttendancePermission,
+  TeacherFacelessAttendancePermissionUpdate,
   TeacherForceLogoutResult,
   TeacherHoliday,
   TeacherHolidayCreate,
@@ -474,6 +476,95 @@ export const useForceLogoutTeacher = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getForceLogoutTeacherMutationOptions(options));
+    }
+
+export const getSetTeacherFacelessAttendancePermissionUrl = (id: string,) => {
+
+
+
+
+  return `/api/teachers/${id}/faceless-attendance-permission`
+}
+
+/**
+ * @summary Grant or revoke a teacher's face-free attendance permission
+ */
+export const setTeacherFacelessAttendancePermission = async (id: string,
+    teacherFacelessAttendancePermissionUpdate: TeacherFacelessAttendancePermissionUpdate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherFacelessAttendancePermission> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<TeacherFacelessAttendancePermission>(getSetTeacherFacelessAttendancePermissionUrl(id),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(teacherFacelessAttendancePermissionUpdate)
+  }
+);}
+
+
+
+
+
+export const getSetTeacherFacelessAttendancePermissionMutationKey = () => ['setTeacherFacelessAttendancePermission'] as const;
+
+export const getSetTeacherFacelessAttendancePermissionMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, TError,SetTeacherFacelessAttendancePermissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, TError,SetTeacherFacelessAttendancePermissionMutationVariables, TContext> => {
+
+const mutationKey = getSetTeacherFacelessAttendancePermissionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, SetTeacherFacelessAttendancePermissionMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  setTeacherFacelessAttendancePermission(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetTeacherFacelessAttendancePermissionMutationResult = NonNullable<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>>
+    export type SetTeacherFacelessAttendancePermissionMutationBody = BodyType<TeacherFacelessAttendancePermissionUpdate>
+    export type SetTeacherFacelessAttendancePermissionMutationError = ErrorType<void>
+    export type SetTeacherFacelessAttendancePermissionMutationVariables = {id: string;data: BodyType<TeacherFacelessAttendancePermissionUpdate>}
+
+    /**
+ * @summary Grant or revoke a teacher's face-free attendance permission
+ */
+export const useSetTeacherFacelessAttendancePermission = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, TError,SetTeacherFacelessAttendancePermissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>,
+        TError,
+        SetTeacherFacelessAttendancePermissionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSetTeacherFacelessAttendancePermissionMutationOptions(options));
     }
 
 export const getHealthCheckUrl = () => {
@@ -1328,6 +1419,83 @@ export function useGetTeacherFaceStatus<TData = Awaited<ReturnType<typeof getTea
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetTeacherFaceStatusQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetTeacherFacelessAttendancePermissionUrl = () => {
+
+
+
+
+  return `/api/teacher-attendance/faceless-permission`
+}
+
+/**
+ * @summary Check the signed-in teacher's face-free attendance permission
+ */
+export const getTeacherFacelessAttendancePermission = async ( options?: Parameters<typeof customFetch>[1]): Promise<TeacherFacelessAttendancePermission> => {
+
+  return customFetch<TeacherFacelessAttendancePermission>(getGetTeacherFacelessAttendancePermissionUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTeacherFacelessAttendancePermissionQueryKey = () => {
+    return [
+    `/api/teacher-attendance/faceless-permission`
+    ] as const;
+    }
+
+
+export const getGetTeacherFacelessAttendancePermissionQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTeacherFacelessAttendancePermissionQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>> = ({ signal }) => getTeacherFacelessAttendancePermission({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTeacherFacelessAttendancePermissionQueryResult = NonNullable<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>>
+export type GetTeacherFacelessAttendancePermissionQueryError = ErrorType<void>
+
+
+/**
+ * @summary Check the signed-in teacher's face-free attendance permission
+ */
+
+export function useGetTeacherFacelessAttendancePermission<TData = Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError = ErrorType<void>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTeacherFacelessAttendancePermissionQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

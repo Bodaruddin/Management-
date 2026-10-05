@@ -72,6 +72,23 @@ export const ForceLogoutTeacherResponse = zod.object({
 
 
 /**
+ * @summary Grant or revoke a teacher's face-free attendance permission
+ */
+export const SetTeacherFacelessAttendancePermissionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const SetTeacherFacelessAttendancePermissionBody = zod.object({
+  "enabled": zod.boolean()
+})
+
+export const SetTeacherFacelessAttendancePermissionResponse = zod.object({
+  "enabled": zod.boolean(),
+  "teacherId": zod.string().optional()
+})
+
+
+/**
  * Returns server health status
  * @summary Health check
  */
@@ -246,6 +263,15 @@ export const GetTeacherFaceStatusResponse = zod.object({
 })
 
 
+/**
+ * @summary Check the signed-in teacher's face-free attendance permission
+ */
+export const GetTeacherFacelessAttendancePermissionResponse = zod.object({
+  "enabled": zod.boolean(),
+  "teacherId": zod.string().optional()
+})
+
+
 export const enrollTeacherFaceBodyFaceSamplesBase64Max = 5;
 
 
@@ -276,6 +302,7 @@ export const TeacherCheckInBody = zod.object({
   "faceVerified": zod.boolean(),
   "faceVerificationMethod": zod.string().optional(),
   "faceImageBase64": zod.string().optional().describe('Camera selfie used to enroll or match the teacher face template'),
+  "skipFaceVerification": zod.boolean().optional().describe('Skip face matching only when an administrator has granted this teacher permission. The configured attendance time and school geofence still apply.'),
   "faceSamplesBase64": zod.array(zod.string()).min(1).max(teacherCheckInBodyFaceSamplesBase64Max).optional().describe('Short burst of camera samples; the server verifies the strongest usable frame')
 })
 
@@ -310,6 +337,7 @@ export const TeacherCheckOutBody = zod.object({
   "latitude": zod.number(),
   "longitude": zod.number(),
   "faceImageBase64": zod.string().optional().describe('Camera selfie used to match the enrolled teacher face template'),
+  "skipFaceVerification": zod.boolean().optional().describe('Skip face matching only when an administrator has granted this teacher permission. The configured attendance time and school geofence still apply.'),
   "faceSamplesBase64": zod.array(zod.string()).min(1).max(teacherCheckOutBodyFaceSamplesBase64Max).optional().describe('Short burst of camera samples; the server verifies the strongest usable frame')
 })
 

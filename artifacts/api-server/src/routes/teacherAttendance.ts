@@ -1,6 +1,7 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import { getAdapter } from "../lib/dbManager.js";
 import { createFaceTemplate, faceMatchesAny } from "../lib/faceTemplate.js";
+import { bearerToken, findAuthSession } from "../lib/authSessions.js";
 import {
   isSundayDate,
   syncTeacherSundayAttendance,
@@ -194,6 +195,33 @@ async function getTeacherById(teacherId: string): Promise<any | null> {
   return teachers.find((teacher: any) => String(teacher.id) === teacherId) ?? null;
 }
 
+async function requireFacelessAttendancePermission(
+  req: Request,
+  res: Response,
+  teacherId: string,
+): Promise<any | null> {
+  const session = await findAuthSession(bearerToken(req.get("authorization")));
+  if (!session) {
+    res.status(401).json({ error: "A valid teacher session is required for face-free attendance" });
+    return null;
+  }
+  if (session.role !== "teacher" || session.userId !== teacherId) {
+    res.status(403).json({ error: "You can only record attendance for your own teacher account" });
+    return null;
+  }
+
+  const teacher = await getTeacherById(teacherId);
+  if (!teacher) {
+    res.status(404).json({ error: "Teacher not found" });
+    return null;
+  }
+  if (teacher.permissions?.facelessAttendance !== true) {
+    res.status(403).json({ error: "An administrator has not enabled face-free attendance for your account" });
+    return null;
+  }
+  return teacher;
+}
+
 function hasFaceReEnrollmentPermission(teacher: any): boolean {
   return teacher?.permissions?.reEnrollFace === true;
 }
@@ -382,6 +410,24 @@ router.get("/teacher-attendance/face-status", async (req, res) => {
   });
 });
 
+router.get("/teacher-attendance/faceless-permission", async (req, res) => {
+  const session = await findAuthSession(bearerToken(req.get("authorization")));
+  if (!session) {
+    res.status(401).json({ error: "A valid teacher session is required" });
+    return;
+  }
+  if (session.role !== "teacher") {
+    res.status(403).json({ error: "Only teachers can check this permission" });
+    return;
+  }
+  const teacher = await getTeacherById(session.userId);
+  if (!teacher) {
+    res.status(404).json({ error: "Teacher not found" });
+    return;
+  }
+  res.json({ enabled: teacher.permissions?.facelessAttendance === true });
+});
+
 router.post("/teacher-attendance/face-enroll", async (req, res) => {
   const teacherId = String(req.body?.teacherId ?? "");
   const images = getFaceImages(req.body);
@@ -435,12 +481,36 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
   const body = req.body ?? {};
   const teacherId = String(body.teacherId ?? "");
   const teacherName = String(body.teacherName ?? "");
-  const date = asDate(body.date);
+  const date = asDate(body.skipFaceVerification === true ? undefined : body.date);
   if (!teacherId || !teacherName) {
     res.status(400).json({ error: "teacherId and teacherName are required" });
     return;
   }
   const settings = await getSettings();
+  let attendanceTeacherName = teacherName;
+  let faceVerified = false;
+  let faceVerificationMethod = "disabled_by_admin";
+  if (settings.requireFaceVerification) {
+    if (body.skipFaceVerification === true) {
+      const teacher = await requireFacelessAttendancePermission(req, res, teacherId);
+      if (!teacher) return;
+      attendanceTeacherName = String(teacher.name ?? teacherName);
+      faceVerificationMethod = "admin_authorized_without_face";
+    } else {
+      const faceImages = getFaceImages(body);
+      if (faceImages.length === 0) {
+        res.status(400).json({ error: "Camera face samples are required for face verification" });
+        return;
+      }
+      try {
+        faceVerificationMethod = (await verifyFace(teacherId, faceImages)).method;
+        faceVerified = true;
+      } catch (error: any) {
+        res.status(403).json({ error: error?.message ?? "Face verification failed" });
+        return;
+      }
+    }
+  }
   const adapter = getAdapter();
   if (settings.sundayHoliday && isSundayDate(date)) {
     await syncTeacherSundayAttendanceForDate(adapter, date, true);
@@ -477,32 +547,16 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
     res.status(403).json({ error: `Check-in closed at ${settings.checkInEnd}. Ask an administrator to allow late check-in.` });
     return;
   }
-  let faceVerificationMethod = "disabled_by_admin";
-  if (settings.requireFaceVerification) {
-    const faceImages = getFaceImages(body);
-    if (faceImages.length === 0) {
-      res.status(400).json({ error: "Camera face samples are required for face verification" });
-      return;
-    }
-    try {
-      faceVerificationMethod = (await verifyFace(teacherId, faceImages)).method;
-    } catch (error: any) {
-      res.status(403).json({ error: error?.message ?? "Face verification failed" });
-      return;
-    }
-  }
   // A check-in inside the configured window is on time. Grace applies only after closing.
   const late = nowMinutes > checkInEnd + settings.lateGraceMinutes;
    try {
       const result = await adapter.teacherAttendance.createIfAbsent(teacherId, date, {
-       id: body.id, teacherId, teacherName, date,
+        id: body.id, teacherId, teacherName: attendanceTeacherName, date,
        status: late ? "late" : "present",
        checkInAt: body.checkInAt ?? new Date().toISOString(),
        checkInLatitude: latitude, checkInLongitude: longitude,
-       distanceFromSchool: distance, faceVerified: settings.requireFaceVerification,
-       faceVerificationMethod: settings.requireFaceVerification
-         ? faceVerificationMethod
-         : "disabled_by_admin",
+        distanceFromSchool: distance, faceVerified,
+        faceVerificationMethod,
        note: typeof body.note === "string" ? body.note.trim() : null,
      });
      if (!result.created) {
@@ -523,6 +577,11 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
 router.post("/teacher-attendance/:id/check-out", async (req, res) => {
   const body = req.body ?? {};
   const teacherId = String(body.teacherId ?? "");
+  const settings = await getSettings();
+  if (settings.requireFaceVerification && body.skipFaceVerification === true) {
+    const teacher = await requireFacelessAttendancePermission(req, res, teacherId);
+    if (!teacher) return;
+  }
   const existing = (await getAdapter().teacherAttendance.list({ teacherId }))
     .find((record: any) => record.id === req.params.id);
   if (!existing) { res.status(404).json({ error: "Attendance record not found" }); return; }
@@ -540,7 +599,6 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
     res.status(400).json({ error: "A valid GPS location is required" });
     return;
   }
-  const settings = await getSettings();
   if (settings.schoolLatitude === null || settings.schoolLongitude === null) {
     res.status(400).json({ error: "School attendance location has not been configured by an administrator" });
     return;
@@ -558,16 +616,18 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
     return;
   }
   if (settings.requireFaceVerification) {
-    const faceImages = getFaceImages(body);
-    if (faceImages.length === 0) {
-      res.status(400).json({ error: "Camera face samples are required for face verification" });
-      return;
-    }
-    try {
-      await verifyFace(teacherId, faceImages);
-    } catch (error: any) {
-      res.status(403).json({ error: error?.message ?? "Face verification failed" });
-      return;
+    if (body.skipFaceVerification !== true) {
+      const faceImages = getFaceImages(body);
+      if (faceImages.length === 0) {
+        res.status(400).json({ error: "Camera face samples are required for face verification" });
+        return;
+      }
+      try {
+        await verifyFace(teacherId, faceImages);
+      } catch (error: any) {
+        res.status(403).json({ error: error?.message ?? "Face verification failed" });
+        return;
+      }
     }
   }
   const row = await getAdapter().teacherAttendance.updateCheckOut(req.params.id, {
