@@ -98,6 +98,7 @@ export default function AdminTeacherAttendance() {
   const [historyFilter, setHistoryFilter] = useState<'all' | 'approved' | 'rejected'>('all');
   const [selectedLeaveHistory, setSelectedLeaveHistory] = useState<TeacherLeaveApplication | null>(null);
   const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
+  const [reportMonthOffset, setReportMonthOffset] = useState(0);
   const [resetTarget, setResetTarget] = useState<{ teacherId?: string; teacherName?: string } | null>(null);
 
   useEffect(() => {
@@ -243,12 +244,17 @@ export default function AdminTeacherAttendance() {
   const currentMonthIndex = today.getMonth();
   const selectedMonthDays = new Date(Date.UTC(year, MONTHS.indexOf(month) + 1, 0)).getUTCDate();
   const pendingLeaves = teacherLeaves.filter(leave => leave.status === 'pending');
-  const reportMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-  const monthlyRecords = teacherAttendanceRecords.filter(record => record.date.startsWith(reportMonthKey));
-  const monthlyHolidays = teacherHolidays.filter(holiday => holiday.date.startsWith(reportMonthKey));
+  const currentMonthKey = `${currentYear}-${String(currentMonthIndex + 1).padStart(2, '0')}`;
+  const reportDate = new Date(currentYear, currentMonthIndex + reportMonthOffset, 1);
+  const reportMonthKey = `${reportDate.getFullYear()}-${String(reportDate.getMonth() + 1).padStart(2, '0')}`;
+  const reportMonthLabel = `${MONTHS[reportDate.getMonth()]} ${reportDate.getFullYear()}`;
+  const monthlyRecords = teacherAttendanceRecords.filter(record => record.date.startsWith(currentMonthKey));
+  const currentMonthHolidays = teacherHolidays.filter(holiday => holiday.date.startsWith(currentMonthKey));
+  const reportMonthRecords = teacherAttendanceRecords.filter(record => record.date.startsWith(reportMonthKey));
+  const reportMonthHolidays = teacherHolidays.filter(holiday => holiday.date.startsWith(reportMonthKey));
   const selectedTeacher = teachers.find(teacher => teacher.id === selectedTeacherId) ?? null;
   const selectedTeacherRows = selectedTeacherId
-    ? monthlyRecords.filter(record => record.teacherId === selectedTeacherId)
+    ? reportMonthRecords.filter(record => record.teacherId === selectedTeacherId)
     : [];
   const selectedTeacherAbsentDates = selectedTeacherRows
     .filter(record => record.status === 'absent')
@@ -403,7 +409,7 @@ export default function AdminTeacherAttendance() {
           <View style={s.sectionHeader}>
             <View style={{ flex: 1 }}>
               <Text style={[s.sectionTitle, { color: colors.text }]}>This month&apos;s attendance</Text>
-              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>Present, absent, late, leave, and holiday totals for {reportMonthKey}. Tap a teacher for the full report.</Text>
+              <Text style={[s.sectionCopy, { color: colors.mutedForeground }]}>Present, absent, late, leave, and holiday totals for {currentMonthKey}. Tap a teacher for the full report.</Text>
             </View>
             <Feather name="calendar" size={20} color={colors.primary} />
           </View>
@@ -414,14 +420,17 @@ export default function AdminTeacherAttendance() {
             const absent = rows.filter(record => record.status === 'absent').length;
             const leave = rows.filter(record => record.status === 'leave').length;
             const holidays = new Set([
-              ...monthlyHolidays.map(holiday => holiday.date),
+              ...currentMonthHolidays.map(holiday => holiday.date),
               ...rows.filter(record => record.status === 'holiday').map(record => record.date),
             ]).size;
             return (
               <TouchableOpacity
                 key={teacher.id}
                 style={[s.payrollRow, { borderBottomColor: colors.border }]}
-                onPress={() => setSelectedTeacherId(teacher.id)}
+                onPress={() => {
+                  setReportMonthOffset(0);
+                  setSelectedTeacherId(teacher.id);
+                }}
                 activeOpacity={0.78}
               >
                 <View style={{ flex: 1 }}>
@@ -806,7 +815,31 @@ export default function AdminTeacherAttendance() {
                 </TouchableOpacity>
               </View>
               <Text style={s.teacherReportName}>{selectedTeacher?.name ?? 'Teacher'}</Text>
-              <Text style={s.teacherReportPeriod}>{MONTHS[new Date().getMonth()]} {new Date().getFullYear()} · Attendance report</Text>
+              <View style={s.reportMonthNav}>
+                <TouchableOpacity
+                  style={s.reportMonthArrow}
+                  onPress={() => setReportMonthOffset(offset => offset - 1)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Show previous month attendance report"
+                >
+                  <Feather name="chevron-left" size={20} color="#fff" />
+                </TouchableOpacity>
+                <Text style={[s.teacherReportPeriod, s.reportMonthLabel]}>
+                  {reportMonthLabel} · Attendance report
+                </Text>
+                <TouchableOpacity
+                  style={[s.reportMonthArrow, reportMonthOffset === 0 && s.reportMonthArrowDisabled]}
+                  onPress={() => setReportMonthOffset(offset => Math.min(0, offset + 1))}
+                  disabled={reportMonthOffset === 0}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Show next month attendance report"
+                  accessibilityState={{ disabled: reportMonthOffset === 0 }}
+                >
+                  <Feather name="chevron-right" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
               <View style={s.teacherRateRow}>
                 <View>
                   <Text style={s.teacherRateLabel}>Attendance rate</Text>
@@ -824,7 +857,7 @@ export default function AdminTeacherAttendance() {
                   ['check-circle', 'Present', selectedTeacherPresent, '#0EA875'],
                   ['x-circle', 'Absent', selectedTeacherAbsent, '#E05252'],
                   ['clock', 'Late', selectedTeacherLate, '#E9A23B'],
-                  ['calendar', 'Holidays', monthlyHolidays.length, '#5B5FEF'],
+                  ['calendar', 'Holidays', reportMonthHolidays.length, '#5B5FEF'],
                 ].map(([icon, label, value, color]) => (
                   <View key={label as string} style={[s.reportStatCard, { backgroundColor: `${color}12`, borderColor: `${color}26` }]}>
                     <Feather name={icon as any} size={17} color={color as string} />
@@ -838,7 +871,7 @@ export default function AdminTeacherAttendance() {
                 <View style={s.reportPanelHeader}>
                   <View>
                     <Text style={[s.reportPanelTitle, { color: colors.text }]}>Absent dates</Text>
-                    <Text style={[s.reportPanelCopy, { color: colors.mutedForeground }]}>Days this teacher missed in {MONTHS[new Date().getMonth()]}</Text>
+                    <Text style={[s.reportPanelCopy, { color: colors.mutedForeground }]}>Days this teacher missed in {reportMonthLabel}</Text>
                   </View>
                   <View style={[s.reportCountBadge, { backgroundColor: selectedTeacherAbsent ? colors.destructive + '16' : colors.success + '16' }]}>
                     <Text style={[s.reportCountText, { color: selectedTeacherAbsent ? colors.destructive : colors.success }]}>{selectedTeacherAbsent}</Text>
@@ -871,12 +904,12 @@ export default function AdminTeacherAttendance() {
                   </View>
                   <Feather name="sun" size={19} color={colors.warning} />
                 </View>
-                {monthlyHolidays.length === 0 ? (
+                {reportMonthHolidays.length === 0 ? (
                   <View style={s.reportEmpty}>
                     <Feather name="calendar" size={18} color={colors.mutedForeground} />
                     <Text style={[s.reportEmptyText, { color: colors.mutedForeground }]}>No holidays recorded</Text>
                   </View>
-                ) : monthlyHolidays.map(holiday => (
+                ) : reportMonthHolidays.map(holiday => (
                   <View key={holiday.id} style={[s.reportDateRow, { borderTopColor: colors.border }]}>
                     <View style={[s.reportDateIcon, { backgroundColor: colors.warning + '18' }]}>
                       <Feather name="sun" size={15} color={colors.warning} />
@@ -1049,6 +1082,10 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   teacherAvatarText: { color: '#fff', fontSize: 21, fontWeight: '800' },
   teacherReportName: { color: '#fff', fontSize: 24, fontWeight: '800' },
   teacherReportPeriod: { color: 'rgba(255,255,255,0.78)', fontSize: 13, marginTop: 4 },
+  reportMonthNav: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 2 },
+  reportMonthArrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  reportMonthArrowDisabled: { opacity: 0.38 },
+  reportMonthLabel: { flex: 1, marginTop: 0, textAlign: 'center' },
   teacherRateRow: { marginTop: 21, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   teacherRateLabel: { color: 'rgba(255,255,255,0.78)', fontSize: 12, fontWeight: '600' },
   teacherRateValue: { color: '#fff', fontSize: 29, fontWeight: '800', marginTop: 2 },
