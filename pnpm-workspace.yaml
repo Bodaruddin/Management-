@@ -68,11 +68,14 @@ catalog:
 
 autoInstallPeers: false
 
-onlyBuiltDependencies:
-  - '@swc/core'
-  - esbuild
-  - msw
-  - unrs-resolver
+allowBuilds:
+  '@firebase/util': true
+  '@swc/core': true
+  core-js: true
+  esbuild: true
+  msw: true
+  protobufjs: true
+  unrs-resolver: true
 
 overrides:
   # replit uses linux-x64 only, we can exclude all other platforms
