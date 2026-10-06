@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getAdapter } from "../lib/dbManager.js";
-import { createAuthSession } from "../lib/authSessions.js";
+import { bearerToken, createAuthSession, findAuthSession } from "../lib/authSessions.js";
 
 const router = Router();
 const TEACHER_EDIT_KEY = "allow_teacher_edit";
@@ -242,8 +242,18 @@ router.put("/settings/admin-users/:id", async (req, res) => {
 });
 
 router.post("/settings/admin-users/:id/switch-teacher", async (req, res) => {
+  const session = await findAuthSession(bearerToken(req.get("authorization")));
+  if (!session) {
+    res.status(401).json({ error: "A valid administrator session is required" });
+    return;
+  }
+  if (session.role !== "admin" || session.userId !== req.params.id) {
+    res.status(403).json({ error: "Only the signed-in administrator can switch to their linked teacher panel" });
+    return;
+  }
+
   const users = await getAdminUsers();
-  const account = validateAdminId(req.body?.adminId, users);
+  const account = validateAdminId(session.userId, users);
   if (!account || account.id !== req.params.id) {
     res.status(403).json({ error: "Only the signed-in administrator can switch to their linked teacher panel" });
     return;
@@ -252,13 +262,16 @@ router.post("/settings/admin-users/:id/switch-teacher", async (req, res) => {
     res.status(400).json({ error: "This administrator is not linked to a teacher profile" });
     return;
   }
-  const teacher = (await getAdapter().teachers.list()).find((item: any) => item.id === account.linkedTeacherId);
+  const teacher = (await getAdapter().teachers.list()).find(
+    (item: any) => String(item.id) === account.linkedTeacherId,
+  );
   if (!teacher) {
     res.status(404).json({ error: "The linked teacher profile was not found" });
     return;
   }
   const { password: _password, ...safeTeacher } = teacher;
-  res.json(safeTeacher);
+  const teacherSession = await createAuthSession(String(teacher.id), "teacher");
+  res.json({ ...safeTeacher, ...teacherSession });
 });
 
 // ─── Document branding ────────────────────────────────────────────────────────

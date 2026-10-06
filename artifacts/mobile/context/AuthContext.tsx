@@ -253,16 +253,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    if (sessionToken) {
+    const tokens = new Set<string>();
+    if (sessionToken) tokens.add(sessionToken);
+    try {
+      const storedAdminSession = await AsyncStorage.getItem(ADMIN_SESSION_KEY);
+      if (storedAdminSession) {
+        const snapshot = JSON.parse(storedAdminSession) as { sessionToken?: unknown };
+        if (typeof snapshot.sessionToken === 'string') tokens.add(snapshot.sessionToken);
+      }
+    } catch {
+      // A malformed saved admin snapshot must not block local sign-out.
+    }
+    await Promise.all([...tokens].map(async token => {
       try {
         await fetch(`${getApiBase()}/api/auth/logout`, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${sessionToken}` },
+          headers: { Authorization: `Bearer ${token}` },
         });
       } catch {
         // Local sign-out must still complete if the server is offline.
       }
-    }
+    }));
     await clearLocalSession();
   };
 
@@ -365,15 +376,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!user || user.role !== 'admin' || !user.linkedTeacherId) {
       return { success: false, error: 'Link this administrator to a teacher profile first.' };
     }
+    if (!sessionToken) {
+      return { success: false, error: 'Your administrator session has expired. Please sign in again.' };
+    }
     try {
       const res = await fetch(`${getApiBase()}/api/settings/admin-users/${encodeURIComponent(user.id)}/switch-teacher`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adminId: user.id }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionToken}`,
+        },
       });
       if (!res.ok) return { success: false, error: (await readApiError(res)) ?? `Server error (${res.status})` };
       const teacher = await res.json();
-      await AsyncStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(user));
+      if (typeof teacher.sessionToken !== 'string' || !teacher.sessionToken) {
+        return { success: false, error: 'The server could not start a secure teacher session. Please try again.' };
+      }
       const teacherUser: AuthUser = {
         id: teacher.id,
         name: teacher.name,
@@ -388,7 +406,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ...(teacher.permissions ?? {}),
         },
       };
-      await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(teacherUser));
+      await AsyncStorage.multiSet([
+        [ADMIN_SESSION_KEY, JSON.stringify({ user, sessionToken })],
+        [AUTH_KEY, JSON.stringify(teacherUser)],
+        [AUTH_TOKEN_KEY, teacher.sessionToken],
+      ]);
+      setSessionToken(teacher.sessionToken);
       setUser(teacherUser);
       return { success: true };
     } catch {
@@ -401,10 +424,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const stored = await AsyncStorage.getItem(ADMIN_SESSION_KEY);
       if (!stored) return { success: false, error: 'The administrator session has expired. Please sign in again.' };
-      const adminUser = JSON.parse(stored) as AuthUser;
-      await AsyncStorage.multiRemove([AUTH_KEY, ADMIN_SESSION_KEY]);
-      await AsyncStorage.setItem(AUTH_KEY, JSON.stringify(adminUser));
+      const snapshot = JSON.parse(stored) as { user?: AuthUser; sessionToken?: unknown } & Partial<AuthUser>;
+      const adminUser = snapshot.user ?? snapshot as AuthUser;
+      // Older app versions left the admin token active while switching panels.
+      const adminToken = typeof snapshot.sessionToken === 'string' ? snapshot.sessionToken : sessionToken;
+      if (!adminToken) return { success: false, error: 'The administrator session has expired. Please sign in again.' };
+
+      await AsyncStorage.multiSet([
+        [AUTH_KEY, JSON.stringify(adminUser)],
+        [AUTH_TOKEN_KEY, adminToken],
+      ]);
+      await AsyncStorage.removeItem(ADMIN_SESSION_KEY);
+      const teacherToken = sessionToken;
+      setSessionToken(adminToken);
       setUser(adminUser);
+      if (teacherToken && teacherToken !== adminToken) {
+        void fetch(`${getApiBase()}/api/auth/logout`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${teacherToken}` },
+        }).catch(() => undefined);
+      }
       return { success: true };
     } catch {
       return { success: false, error: 'Could not switch panels. Please try again.' };
