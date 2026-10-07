@@ -832,7 +832,7 @@ function buildCombinedMarksheetHtml(
   // marksheet scale. Only the dense marks table should need to be compacted.
   // The old hard cap of 0.82 made every part of the combined document visibly
   // smaller, even when there was enough vertical space.
-  const _innerContentH = 790 + subjectRows.length * 27;
+  const _innerContentH = 814 + subjectRows.length * 27;
   const _innerZoomVal = Math.min(0.93, 940 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
@@ -936,9 +936,31 @@ function buildCombinedMarksheetHtml(
     * absolutely positioned near the footer, which allowed the remarks text to
     * extend underneath the signature images in downloaded PDFs.
     */
-    .sigs { position:relative; left:auto; right:auto; bottom:auto; display:flex; flex:0 0 62px; justify-content:space-around; margin:0; padding:2px 0 0; min-height:62px; align-items:flex-end; text-align:center; z-index:12; }
+    .sigs {
+      position:relative;
+      display:table;
+      width:100%;
+      table-layout:fixed;
+      border-collapse:collapse;
+      border-spacing:0;
+      flex:0 0 80px;
+      height:80px;
+      min-height:80px;
+      margin:6px 0 0;
+      padding:0;
+      text-align:center;
+      z-index:12;
+      page-break-inside:avoid;
+      break-inside:avoid;
+    }
+    .sig-block {
+      display:table-cell;
+      width:50%;
+      vertical-align:bottom;
+      text-align:center;
+    }
   .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
-  .sig-block .role { font-size:10px; font-weight:700; color:#0c1f4a; letter-spacing:0.2px; }
+  .sig-block .role { display:block; min-height:14px; font-size:11px; font-weight:700; color:#0c1f4a; line-height:14px; letter-spacing:0.2px; white-space:nowrap; }
   /* footer — flex-shrink:0 always pins it at page bottom */
    .footer { position:absolute; left:8px; right:8px; bottom:8px; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin:0; min-height:32px; padding:8px 22px; text-align:center; }
    .footer-quote { font-size:10px; line-height:normal; color:#c8a040; letter-spacing:1.2px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; white-space:nowrap; }
