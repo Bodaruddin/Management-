@@ -938,14 +938,13 @@ function buildCombinedMarksheetHtml(
     */
     .sigs {
       position:relative;
-      display:table;
+      display:flex;
       width:100%;
-      table-layout:fixed;
-      border-collapse:collapse;
-      border-spacing:0;
       flex:0 0 80px;
       height:80px;
       min-height:80px;
+      align-items:flex-end;
+      justify-content:space-around;
       margin:6px 0 0;
       padding:0;
       text-align:center;
@@ -954,14 +953,18 @@ function buildCombinedMarksheetHtml(
       break-inside:avoid;
     }
     .sig-block {
-      display:table-cell;
-      width:50%;
-      vertical-align:bottom;
+      display:flex;
+      flex:0 0 50%;
+      flex-direction:column;
+      align-items:center;
+      justify-content:flex-end;
+      min-width:0;
       text-align:center;
     }
   .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
   .sig-block .role { display:block; min-height:14px; font-size:11px; font-weight:700; color:#0c1f4a; line-height:14px; letter-spacing:0.2px; white-space:nowrap; }
-  /* footer — flex-shrink:0 always pins it at page bottom */
+
+/* footer — flex-shrink:0 always pins it at page bottom */
    .footer { position:absolute; left:8px; right:8px; bottom:8px; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin:0; min-height:32px; padding:8px 22px; text-align:center; }
    .footer-quote { font-size:10px; line-height:normal; color:#c8a040; letter-spacing:1.2px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; white-space:nowrap; }
 </style>
