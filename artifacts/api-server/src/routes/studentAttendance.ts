@@ -8,6 +8,21 @@ import {
 } from "../lib/studentHolidayAttendance.js";
 
 const router = Router();
+const HOLIDAY_ALREADY_EXISTS_MESSAGE = "A holiday already exists for this date.";
+
+function isUniqueConstraintViolation(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const candidate = current as { code?: unknown; cause?: unknown };
+    if (candidate.code === "23505") return true;
+    current = candidate.cause;
+  }
+
+  return false;
+}
 
 router.get("/student-attendance/settings", async (_req, res) => {
   const adapter = getAdapter();
@@ -42,11 +57,27 @@ router.post("/student-attendance/holidays", async (req, res) => {
   }
 
   const adapter = getAdapter();
-  const row = await adapter.teacherHolidays.create({
-    id: req.body.id,
-    date: req.body.date,
-    name: String(req.body.name).trim(),
-  });
+  const date = String(req.body.date);
+  const holidays = await adapter.teacherHolidays.list();
+  if (holidays.some((holiday) => String(holiday.date).slice(0, 10) === date)) {
+    res.status(409).json({ error: HOLIDAY_ALREADY_EXISTS_MESSAGE });
+    return;
+  }
+
+  let row: Awaited<ReturnType<typeof adapter.teacherHolidays.create>>;
+  try {
+    row = await adapter.teacherHolidays.create({
+      id: req.body.id,
+      date,
+      name: String(req.body.name).trim(),
+    });
+  } catch (error) {
+    if (isUniqueConstraintViolation(error)) {
+      res.status(409).json({ error: HOLIDAY_ALREADY_EXISTS_MESSAGE });
+      return;
+    }
+    throw error;
+  }
   await syncStudentHolidayAttendanceForDates(adapter, [row.date]);
   res.status(201).json(row);
 });
@@ -67,10 +98,26 @@ router.put("/student-attendance/holidays/:id", async (req, res) => {
     res.status(404).json({ error: "Holiday not found" });
     return;
   }
-  const row = await adapter.teacherHolidays.update(req.params.id, {
-    date: req.body.date,
-    name: String(req.body.name).trim(),
-  });
+  const date = String(req.body.date);
+  const holidays = await adapter.teacherHolidays.list();
+  if (holidays.some((holiday) => holiday.id !== req.params.id && String(holiday.date).slice(0, 10) === date)) {
+    res.status(409).json({ error: HOLIDAY_ALREADY_EXISTS_MESSAGE });
+    return;
+  }
+
+  let row: Awaited<ReturnType<typeof adapter.teacherHolidays.update>>;
+  try {
+    row = await adapter.teacherHolidays.update(req.params.id, {
+      date,
+      name: String(req.body.name).trim(),
+    });
+  } catch (error) {
+    if (isUniqueConstraintViolation(error)) {
+      res.status(409).json({ error: HOLIDAY_ALREADY_EXISTS_MESSAGE });
+      return;
+    }
+    throw error;
+  }
   if (!row) {
     res.status(404).json({ error: "Holiday not found" });
     return;

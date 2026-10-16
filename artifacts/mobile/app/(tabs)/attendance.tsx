@@ -272,6 +272,7 @@ export default function AttendanceScreen() {
   const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null);
   const [editingHolidayId, setEditingHolidayId] = useState<string | null>(null);
   const [showHolidayPanel, setShowHolidayPanel] = useState(false);
+  const [holidayNotice, setHolidayNotice] = useState<{ title: string; message: string } | null>(null);
 
   const getFilteredRecords = () => {
     let records = attendanceRecords;
@@ -317,26 +318,50 @@ export default function AttendanceScreen() {
     setHolidayName('');
   };
 
+  const showHolidayNotice = (title: string, message: string) => {
+    setHolidayNotice({ title, message });
+  };
+
   const saveHoliday = async () => {
+    const date = holidayDate.trim();
     const name = holidayName.trim();
-    if (!isValidDateString(holidayDate.trim()) || !name) {
-      Alert.alert('Holiday details needed', 'Enter a valid date as YYYY-MM-DD and a holiday name.');
+    if (!isValidDateString(date) || !name) {
+      showHolidayNotice('Holiday details needed', 'Enter a valid date as YYYY-MM-DD and a holiday name.');
+      return;
+    }
+
+    const dateAlreadyUsed = studentAttendanceHolidaySettings.holidays.some(
+      holiday => holiday.date.slice(0, 10) === date && holiday.id !== editingHolidayId,
+    );
+    if (dateAlreadyUsed) {
+      showHolidayNotice(
+        'Holiday already exists',
+        'A holiday is already saved for this date. Please choose another date.',
+      );
       return;
     }
 
     setSavingHoliday(true);
     try {
       if (editingHolidayId) {
-        await updateStudentHoliday(editingHolidayId, { date: holidayDate.trim(), name });
+        await updateStudentHoliday(editingHolidayId, { date, name });
       } else {
-        await addStudentHoliday({ date: holidayDate.trim(), name });
+        await addStudentHoliday({ date, name });
       }
       resetHolidayForm();
     } catch (error: any) {
-      Alert.alert(
-        editingHolidayId ? 'Could not update holiday' : 'Could not add holiday',
-        error?.message ?? 'Please try again.',
-      );
+      const message = typeof error?.message === 'string' ? error.message : '';
+      if (/holiday already exists|duplicate key|unique constraint|23505|\b409\b/i.test(message)) {
+        showHolidayNotice(
+          'Holiday already exists',
+          'A holiday is already saved for this date. Please choose another date.',
+        );
+      } else {
+        showHolidayNotice(
+          editingHolidayId ? 'Could not update holiday' : 'Could not add holiday',
+          message || 'Please try again.',
+        );
+      }
     } finally {
       setSavingHoliday(false);
     }
@@ -677,6 +702,45 @@ export default function AttendanceScreen() {
         />
       )}
 
+      <Modal
+        visible={holidayNotice !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setHolidayNotice(null)}
+      >
+        <View style={s.holidayNoticeOverlay}>
+          <View style={[s.holidayNoticeCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={s.holidayNoticeHeader}>
+              <View style={[s.holidayNoticeIcon, { backgroundColor: colors.warning + '18' }]}>
+                <Feather name="calendar" size={21} color={colors.warning} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.holidayNoticeEyebrow, { color: colors.mutedForeground }]}>HOLIDAY NOTICE</Text>
+                <Text testID="holiday-notice-title" style={[s.holidayNoticeTitle, { color: colors.text }]}>
+                  {holidayNotice?.title}
+                </Text>
+              </View>
+            </View>
+            <Text style={[s.holidayNoticeMessage, { color: colors.mutedForeground }]}>
+              {holidayNotice?.message}
+            </Text>
+            <View style={s.holidayNoticeActions}>
+              <TouchableOpacity
+                onPress={() => setHolidayNotice(null)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Choose another holiday date"
+                testID="holiday-notice-dismiss"
+                style={[s.holidayNoticeButton, { backgroundColor: colors.primary }]}
+              >
+                <Text style={s.holidayNoticeButtonText}>Choose another date</Text>
+                <Feather name="arrow-right" size={17} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Class Picker */}
       <Modal visible={showClassPicker} animationType="slide" transparent>
         <View style={m.overlay}>
@@ -751,4 +815,14 @@ const styles = (c: ReturnType<typeof useColors>) => StyleSheet.create({
   holidayIconButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   holidayDate: { fontSize: 12, fontWeight: '700' },
   holidayName: { fontSize: 12, marginTop: 2 },
+  holidayNoticeOverlay: { flex: 1, backgroundColor: 'rgba(7,20,48,0.58)', justifyContent: 'center', alignItems: 'center', padding: 24 },
+  holidayNoticeCard: { width: '100%', maxWidth: 390, borderRadius: 24, borderWidth: 1, padding: 24, elevation: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 24 },
+  holidayNoticeHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  holidayNoticeIcon: { width: 50, height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  holidayNoticeEyebrow: { fontSize: 10, fontWeight: '700', letterSpacing: 1.1, textTransform: 'uppercase' },
+  holidayNoticeTitle: { fontSize: 19, fontWeight: '700', marginTop: 4 },
+  holidayNoticeMessage: { fontSize: 14, lineHeight: 21, marginTop: 16 },
+  holidayNoticeActions: { marginTop: 22 },
+  holidayNoticeButton: { minHeight: 50, borderRadius: 14, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  holidayNoticeButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
