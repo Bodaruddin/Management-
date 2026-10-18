@@ -5,6 +5,7 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { TeacherAttendanceRecordCheckOutMethod } from './teacherAttendanceRecordCheckOutMethod';
 import type { TeacherAttendanceRecordStatus } from './teacherAttendanceRecordStatus';
 
 export interface TeacherAttendanceRecord {
@@ -17,6 +18,9 @@ export interface TeacherAttendanceRecord {
   checkInAt?: Date | null;
   /** @nullable */
   checkOutAt?: Date | null;
+  autoCheckoutEnabled?: boolean;
+  /** @nullable */
+  checkOutMethod?: TeacherAttendanceRecordCheckOutMethod;
   /** @nullable */
   checkInLatitude?: number | null;
   /** @nullable */

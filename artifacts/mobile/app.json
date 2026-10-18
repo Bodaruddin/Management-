@@ -42,6 +42,16 @@
           "faceIDPermission": "Allow School Management to use Face ID to verify teacher attendance."
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow School Management to verify attendance at school.",
+          "locationAlwaysAndWhenInUsePermission": "Allow School Management to record the last location inside school for automatic checkout.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
       "expo-notifications",
       "expo-sharing"
     ],

@@ -53,7 +53,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 const AUTH_KEY = '@school_auth_user';
 const ADMIN_SESSION_KEY = '@school_admin_session';
-const AUTH_TOKEN_KEY = '@school_auth_session_token';
+export const AUTH_TOKEN_KEY = '@school_auth_session_token';
 const SESSION_CHECK_INTERVAL_MS = 20_000;
 
 async function readApiError(response: Response): Promise<string | undefined> {

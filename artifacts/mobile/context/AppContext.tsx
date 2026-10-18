@@ -4,6 +4,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PENDING_CONFIG_KEY, PendingDbConfig, useDbSetup } from '@/context/DbSetupContext';
 import { getApiBase } from '@/constants/api';
 import { useAuth } from '@/context/AuthContext';
+import {
+  offerTeacherAutoCheckout,
+  stopTeacherAutoCheckout,
+} from '@/utils/teacherAutoCheckout';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export interface Student {
@@ -152,6 +156,8 @@ export interface TeacherAttendanceRecord {
   status: 'present' | 'late' | 'absent' | 'leave' | 'holiday';
   checkInAt?: string;
   checkOutAt?: string;
+  checkOutMethod?: 'manual' | 'automatic_location' | 'automatic_end_of_day';
+  autoCheckoutEnabled?: boolean;
   checkInLatitude?: number;
   checkInLongitude?: number;
   checkOutLatitude?: number;
@@ -900,6 +906,8 @@ function mapTeacherAttendance(r: any): TeacherAttendanceRecord {
     status: r.status ?? 'present',
     checkInAt: r.checkInAt ?? r.check_in_at ?? undefined,
     checkOutAt: r.checkOutAt ?? r.check_out_at ?? undefined,
+    checkOutMethod: r.checkOutMethod ?? r.check_out_method ?? undefined,
+    autoCheckoutEnabled: r.autoCheckoutEnabled === true || r.auto_checkout_enabled === true,
     checkInLatitude: r.checkInLatitude ?? r.check_in_latitude ?? undefined,
     checkInLongitude: r.checkInLongitude ?? r.check_in_longitude ?? undefined,
     checkOutLatitude: r.checkOutLatitude ?? r.check_out_latitude ?? undefined,
@@ -1630,8 +1638,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
     const record = mapTeacherAttendance(row);
     setState(prev => ({ ...prev, teacherAttendanceRecords: [record, ...prev.teacherAttendanceRecords.filter(item => item.id !== record.id)] }));
+    if (user?.role === 'teacher' && data.teacherId === user.id && Platform.OS !== 'web') {
+      const trackingEnabled = await offerTeacherAutoCheckout(record.id, record.date, authenticatedFetch);
+      if (trackingEnabled) {
+        record.autoCheckoutEnabled = true;
+        setState(prev => ({
+          ...prev,
+          teacherAttendanceRecords: prev.teacherAttendanceRecords.map(item =>
+            item.id === record.id ? { ...item, autoCheckoutEnabled: true } : item,
+          ),
+        }));
+      }
+    }
     return record;
-  }, [authenticatedFetch]);
+  }, [authenticatedFetch, user?.id, user?.role]);
 
   const checkOutTeacher = useCallback(async (id: string, data: {
     teacherId: string; latitude: number; longitude: number;
@@ -1645,6 +1665,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       data,
     );
     const record = mapTeacherAttendance(row);
+    await stopTeacherAutoCheckout(id);
     setState(prev => ({ ...prev, teacherAttendanceRecords: prev.teacherAttendanceRecords.map(item => item.id === id ? record : item) }));
     return record;
   }, [authenticatedFetch]);

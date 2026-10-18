@@ -231,6 +231,8 @@ export const ListTeacherAttendanceResponseItem = zod.object({
   "status": zod.enum(['present', 'late', 'absent', 'leave', 'holiday']).optional(),
   "checkInAt": zod.coerce.date().nullish(),
   "checkOutAt": zod.coerce.date().nullish(),
+  "autoCheckoutEnabled": zod.boolean().optional(),
+  "checkOutMethod": zod.union([zod.literal('manual'),zod.literal('automatic_location'),zod.literal('automatic_end_of_day'),zod.literal(null)]).nullish(),
   "checkInLatitude": zod.number().nullish(),
   "checkInLongitude": zod.number().nullish(),
   "checkOutLatitude": zod.number().nullish(),
@@ -314,6 +316,8 @@ export const TeacherCheckInResponse = zod.object({
   "status": zod.enum(['present', 'late', 'absent', 'leave', 'holiday']).optional(),
   "checkInAt": zod.coerce.date().nullish(),
   "checkOutAt": zod.coerce.date().nullish(),
+  "autoCheckoutEnabled": zod.boolean().optional(),
+  "checkOutMethod": zod.union([zod.literal('manual'),zod.literal('automatic_location'),zod.literal('automatic_end_of_day'),zod.literal(null)]).nullish(),
   "checkInLatitude": zod.number().nullish(),
   "checkInLongitude": zod.number().nullish(),
   "checkOutLatitude": zod.number().nullish(),
@@ -349,6 +353,8 @@ export const TeacherCheckOutResponse = zod.object({
   "status": zod.enum(['present', 'late', 'absent', 'leave', 'holiday']).optional(),
   "checkInAt": zod.coerce.date().nullish(),
   "checkOutAt": zod.coerce.date().nullish(),
+  "autoCheckoutEnabled": zod.boolean().optional(),
+  "checkOutMethod": zod.union([zod.literal('manual'),zod.literal('automatic_location'),zod.literal('automatic_end_of_day'),zod.literal(null)]).nullish(),
   "checkInLatitude": zod.number().nullish(),
   "checkInLongitude": zod.number().nullish(),
   "checkOutLatitude": zod.number().nullish(),
@@ -356,6 +362,79 @@ export const TeacherCheckOutResponse = zod.object({
   "distanceFromSchool": zod.number().nullish(),
   "faceVerified": zod.string().optional(),
   "faceVerificationMethod": zod.string().nullish()
+})
+
+
+export const ConfigureTeacherAutoCheckoutParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ConfigureTeacherAutoCheckoutBody = zod.object({
+  "date": zod.coerce.date(),
+  "enabled": zod.boolean()
+})
+
+export const ConfigureTeacherAutoCheckoutResponse = zod.object({
+  "checkedOut": zod.boolean(),
+  "record": zod.object({
+  "id": zod.string().optional(),
+  "teacherId": zod.string().optional(),
+  "teacherName": zod.string().optional(),
+  "date": zod.string().optional(),
+  "status": zod.enum(['present', 'late', 'absent', 'leave', 'holiday']).optional(),
+  "checkInAt": zod.coerce.date().nullish(),
+  "checkOutAt": zod.coerce.date().nullish(),
+  "autoCheckoutEnabled": zod.boolean().optional(),
+  "checkOutMethod": zod.union([zod.literal('manual'),zod.literal('automatic_location'),zod.literal('automatic_end_of_day'),zod.literal(null)]).nullish(),
+  "checkInLatitude": zod.number().nullish(),
+  "checkInLongitude": zod.number().nullish(),
+  "checkOutLatitude": zod.number().nullish(),
+  "checkOutLongitude": zod.number().nullish(),
+  "distanceFromSchool": zod.number().nullish(),
+  "faceVerified": zod.string().optional(),
+  "faceVerificationMethod": zod.string().nullish()
+})
+})
+
+
+export const SubmitTeacherAttendanceLocationSamplesParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const submitTeacherAttendanceLocationSamplesBodyLocationsMax = 50;
+
+
+
+export const SubmitTeacherAttendanceLocationSamplesBody = zod.object({
+  "date": zod.coerce.date(),
+  "locations": zod.array(zod.object({
+  "latitude": zod.number(),
+  "longitude": zod.number(),
+  "accuracy": zod.number().nullish(),
+  "timestamp": zod.coerce.date()
+})).max(submitTeacherAttendanceLocationSamplesBodyLocationsMax)
+})
+
+export const SubmitTeacherAttendanceLocationSamplesResponse = zod.object({
+  "checkedOut": zod.boolean(),
+  "record": zod.object({
+  "id": zod.string().optional(),
+  "teacherId": zod.string().optional(),
+  "teacherName": zod.string().optional(),
+  "date": zod.string().optional(),
+  "status": zod.enum(['present', 'late', 'absent', 'leave', 'holiday']).optional(),
+  "checkInAt": zod.coerce.date().nullish(),
+  "checkOutAt": zod.coerce.date().nullish(),
+  "autoCheckoutEnabled": zod.boolean().optional(),
+  "checkOutMethod": zod.union([zod.literal('manual'),zod.literal('automatic_location'),zod.literal('automatic_end_of_day'),zod.literal(null)]).nullish(),
+  "checkInLatitude": zod.number().nullish(),
+  "checkInLongitude": zod.number().nullish(),
+  "checkOutLatitude": zod.number().nullish(),
+  "checkOutLongitude": zod.number().nullish(),
+  "distanceFromSchool": zod.number().nullish(),
+  "faceVerified": zod.string().optional(),
+  "faceVerificationMethod": zod.string().nullish()
+})
 })
 
 

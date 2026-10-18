@@ -374,6 +374,48 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeacherAttendanceRecord"
+  /teacher-attendance/{id}/auto-checkout:
+    post:
+      operationId: configureTeacherAutoCheckout
+      tags: [teacher-attendance]
+      security:
+        - BearerSessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherAutoCheckoutToggle"
+      responses:
+        "200":
+          description: Automatic checkout preference updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAutoCheckoutResult"
+  /teacher-attendance/{id}/location-samples:
+    post:
+      operationId: submitTeacherAttendanceLocationSamples
+      tags: [teacher-attendance]
+      security:
+        - BearerSessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherLocationSamples"
+      responses:
+        "200":
+          description: Location samples stored or attendance checked out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherAutoCheckoutResult"
   /teacher-leaves:
     get:
       operationId: listTeacherLeaves
@@ -990,6 +1032,10 @@ components:
         status: { type: string, enum: [present, late, absent, leave, holiday] }
         checkInAt: { type: [string, "null"], format: date-time }
         checkOutAt: { type: [string, "null"], format: date-time }
+        autoCheckoutEnabled: { type: boolean }
+        checkOutMethod:
+          type: [string, "null"]
+          enum: [manual, automatic_location, automatic_end_of_day, null]
         checkInLatitude: { type: [number, "null"] }
         checkInLongitude: { type: [number, "null"] }
         checkOutLatitude: { type: [number, "null"] }
@@ -997,6 +1043,37 @@ components:
         distanceFromSchool: { type: [number, "null"] }
         faceVerified: { type: string }
         faceVerificationMethod: { type: [string, "null"] }
+    TeacherAutoCheckoutToggle:
+      type: object
+      required: [date, enabled]
+      properties:
+        date: { type: string, format: date }
+        enabled: { type: boolean }
+    TeacherLocationSample:
+      type: object
+      required: [latitude, longitude, timestamp]
+      properties:
+        latitude: { type: number }
+        longitude: { type: number }
+        accuracy: { type: [number, "null"] }
+        timestamp: { type: string, format: date-time }
+    TeacherLocationSamples:
+      type: object
+      required: [date, locations]
+      properties:
+        date: { type: string, format: date }
+        locations:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/TeacherLocationSample"
+    TeacherAutoCheckoutResult:
+      type: object
+      required: [checkedOut, record]
+      properties:
+        checkedOut: { type: boolean }
+        record:
+          $ref: "#/components/schemas/TeacherAttendanceRecord"
     TeacherAttendanceReset:
       type: object
       required: [adminId]

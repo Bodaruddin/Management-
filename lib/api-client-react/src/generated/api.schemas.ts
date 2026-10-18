@@ -262,6 +262,18 @@ export const TeacherAttendanceRecordStatus = {
   holiday: 'holiday',
 } as const;
 
+/**
+ * @nullable
+ */
+export type TeacherAttendanceRecordCheckOutMethod = typeof TeacherAttendanceRecordCheckOutMethod[keyof typeof TeacherAttendanceRecordCheckOutMethod] | null;
+
+
+export const TeacherAttendanceRecordCheckOutMethod = {
+  manual: 'manual',
+  automatic_location: 'automatic_location',
+  automatic_end_of_day: 'automatic_end_of_day',
+} as const;
+
 export interface TeacherAttendanceRecord {
   id?: string;
   teacherId?: string;
@@ -272,6 +284,9 @@ export interface TeacherAttendanceRecord {
   checkInAt?: string | null;
   /** @nullable */
   checkOutAt?: string | null;
+  autoCheckoutEnabled?: boolean;
+  /** @nullable */
+  checkOutMethod?: TeacherAttendanceRecordCheckOutMethod;
   /** @nullable */
   checkInLatitude?: number | null;
   /** @nullable */
@@ -285,6 +300,30 @@ export interface TeacherAttendanceRecord {
   faceVerified?: string;
   /** @nullable */
   faceVerificationMethod?: string | null;
+}
+
+export interface TeacherAutoCheckoutToggle {
+  date: string;
+  enabled: boolean;
+}
+
+export interface TeacherLocationSample {
+  latitude: number;
+  longitude: number;
+  /** @nullable */
+  accuracy?: number | null;
+  timestamp: string;
+}
+
+export interface TeacherLocationSamples {
+  date: string;
+  /** @maxItems 50 */
+  locations: TeacherLocationSample[];
+}
+
+export interface TeacherAutoCheckoutResult {
+  checkedOut: boolean;
+  record: TeacherAttendanceRecord;
 }
 
 export interface TeacherAttendanceReset {

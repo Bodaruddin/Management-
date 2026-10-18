@@ -875,6 +875,7 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
           teacherId: data.teacherId, teacherName: data.teacherName ?? "", date: data.date,
           status: data.status ?? "present", checkInAt: data.checkInAt === null ? null : data.checkInAt ?? now(),
           checkInLatitude: data.checkInLatitude ?? null, checkInLongitude: data.checkInLongitude ?? null,
+          autoCheckoutEnabled: false,
           distanceFromSchool: data.distanceFromSchool ?? null, faceVerified: String(Boolean(data.faceVerified)),
           faceVerificationMethod: data.faceVerificationMethod ?? null, note: data.note ?? null,
         });
@@ -892,6 +893,7 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
           teacherId, teacherName: data.teacherName ?? "", date,
           status: data.status ?? "present", checkInAt: data.checkInAt ?? now(),
           checkInLatitude: data.checkInLatitude ?? null, checkInLongitude: data.checkInLongitude ?? null,
+          autoCheckoutEnabled: false,
           distanceFromSchool: data.distanceFromSchool ?? null, faceVerified: String(Boolean(data.faceVerified)),
           faceVerificationMethod: data.faceVerificationMethod ?? null, note: data.note ?? null,
         });
@@ -980,9 +982,74 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
           checkOutAt: data.checkOutAt ?? now(),
           checkOutLatitude: data.checkOutLatitude ?? null,
           checkOutLongitude: data.checkOutLongitude ?? null,
+          checkOutMethod: data.checkOutMethod ?? "manual",
         };
         await ref.update(updates);
         return { id, ...existing.data(), ...updates };
+      },
+      async setAutoCheckoutEnabled(id, teacherId, enabled) {
+        const ref = col("teacher_attendance_records").doc(id);
+        return fs.runTransaction(async (transaction) => {
+          const snapshot = await transaction.get(ref);
+          if (!snapshot.exists) return null;
+          const existing = snapshot.data() ?? {};
+          if (String(existing.teacherId) !== teacherId || existing.checkOutAt) return null;
+          transaction.update(ref, { autoCheckoutEnabled: enabled });
+          return { id, ...existing, autoCheckoutEnabled: enabled };
+        });
+      },
+      async updateLastSchoolLocation(id, teacherId, data) {
+        const ref = col("teacher_attendance_records").doc(id);
+        return fs.runTransaction(async (transaction) => {
+          const snapshot = await transaction.get(ref);
+          if (!snapshot.exists) return null;
+          const existing = snapshot.data() ?? {};
+          const currentAt = existing.lastSchoolAt?.toDate
+            ? existing.lastSchoolAt.toDate().getTime()
+            : Date.parse(String(existing.lastSchoolAt ?? ""));
+          const nextAt = Date.parse(data.at);
+          if (
+            String(existing.teacherId) !== teacherId
+            || existing.autoCheckoutEnabled !== true
+            || existing.checkOutAt
+            || (Number.isFinite(currentAt) && currentAt >= nextAt)
+          ) return null;
+          const updates = {
+            lastSchoolAt: data.at,
+            lastSchoolLatitude: data.latitude,
+            lastSchoolLongitude: data.longitude,
+          };
+          transaction.update(ref, updates);
+          return { id, ...existing, ...updates };
+        });
+      },
+      async autoCheckOutIfOpen(id, data) {
+        const ref = col("teacher_attendance_records").doc(id);
+        return fs.runTransaction(async (transaction) => {
+          const snapshot = await transaction.get(ref);
+          if (!snapshot.exists) return null;
+          const existing = snapshot.data() ?? {};
+          if (existing.checkOutAt) return null;
+          const updates = {
+            checkOutAt: data.checkOutAt,
+            checkOutLatitude: data.checkOutLatitude,
+            checkOutLongitude: data.checkOutLongitude,
+            checkOutMethod: data.checkOutMethod,
+          };
+          transaction.update(ref, updates);
+          return { id, ...existing, ...updates };
+        });
+      },
+      async listAutoCheckoutCandidates(date) {
+        const snapshot = await col("teacher_attendance_records")
+          .where("date", "==", date)
+          .get();
+        return snapshot.docs.map(mapDoc).filter((row: any) =>
+          row.autoCheckoutEnabled === true
+          && ["present", "late"].includes(String(row.status))
+          && !row.checkOutAt
+          && Boolean(row.lastSchoolAt),
+        );
       },
       async reset(teacherId) {
         const snap = teacherId

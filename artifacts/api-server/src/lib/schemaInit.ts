@@ -223,10 +223,15 @@ CREATE TABLE IF NOT EXISTS teacher_attendance_records (
   status                     TEXT NOT NULL DEFAULT 'present',
   check_in_at                TIMESTAMPTZ,
   check_out_at               TIMESTAMPTZ,
+  check_out_method           TEXT,
   check_in_latitude          DOUBLE PRECISION,
   check_in_longitude         DOUBLE PRECISION,
   check_out_latitude         DOUBLE PRECISION,
   check_out_longitude        DOUBLE PRECISION,
+  auto_checkout_enabled     BOOLEAN NOT NULL DEFAULT FALSE,
+  last_school_at             TIMESTAMPTZ,
+  last_school_latitude       DOUBLE PRECISION,
+  last_school_longitude      DOUBLE PRECISION,
   distance_from_school       DOUBLE PRECISION,
   face_verified              TEXT NOT NULL DEFAULT 'false',
   face_verification_method   TEXT,
@@ -234,6 +239,12 @@ CREATE TABLE IF NOT EXISTS teacher_attendance_records (
   created_at                 TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   UNIQUE (teacher_id, date)
 );
+
+ALTER TABLE teacher_attendance_records ADD COLUMN IF NOT EXISTS check_out_method TEXT;
+ALTER TABLE teacher_attendance_records ADD COLUMN IF NOT EXISTS auto_checkout_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE teacher_attendance_records ADD COLUMN IF NOT EXISTS last_school_at TIMESTAMPTZ;
+ALTER TABLE teacher_attendance_records ADD COLUMN IF NOT EXISTS last_school_latitude DOUBLE PRECISION;
+ALTER TABLE teacher_attendance_records ADD COLUMN IF NOT EXISTS last_school_longitude DOUBLE PRECISION;
 
 CREATE TABLE IF NOT EXISTS teacher_leave_applications (
   id           TEXT PRIMARY KEY DEFAULT gen_random_uuid(),

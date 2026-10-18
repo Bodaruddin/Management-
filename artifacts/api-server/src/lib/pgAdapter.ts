@@ -2,7 +2,9 @@
  * PostgreSQL DataAdapter — wraps Drizzle ORM queries.
  */
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { eq, asc, and, desc, inArray, notInArray, sql as drizzleSql } from "drizzle-orm";
+import {
+  eq, asc, and, or, desc, inArray, notInArray, isNull, isNotNull, lt, sql as drizzleSql,
+} from "drizzle-orm";
 import * as schema from "@workspace/db/schema";
 import type { DataAdapter } from "./adapter.js";
 
@@ -857,6 +859,7 @@ export function createPgAdapter(db: DB): DataAdapter {
           teacherId: data.teacherId, teacherName: data.teacherName ?? "", date: data.date,
           status: data.status ?? "present", checkInAt: data.checkInAt === null ? null : data.checkInAt ? new Date(data.checkInAt) : new Date(),
           checkInLatitude: data.checkInLatitude ?? null, checkInLongitude: data.checkInLongitude ?? null,
+          autoCheckoutEnabled: false,
           distanceFromSchool: data.distanceFromSchool ?? null, faceVerified: String(Boolean(data.faceVerified)),
           faceVerificationMethod: data.faceVerificationMethod ?? null, note: data.note ?? null,
         };
@@ -879,8 +882,65 @@ export function createPgAdapter(db: DB): DataAdapter {
         const [row] = await db.update(teacherAttendanceRecordsTable).set({
           checkOutAt: data.checkOutAt ? new Date(data.checkOutAt) : new Date(),
           checkOutLatitude: data.checkOutLatitude ?? null, checkOutLongitude: data.checkOutLongitude ?? null,
+          checkOutMethod: data.checkOutMethod ?? "manual",
         }).where(eq(teacherAttendanceRecordsTable.id, id)).returning();
         return row ?? null;
+      },
+      async setAutoCheckoutEnabled(id, teacherId, enabled) {
+        const [row] = await db.update(teacherAttendanceRecordsTable)
+          .set({ autoCheckoutEnabled: enabled })
+          .where(and(
+            eq(teacherAttendanceRecordsTable.id, id),
+            eq(teacherAttendanceRecordsTable.teacherId, teacherId),
+            isNull(teacherAttendanceRecordsTable.checkOutAt),
+          ))
+          .returning();
+        return row ?? null;
+      },
+      async updateLastSchoolLocation(id, teacherId, data) {
+        const at = new Date(data.at);
+        const [row] = await db.update(teacherAttendanceRecordsTable)
+          .set({
+            lastSchoolAt: at,
+            lastSchoolLatitude: data.latitude,
+            lastSchoolLongitude: data.longitude,
+          })
+          .where(and(
+            eq(teacherAttendanceRecordsTable.id, id),
+            eq(teacherAttendanceRecordsTable.teacherId, teacherId),
+            eq(teacherAttendanceRecordsTable.autoCheckoutEnabled, true),
+            isNull(teacherAttendanceRecordsTable.checkOutAt),
+            or(
+              isNull(teacherAttendanceRecordsTable.lastSchoolAt),
+              lt(teacherAttendanceRecordsTable.lastSchoolAt, at),
+            ),
+          ))
+          .returning();
+        return row ?? null;
+      },
+      async autoCheckOutIfOpen(id, data) {
+        const [row] = await db.update(teacherAttendanceRecordsTable)
+          .set({
+            checkOutAt: new Date(data.checkOutAt),
+            checkOutLatitude: data.checkOutLatitude,
+            checkOutLongitude: data.checkOutLongitude,
+            checkOutMethod: data.checkOutMethod,
+          })
+          .where(and(
+            eq(teacherAttendanceRecordsTable.id, id),
+            isNull(teacherAttendanceRecordsTable.checkOutAt),
+          ))
+          .returning();
+        return row ?? null;
+      },
+      async listAutoCheckoutCandidates(date) {
+        return db.select().from(teacherAttendanceRecordsTable).where(and(
+          eq(teacherAttendanceRecordsTable.date, date),
+          eq(teacherAttendanceRecordsTable.autoCheckoutEnabled, true),
+          inArray(teacherAttendanceRecordsTable.status, ["present", "late"]),
+          isNull(teacherAttendanceRecordsTable.checkOutAt),
+          isNotNull(teacherAttendanceRecordsTable.lastSchoolAt),
+        ));
       },
       async reset(teacherId) {
         const deleted = teacherId

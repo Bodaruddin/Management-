@@ -51,6 +51,8 @@ import type {
   TeacherAttendanceResetResult,
   TeacherAttendanceSettings,
   TeacherAttendanceSettingsUpdate,
+  TeacherAutoCheckoutResult,
+  TeacherAutoCheckoutToggle,
   TeacherCheckIn,
   TeacherCheckOut,
   TeacherFaceEnroll,
@@ -63,6 +65,7 @@ import type {
   TeacherLeave,
   TeacherLeaveCreate,
   TeacherLeaveUpdate,
+  TeacherLocationSamples,
   TeacherLoginRequest,
   TeacherLoginResponse,
   TeacherNotificationInbox,
@@ -1762,6 +1765,172 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getTeacherCheckOutMutationOptions(options));
+    }
+
+export const getConfigureTeacherAutoCheckoutUrl = (id: string,) => {
+
+
+
+
+  return `/api/teacher-attendance/${id}/auto-checkout`
+}
+
+export const configureTeacherAutoCheckout = async (id: string,
+    teacherAutoCheckoutToggle: TeacherAutoCheckoutToggle, options?: Parameters<typeof customFetch>[1]): Promise<TeacherAutoCheckoutResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<TeacherAutoCheckoutResult>(getConfigureTeacherAutoCheckoutUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(teacherAutoCheckoutToggle)
+  }
+);}
+
+
+
+
+
+export const getConfigureTeacherAutoCheckoutMutationKey = () => ['configureTeacherAutoCheckout'] as const;
+
+export const getConfigureTeacherAutoCheckoutMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, TError,ConfigureTeacherAutoCheckoutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, TError,ConfigureTeacherAutoCheckoutMutationVariables, TContext> => {
+
+const mutationKey = getConfigureTeacherAutoCheckoutMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, ConfigureTeacherAutoCheckoutMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  configureTeacherAutoCheckout(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfigureTeacherAutoCheckoutMutationResult = NonNullable<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>>
+    export type ConfigureTeacherAutoCheckoutMutationBody = BodyType<TeacherAutoCheckoutToggle>
+    export type ConfigureTeacherAutoCheckoutMutationError = ErrorType<unknown>
+    export type ConfigureTeacherAutoCheckoutMutationVariables = {id: string;data: BodyType<TeacherAutoCheckoutToggle>}
+
+    export const useConfigureTeacherAutoCheckout = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, TError,ConfigureTeacherAutoCheckoutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof configureTeacherAutoCheckout>>,
+        TError,
+        ConfigureTeacherAutoCheckoutMutationVariables,
+        TContext
+      > => {
+      return useMutation(getConfigureTeacherAutoCheckoutMutationOptions(options));
+    }
+
+export const getSubmitTeacherAttendanceLocationSamplesUrl = (id: string,) => {
+
+
+
+
+  return `/api/teacher-attendance/${id}/location-samples`
+}
+
+export const submitTeacherAttendanceLocationSamples = async (id: string,
+    teacherLocationSamples: TeacherLocationSamples, options?: Parameters<typeof customFetch>[1]): Promise<TeacherAutoCheckoutResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<TeacherAutoCheckoutResult>(getSubmitTeacherAttendanceLocationSamplesUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(teacherLocationSamples)
+  }
+);}
+
+
+
+
+
+export const getSubmitTeacherAttendanceLocationSamplesMutationKey = () => ['submitTeacherAttendanceLocationSamples'] as const;
+
+export const getSubmitTeacherAttendanceLocationSamplesMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, TError,SubmitTeacherAttendanceLocationSamplesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, TError,SubmitTeacherAttendanceLocationSamplesMutationVariables, TContext> => {
+
+const mutationKey = getSubmitTeacherAttendanceLocationSamplesMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, SubmitTeacherAttendanceLocationSamplesMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  submitTeacherAttendanceLocationSamples(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitTeacherAttendanceLocationSamplesMutationResult = NonNullable<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>>
+    export type SubmitTeacherAttendanceLocationSamplesMutationBody = BodyType<TeacherLocationSamples>
+    export type SubmitTeacherAttendanceLocationSamplesMutationError = ErrorType<unknown>
+    export type SubmitTeacherAttendanceLocationSamplesMutationVariables = {id: string;data: BodyType<TeacherLocationSamples>}
+
+    export const useSubmitTeacherAttendanceLocationSamples = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, TError,SubmitTeacherAttendanceLocationSamplesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>,
+        TError,
+        SubmitTeacherAttendanceLocationSamplesMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitTeacherAttendanceLocationSamplesMutationOptions(options));
     }
 
 export const getListTeacherLeavesUrl = (params?: ListTeacherLeavesParams,) => {

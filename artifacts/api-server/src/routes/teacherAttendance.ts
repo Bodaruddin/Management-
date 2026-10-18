@@ -222,6 +222,24 @@ async function requireFacelessAttendancePermission(
   return teacher;
 }
 
+async function requireTeacherAttendanceSession(req: Request, res: Response) {
+  const session = await findAuthSession(bearerToken(req.get("authorization")));
+  if (!session) {
+    res.status(401).json({ error: "A valid teacher session is required" });
+    return null;
+  }
+  if (session.role !== "teacher") {
+    res.status(403).json({ error: "Only teachers can manage their automatic checkout" });
+    return null;
+  }
+  return session;
+}
+
+function toIsoTimestamp(value: unknown): string | null {
+  const date = value instanceof Date ? value : new Date(String(value ?? ""));
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
 function hasFaceReEnrollmentPermission(teacher: any): boolean {
   return teacher?.permissions?.reEnrollFace === true;
 }
@@ -240,6 +258,7 @@ async function verifyFace(teacherId: string, images: string[]) {
 
 
 let absenceSweepInProgress = false;
+let autoCheckoutSweepInProgress = false;
 
 /** Mark teachers absent after the configured attendance cutoff.
  *  This is intentionally server-side so it runs even when a teacher never opens the app.
@@ -311,6 +330,61 @@ export async function markMissedTeacherAttendance() {
     return { date, created, skipped: false };
   } finally {
     absenceSweepInProgress = false;
+  }
+}
+
+/** Close opted-in open attendance after the checkout window, using the final
+ *  server-verified GPS point received inside the school geofence.
+ */
+export async function markForgottenTeacherCheckouts() {
+  const date = asDate(undefined);
+  if (autoCheckoutSweepInProgress) {
+    return { date, closed: 0, skipped: true, reason: "in_progress" };
+  }
+  autoCheckoutSweepInProgress = true;
+  try {
+    const settings = await getSettings();
+    const fallbackMinute = Math.min(1439, timeToMinutes(settings.checkOutEnd) + 15);
+    if (currentTimeMinutes() < fallbackMinute) {
+      return { date, closed: 0, skipped: true, reason: "before_checkout_fallback" };
+    }
+
+    const adapter = getAdapter();
+    const firstDate = new Date(`${date}T12:00:00Z`);
+    firstDate.setUTCDate(firstDate.getUTCDate() - 6);
+    const datesToCheck = dateRange(firstDate.toISOString().slice(0, 10), date);
+    const currentMinutes = currentTimeMinutes();
+    let closed = 0;
+    for (const attendanceDate of datesToCheck) {
+      if (attendanceDate === date && currentMinutes < fallbackMinute) continue;
+      const candidates = await adapter.teacherAttendance.listAutoCheckoutCandidates(attendanceDate);
+      for (const record of candidates as any[]) {
+        const lastSchoolAt = toIsoTimestamp(record.lastSchoolAt);
+        const checkInAt = toIsoTimestamp(record.checkInAt);
+        const latitude = Number(record.lastSchoolLatitude);
+        const longitude = Number(record.lastSchoolLongitude);
+        if (
+          !lastSchoolAt
+          || !checkInAt
+          || String(record.date) !== attendanceDate
+          || asDate(lastSchoolAt) !== attendanceDate
+          || Date.parse(lastSchoolAt) <= Date.parse(checkInAt)
+          || !isValidCoordinate(latitude, -90, 90)
+          || !isValidCoordinate(longitude, -180, 180)
+        ) continue;
+
+        const row = await adapter.teacherAttendance.autoCheckOutIfOpen(String(record.id), {
+          checkOutAt: lastSchoolAt,
+          checkOutLatitude: latitude,
+          checkOutLongitude: longitude,
+          checkOutMethod: "automatic_end_of_day",
+        });
+        if (row) closed += 1;
+      }
+    }
+    return { date, closed, skipped: false };
+  } finally {
+    autoCheckoutSweepInProgress = false;
   }
 }
 
@@ -633,8 +707,166 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
   const row = await getAdapter().teacherAttendance.updateCheckOut(req.params.id, {
     checkOutAt: body.checkOutAt ?? new Date().toISOString(),
     checkOutLatitude: latitude, checkOutLongitude: longitude,
+    checkOutMethod: "manual",
   });
   res.json(row);
+});
+
+router.post("/teacher-attendance/:id/auto-checkout", async (req, res) => {
+  const session = await requireTeacherAttendanceSession(req, res);
+  if (!session) return;
+  const body = req.body ?? {};
+  const date = body.date;
+  if (typeof body.enabled !== "boolean" || typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    res.status(400).json({ error: "date and enabled are required" });
+    return;
+  }
+  const record = await getAdapter().teacherAttendance.getByTeacherDate(session.userId, date);
+  if (!record || String(record.id) !== req.params.id) {
+    res.status(404).json({ error: "Today's teacher attendance record was not found" });
+    return;
+  }
+  if (record.checkOutAt) {
+    res.json({ checkedOut: true, record });
+    return;
+  }
+  if (!record.checkInAt) {
+    res.status(409).json({ error: "Automatic checkout requires a recorded check-in", record });
+    return;
+  }
+  const updated = await getAdapter().teacherAttendance.setAutoCheckoutEnabled(
+    String(record.id),
+    session.userId,
+    body.enabled,
+  );
+  if (!updated) {
+    res.status(409).json({ error: "Automatic checkout could not be enabled for this attendance record" });
+    return;
+  }
+  res.json({ checkedOut: false, record: updated });
+});
+
+router.post("/teacher-attendance/:id/location-samples", async (req, res) => {
+  const session = await requireTeacherAttendanceSession(req, res);
+  if (!session) return;
+  const body = req.body ?? {};
+  const date = body.date;
+  const locations = body.locations;
+  if (
+    typeof date !== "string"
+    || !/^\d{4}-\d{2}-\d{2}$/.test(date)
+    || !Array.isArray(locations)
+    || locations.length === 0
+    || locations.length > 50
+  ) {
+    res.status(400).json({ error: "date and 1–50 location samples are required" });
+    return;
+  }
+
+  const adapter = getAdapter();
+  let record = await adapter.teacherAttendance.getByTeacherDate(session.userId, date);
+  if (!record || String(record.id) !== req.params.id) {
+    res.status(404).json({ error: "Teacher attendance record was not found" });
+    return;
+  }
+  if (record.checkOutAt) {
+    res.json({ checkedOut: true, record });
+    return;
+  }
+  if (!record.autoCheckoutEnabled) {
+    res.status(409).json({ error: "Automatic checkout location tracking is not enabled" });
+    return;
+  }
+
+  const settings = await getSettings();
+  if (settings.schoolLatitude === null || settings.schoolLongitude === null) {
+    res.status(409).json({ error: "School attendance location has not been configured" });
+    return;
+  }
+  const checkInMs = Date.parse(String(record.checkInAt));
+  const nowMs = Date.now();
+  const sortedLocations = locations
+    .map((sample: any) => {
+      const at = typeof sample?.timestamp === "number"
+        ? new Date(sample.timestamp)
+        : new Date(String(sample?.timestamp ?? ""));
+      return {
+        latitude: Number(sample?.latitude),
+        longitude: Number(sample?.longitude),
+        accuracy: sample?.accuracy === undefined || sample?.accuracy === null
+          ? undefined : Number(sample.accuracy),
+        at,
+      };
+    })
+    .filter((sample: any) =>
+      Number.isFinite(sample.at.getTime())
+      && isValidCoordinate(sample.latitude, -90, 90)
+      && isValidCoordinate(sample.longitude, -180, 180)
+      && (sample.accuracy === undefined || (
+        Number.isFinite(sample.accuracy) && sample.accuracy >= 0 && sample.accuracy <= 200
+      ))
+      && sample.at.getTime() >= checkInMs
+      && sample.at.getTime() <= nowMs + 120_000
+      && asDate(sample.at.toISOString()) === date,
+    )
+    .sort((left: any, right: any) => left.at.getTime() - right.at.getTime());
+
+  if (sortedLocations.length === 0) {
+    res.status(400).json({ error: "No valid same-day location samples were provided" });
+    return;
+  }
+
+  for (const sample of sortedLocations) {
+    const sampleAt = sample.at.toISOString();
+    const distance = distanceInMeters(
+      Number(settings.schoolLatitude),
+      Number(settings.schoolLongitude),
+      sample.latitude,
+      sample.longitude,
+    );
+    if (distance <= settings.radiusMeters) {
+      const updated = await adapter.teacherAttendance.updateLastSchoolLocation(
+        String(record.id),
+        session.userId,
+        { at: sampleAt, latitude: sample.latitude, longitude: sample.longitude },
+      );
+      if (updated) record = updated;
+      continue;
+    }
+
+    // Require the location to be clearly outside the boundary so GPS jitter at
+    // the edge does not close attendance prematurely.
+    const exitMargin = Math.max(25, Math.min(sample.accuracy ?? 25, 100));
+    if (distance <= settings.radiusMeters + exitMargin) continue;
+    const lastSchoolAt = toIsoTimestamp(record.lastSchoolAt);
+    const lastSchoolLatitude = Number(record.lastSchoolLatitude);
+    const lastSchoolLongitude = Number(record.lastSchoolLongitude);
+    if (
+      !lastSchoolAt
+      || asDate(lastSchoolAt) !== date
+      || Date.parse(lastSchoolAt) >= sample.at.getTime()
+      || !isValidCoordinate(lastSchoolLatitude, -90, 90)
+      || !isValidCoordinate(lastSchoolLongitude, -180, 180)
+    ) continue;
+
+    const closed = await adapter.teacherAttendance.autoCheckOutIfOpen(String(record.id), {
+      checkOutAt: lastSchoolAt,
+      checkOutLatitude: lastSchoolLatitude,
+      checkOutLongitude: lastSchoolLongitude,
+      checkOutMethod: "automatic_location",
+    });
+    if (closed) {
+      res.json({ checkedOut: true, record: closed });
+      return;
+    }
+    record = await adapter.teacherAttendance.getByTeacherDate(session.userId, date) ?? record;
+    if (record.checkOutAt) {
+      res.json({ checkedOut: true, record });
+      return;
+    }
+  }
+
+  res.json({ checkedOut: Boolean(record.checkOutAt), record });
 });
 
 router.get("/teacher-leaves", async (req, res) => {

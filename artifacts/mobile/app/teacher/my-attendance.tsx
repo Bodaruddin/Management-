@@ -1375,6 +1375,22 @@ export default function MyTeacherAttendance() {
                   <Text style={[s.time, { color: colors.text }]}>{formatTime(todayRecord?.checkOutAt)}</Text>
                 </View>
               </View>
+              {todayRecord?.autoCheckoutEnabled && !todayRecord.checkOutAt && (
+                <View style={[s.distanceRow, { borderTopColor: colors.border }]}>
+                  <Feather name="map-pin" size={13} color={colors.success} />
+                  <Text style={[s.distance, { color: colors.mutedForeground }]}>
+                    Automatic checkout is on. Background location may be paused by your phone.
+                  </Text>
+                </View>
+              )}
+              {todayRecord?.checkOutMethod && todayRecord.checkOutMethod !== 'manual' && (
+                <View style={[s.distanceRow, { borderTopColor: colors.border }]}>
+                  <Feather name="map-pin" size={13} color={colors.primary} />
+                  <Text style={[s.distance, { color: colors.mutedForeground }]}>
+                    Automatically checked out using the last GPS point inside school.
+                  </Text>
+                </View>
+              )}
               {todayRecord?.distanceFromSchool !== undefined && (
                 <View style={[s.distanceRow, { borderTopColor: colors.border }]}>
                   <Feather name="navigation" size={13} color={colors.success} />

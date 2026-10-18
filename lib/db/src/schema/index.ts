@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, jsonb, timestamp, unique, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, jsonb, timestamp, unique, doublePrecision, boolean } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
 export const classesTable = pgTable("classes", {
@@ -158,10 +158,15 @@ export const teacherAttendanceRecordsTable = pgTable("teacher_attendance_records
   status: text("status").notNull().default("present"),
   checkInAt: timestamp("check_in_at", { withTimezone: true }),
   checkOutAt: timestamp("check_out_at", { withTimezone: true }),
+  checkOutMethod: text("check_out_method"),
   checkInLatitude: doublePrecision("check_in_latitude"),
   checkInLongitude: doublePrecision("check_in_longitude"),
   checkOutLatitude: doublePrecision("check_out_latitude"),
   checkOutLongitude: doublePrecision("check_out_longitude"),
+  autoCheckoutEnabled: boolean("auto_checkout_enabled").notNull().default(false),
+  lastSchoolAt: timestamp("last_school_at", { withTimezone: true }),
+  lastSchoolLatitude: doublePrecision("last_school_latitude"),
+  lastSchoolLongitude: doublePrecision("last_school_longitude"),
   distanceFromSchool: doublePrecision("distance_from_school"),
   faceVerified: text("face_verified").notNull().default("false"),
   faceVerificationMethod: text("face_verification_method"),

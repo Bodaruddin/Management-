@@ -95,6 +95,22 @@ export interface DataAdapter {
     reconcileGeneratedHolidays(date: string, records: any[]): Promise<void>;
     clearGeneratedHolidaysExcept(dates: string[]): Promise<void>;
     updateCheckOut(id: string, data: any): Promise<any | null>;
+    setAutoCheckoutEnabled(id: string, teacherId: string, enabled: boolean): Promise<any | null>;
+    updateLastSchoolLocation(
+      id: string,
+      teacherId: string,
+      data: { at: string; latitude: number; longitude: number },
+    ): Promise<any | null>;
+    autoCheckOutIfOpen(
+      id: string,
+      data: {
+        checkOutAt: string;
+        checkOutLatitude: number;
+        checkOutLongitude: number;
+        checkOutMethod: "automatic_location" | "automatic_end_of_day";
+      },
+    ): Promise<any | null>;
+    listAutoCheckoutCandidates(date: string): Promise<any[]>;
     reset(teacherId?: string): Promise<number>;
   };
   teacherLeaveApplications: {
