@@ -16,7 +16,6 @@ import {
   useApp,
   Student,
   alumniToStudent,
-  isActiveStudent,
   STUDENT_GENDER_OPTIONS,
   STUDENT_CASTE_OPTIONS,
 } from '@/context/AppContext';
@@ -34,6 +33,19 @@ function calcFinalPayable(annualFee: string, discountType: 'fixed' | 'percent', 
 }
 function genAdmissionNo(count: number): string {
   return `ADM${new Date().getFullYear()}${String(count).padStart(4, '0')}`;
+}
+
+function birthdayStudentIdentityKeys(student: Student): string[] {
+  const keys = [`id:${student.id}`];
+  const admissionNo = student.admissionNo?.trim().toLowerCase();
+  if (admissionNo) keys.push(`admission:${admissionNo}`);
+
+  const name = student.name.trim().toLowerCase().replace(/\s+/g, ' ');
+  const fatherName = student.fatherName.trim().toLowerCase().replace(/\s+/g, ' ');
+  const dateOfBirth = student.dateOfBirth.trim();
+  if (name && dateOfBirth) keys.push(`person:${name}|${fatherName}|${dateOfBirth}`);
+
+  return keys;
 }
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -262,21 +274,38 @@ export default function TeacherDashboard() {
     [exams, todayStr],
   );
 
+  const birthdayEligibleStudents = useMemo(() => {
+    const seen = new Set<string>();
+    const candidates = [
+      ...students,
+      ...alumni.map(alumnus => ({
+        ...alumniToStudent(alumnus),
+        class: alumnus.class?.trim() || alumnus.passOutClass?.trim() || '',
+      })),
+    ];
+    return candidates.filter(student => {
+      if (!student.class.trim()) return false;
+      const identities = birthdayStudentIdentityKeys(student);
+      if (identities.some(identity => seen.has(identity))) return false;
+      identities.forEach(identity => seen.add(identity));
+      return true;
+    });
+  }, [students, alumni]);
   const birthdayStudents = useMemo(() =>
-    [...students, ...alumni.map(alumniToStudent)].filter(s => isBirthdayToday(s.dateOfBirth)),
-    [students, alumni],
+    birthdayEligibleStudents.filter(s => isBirthdayToday(s.dateOfBirth)),
+    [birthdayEligibleStudents],
   );
   const upcomingBirthdays = useMemo(() =>
-    [...students, ...alumni.map(alumniToStudent)]
+    birthdayEligibleStudents
       .filter(s => (() => { const d = daysUntilBirthday(s.dateOfBirth); return d > 0 && d <= 30; })())
       .sort((a, b) => daysUntilBirthday(a.dateOfBirth) - daysUntilBirthday(b.dateOfBirth))
       .slice(0, 5),
-    [students, alumni],
+    [birthdayEligibleStudents],
   );
   const monthBirthdays = useMemo(() => {
     const month = now.getMonth() + 1;
     const today = now.getDate();
-    return [...students, ...alumni.map(alumniToStudent)]
+    return birthdayEligibleStudents
       .filter(s => {
         const mmdd = extractMMDD(s.dateOfBirth);
         if (!mmdd) return false;
@@ -289,7 +318,7 @@ export default function TeacherDashboard() {
         const db = Number(extractMMDD(b.dateOfBirth)?.split('-')[1] ?? 99);
         return da - db;
       });
-  }, [students, alumni, now.getMonth(), now.getDate()]);
+  }, [birthdayEligibleStudents, now.getMonth(), now.getDate()]);
 
   useEffect(() => {
     if (isLoading) return;

@@ -168,6 +168,13 @@ function getEnvironmentDatabaseUrl(): string | undefined {
   );
 }
 
+function getEnvironmentDatabaseName(): string {
+  if (process.env.RENDER_DATABASE_URL) return "Render Database";
+  if (process.env.APP_DATABASE_URL) return "Application Database";
+  if (process.env.SUPABASE_DATABASE_URL || process.env.SUPABASE_DB_URL) return "Supabase Database";
+  return "Replit Database";
+}
+
 function isEncryptedValueError(error: unknown): boolean {
   const candidate = error as { code?: string; message?: string } | null;
   const message = candidate?.message ?? "";
@@ -275,6 +282,7 @@ export async function initDbManager(): Promise<void> {
       const { host, dbName } = parseDisplayInfo(envUrl);
       const refreshedConn: StoredConnectionPg = {
         ...conn,
+        name: getEnvironmentDatabaseName(),
         encryptedUrl: encrypt(envUrl),
         host,
         dbName,
@@ -333,13 +341,13 @@ export async function initDbManager(): Promise<void> {
       await pool.query("SELECT 1");
       _activeAdapter = createPgAdapter(buildDrizzle(pool));
       _activeId = "env";
-      _activeName = "Render Database";
+      _activeName = getEnvironmentDatabaseName();
       _activeDbType = "postgresql";
 
       if (!store.connections.find((c) => c.id === "env")) {
         const { host, dbName } = parseDisplayInfo(envUrl);
         store.connections.unshift({
-          id: "env", name: "Environment Database", dbType: "postgresql",
+          id: "env", name: getEnvironmentDatabaseName(), dbType: "postgresql",
           encryptedUrl: encrypt(envUrl), host, dbName,
           createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
         });
