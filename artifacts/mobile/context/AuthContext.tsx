@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { AppState } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getApiBase } from '@/constants/api';
+import { setAuthTokenGetter } from '@workspace/api-client-react';
 
 export interface AuthUser {
   id: string;
@@ -123,6 +124,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       Authorization: `Bearer ${sessionToken}`,
     };
     return fetch(`${getApiBase()}/api${path}`, { ...init, headers });
+  }, [sessionToken]);
+
+  useEffect(() => {
+    setAuthTokenGetter(() => sessionToken);
+    return () => setAuthTokenGetter(null);
   }, [sessionToken]);
 
   const clearLocalSession = useCallback(async () => {

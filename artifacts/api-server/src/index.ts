@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { initDbManager } from "./lib/dbManager";
 import { markMissedTeacherAttendance } from "./routes/teacherAttendance";
+import { runDailyNotificationScheduler } from "./lib/teacherNotifications";
 
 const rawPort = process.env["PORT"];
 
@@ -31,6 +32,12 @@ const runAbsenceSweep = async () => {
 await runAbsenceSweep();
 const absenceSweepTimer = setInterval(runAbsenceSweep, 60_000);
 absenceSweepTimer.unref?.();
+
+void runDailyNotificationScheduler();
+const notificationTimer = setInterval(() => {
+  void runDailyNotificationScheduler();
+}, 30_000);
+notificationTimer.unref?.();
 
 app.listen(port, (err) => {
   if (err) {

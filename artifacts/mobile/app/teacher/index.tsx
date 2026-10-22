@@ -213,6 +213,7 @@ const ACTIONS: {
   { label: 'Attendance',   sub: 'Mark & View',     grad: ['#8B5CF6','#A855F7'], icon: 'check-square',    route: '/teacher/attendance-menu' },
   { label: 'Enter Marks',  sub: 'Add & Manage',    grad: ['#F59E0B','#FBBF24'], icon: 'edit-2',          route: '/teacher/marks',   permKey: 'manageResults' },
   { label: 'Salary History', sub: 'Paid payments', grad: ['#10B981','#34D399'], icon: 'credit-card', route: '/teacher/salary' },
+  { label: 'Notifications', sub: 'School inbox', grad: ['#1E3A8A','#3B82F6'], icon: 'bell', route: '/notifications' },
   // ── Permission-gated (all 6 always rendered; locked when no access) ──
   { label: 'Collect Fee',  sub: 'Add & View',      grad: ['#F43F5E','#FB7185'], icon: 'dollar-sign',     route: '/teacher/fees',    permKey: 'feeCollection',   actionKey: 'feeCollection' },
   { label: 'Students',     sub: 'Add & Manage',    grad: ['#3B82F6','#60A5FA'], icon: 'users',        route: '/teacher/students', permKey: 'addStudent' },
@@ -450,7 +451,7 @@ export default function TeacherDashboard() {
   const ITEM_W = Math.floor((screenW - H_PAD * 2 - GRID_GAP * (COLS - 1)) / COLS);
   const STAT_W = (screenW - H_PAD * 2 - GRID_GAP) / 2;
 
-  // ── Action items: all 9 rendered, permission ones show lock when disabled ────
+  // ── Action items: all actions render; permission ones show lock when disabled ──
   const actionItems = ACTIONS.map(a => ({
     ...a,
     disabled: a.permKey

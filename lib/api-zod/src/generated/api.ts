@@ -603,3 +603,116 @@ export const SwitchAdminToTeacherResponse = zod.object({
 })
 
 
+export const getAdminNotificationsResponseScheduleTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+
+
+export const GetAdminNotificationsResponse = zod.object({
+  "teachers": zod.array(zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "hasPushToken": zod.boolean()
+})),
+  "schedule": zod.object({
+  "enabled": zod.boolean(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "time": zod.string().regex(getAdminNotificationsResponseScheduleTimeRegExp),
+  "timeZone": zod.string(),
+  "teacherId": zod.string().nullable().describe('Null sends to all teachers'),
+  "lastSentDate": zod.coerce.date().nullable()
+}),
+  "history": zod.array(zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "sentAt": zod.coerce.date(),
+  "recipientCount": zod.number().int(),
+  "pushAccepted": zod.number().int(),
+  "pushFailed": zod.number().int(),
+  "teacherId": zod.string().nullish(),
+  "source": zod.enum(['manual', 'daily'])
+}))
+})
+
+
+export const sendTeacherNotificationBodyTitleMax = 100;
+
+export const sendTeacherNotificationBodyBodyMax = 500;
+
+
+
+export const SendTeacherNotificationBody = zod.object({
+  "title": zod.string().max(sendTeacherNotificationBodyTitleMax),
+  "body": zod.string().max(sendTeacherNotificationBodyBodyMax),
+  "teacherId": zod.string().nullish().describe('Null sends to all teachers')
+})
+
+export const SendTeacherNotificationResponse = zod.object({
+  "notificationId": zod.string(),
+  "targetCount": zod.number().int(),
+  "pushAccepted": zod.number().int(),
+  "pushFailed": zod.number().int(),
+  "inAppCount": zod.number().int()
+})
+
+
+export const saveDailyNotificationScheduleBodyTitleMax = 100;
+
+export const saveDailyNotificationScheduleBodyBodyMax = 500;
+
+export const saveDailyNotificationScheduleBodyTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+
+
+export const SaveDailyNotificationScheduleBody = zod.object({
+  "enabled": zod.boolean(),
+  "title": zod.string().max(saveDailyNotificationScheduleBodyTitleMax),
+  "body": zod.string().max(saveDailyNotificationScheduleBodyBodyMax),
+  "time": zod.string().regex(saveDailyNotificationScheduleBodyTimeRegExp),
+  "teacherId": zod.string().nullish().describe('Null sends to all teachers')
+})
+
+export const saveDailyNotificationScheduleResponseTimeRegExp = new RegExp('^([01][0-9]|2[0-3]):[0-5][0-9]$');
+
+
+export const SaveDailyNotificationScheduleResponse = zod.object({
+  "enabled": zod.boolean(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "time": zod.string().regex(saveDailyNotificationScheduleResponseTimeRegExp),
+  "timeZone": zod.string(),
+  "teacherId": zod.string().nullable().describe('Null sends to all teachers'),
+  "lastSentDate": zod.coerce.date().nullable()
+})
+
+
+export const GetTeacherNotificationInboxResponse = zod.object({
+  "notifications": zod.array(zod.object({
+  "id": zod.string(),
+  "title": zod.string(),
+  "body": zod.string(),
+  "sentAt": zod.coerce.date(),
+  "read": zod.boolean(),
+  "source": zod.enum(['manual', 'daily']).optional()
+})),
+  "pushEnabled": zod.boolean()
+})
+
+
+export const MarkTeacherNotificationReadParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const MarkTeacherNotificationReadResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+export const RegisterTeacherNotificationDeviceBody = zod.object({
+  "token": zod.string()
+})
+
+export const RegisterTeacherNotificationDeviceResponse = zod.object({
+  "registered": zod.boolean()
+})
+
+

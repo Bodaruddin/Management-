@@ -83,6 +83,112 @@ export interface AdminUserUpdate {
   linkedTeacherId?: string | null;
 }
 
+export interface DailyNotificationSchedule {
+  enabled: boolean;
+  title: string;
+  body: string;
+  /** @pattern ^([01][0-9]|2[0-3]):[0-5][0-9]$ */
+  time: string;
+  timeZone: string;
+  /**
+     * Null sends to all teachers
+     * @nullable
+     */
+  teacherId: string | null;
+  /** @nullable */
+  lastSentDate: string | null;
+}
+
+export interface DailyNotificationScheduleUpdate {
+  enabled: boolean;
+  /** @maxLength 100 */
+  title: string;
+  /** @maxLength 500 */
+  body: string;
+  /** @pattern ^([01][0-9]|2[0-3]):[0-5][0-9]$ */
+  time: string;
+  /**
+     * Null sends to all teachers
+     * @nullable
+     */
+  teacherId?: string | null;
+}
+
+export interface TeacherNotificationSend {
+  /** @maxLength 100 */
+  title: string;
+  /** @maxLength 500 */
+  body: string;
+  /**
+     * Null sends to all teachers
+     * @nullable
+     */
+  teacherId?: string | null;
+}
+
+export interface TeacherNotificationSendResult {
+  notificationId: string;
+  targetCount: number;
+  pushAccepted: number;
+  pushFailed: number;
+  inAppCount: number;
+}
+
+export type TeacherNotificationSource = typeof TeacherNotificationSource[keyof typeof TeacherNotificationSource];
+
+
+export const TeacherNotificationSource = {
+  manual: 'manual',
+  daily: 'daily',
+} as const;
+
+export interface TeacherNotification {
+  id: string;
+  title: string;
+  body: string;
+  sentAt: string;
+  read: boolean;
+  source?: TeacherNotificationSource;
+}
+
+export interface NotificationTeacher {
+  id: string;
+  name: string;
+  hasPushToken: boolean;
+}
+
+export type NotificationHistoryItemSource = typeof NotificationHistoryItemSource[keyof typeof NotificationHistoryItemSource];
+
+
+export const NotificationHistoryItemSource = {
+  manual: 'manual',
+  daily: 'daily',
+} as const;
+
+export interface NotificationHistoryItem {
+  id: string;
+  title: string;
+  body: string;
+  sentAt: string;
+  recipientCount: number;
+  pushAccepted: number;
+  pushFailed: number;
+  /** @nullable */
+  teacherId?: string | null;
+  source: NotificationHistoryItemSource;
+}
+
+export interface AdminNotificationsDashboard {
+  teachers: NotificationTeacher[];
+  schedule: DailyNotificationSchedule;
+  history: NotificationHistoryItem[];
+}
+
+export interface TeacherNotificationInbox {
+  notifications: TeacherNotification[];
+  pushEnabled: boolean;
+}
+
 export type TeacherProfilePermissions = { [key: string]: unknown };
 
 export interface TeacherProfile {
@@ -357,5 +463,17 @@ adminId: AdminIdParameter;
 
 export type SwitchAdminToTeacherBody = {
   adminId: string;
+};
+
+export type MarkTeacherNotificationRead200 = {
+  success: boolean;
+};
+
+export type RegisterTeacherNotificationDeviceBody = {
+  token: string;
+};
+
+export type RegisterTeacherNotificationDevice200 = {
+  registered: boolean;
 };
 

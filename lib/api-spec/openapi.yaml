@@ -22,6 +22,8 @@ tags:
     description: Teacher holidays
   - name: student-attendance
     description: Student attendance holiday rules
+  - name: notifications
+    description: Admin announcements, daily notification schedules, and teacher push registrations
 paths:
   /teachers/login:
     post:
@@ -617,6 +619,113 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeacherProfile"
+  /notifications/admin:
+    get:
+      operationId: getAdminNotifications
+      tags: [notifications]
+      security:
+        - BearerSessionAuth: []
+      responses:
+        "200":
+          description: Notification setup, teachers, and recent sends
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminNotificationsDashboard"
+  /notifications/send:
+    post:
+      operationId: sendTeacherNotification
+      tags: [notifications]
+      security:
+        - BearerSessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeacherNotificationSend"
+      responses:
+        "200":
+          description: Notification saved to teacher inboxes and push delivery attempted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherNotificationSendResult"
+  /notifications/schedule:
+    put:
+      operationId: saveDailyNotificationSchedule
+      tags: [notifications]
+      security:
+        - BearerSessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DailyNotificationScheduleUpdate"
+      responses:
+        "200":
+          description: Daily notification schedule saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DailyNotificationSchedule"
+  /notifications/inbox:
+    get:
+      operationId: getTeacherNotificationInbox
+      tags: [notifications]
+      security:
+        - BearerSessionAuth: []
+      responses:
+        "200":
+          description: Notifications addressed to the signed-in teacher
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherNotificationInbox"
+  /notifications/inbox/{id}/read:
+    patch:
+      operationId: markTeacherNotificationRead
+      tags: [notifications]
+      security:
+        - BearerSessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      responses:
+        "200":
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [success]
+                properties:
+                  success: { type: boolean }
+  /notifications/device:
+    post:
+      operationId: registerTeacherNotificationDevice
+      tags: [notifications]
+      security:
+        - BearerSessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string }
+      responses:
+        "200":
+          description: Push device registered
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [registered]
+                properties:
+                  registered: { type: boolean }
 components:
   securitySchemes:
     BearerSessionAuth:
@@ -729,6 +838,95 @@ components:
         name: { type: string }
         password: { type: string }
         linkedTeacherId: { type: [string, "null"] }
+    DailyNotificationSchedule:
+      type: object
+      required: [enabled, title, body, time, timeZone, teacherId, lastSentDate]
+      properties:
+        enabled: { type: boolean }
+        title: { type: string }
+        body: { type: string }
+        time: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        timeZone: { type: string }
+        teacherId: { type: [string, "null"], description: Null sends to all teachers }
+        lastSentDate: { type: [string, "null"], format: date }
+    DailyNotificationScheduleUpdate:
+      type: object
+      required: [enabled, title, body, time]
+      properties:
+        enabled: { type: boolean }
+        title: { type: string, maxLength: 100 }
+        body: { type: string, maxLength: 500 }
+        time: { type: string, pattern: "^([01][0-9]|2[0-3]):[0-5][0-9]$" }
+        teacherId: { type: [string, "null"], description: Null sends to all teachers }
+    TeacherNotificationSend:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string, maxLength: 100 }
+        body: { type: string, maxLength: 500 }
+        teacherId: { type: [string, "null"], description: Null sends to all teachers }
+    TeacherNotificationSendResult:
+      type: object
+      required: [notificationId, targetCount, pushAccepted, pushFailed, inAppCount]
+      properties:
+        notificationId: { type: string }
+        targetCount: { type: integer }
+        pushAccepted: { type: integer }
+        pushFailed: { type: integer }
+        inAppCount: { type: integer }
+    TeacherNotification:
+      type: object
+      required: [id, title, body, sentAt, read]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        body: { type: string }
+        sentAt: { type: string, format: date-time }
+        read: { type: boolean }
+        source: { type: string, enum: [manual, daily] }
+    NotificationTeacher:
+      type: object
+      required: [id, name, hasPushToken]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        hasPushToken: { type: boolean }
+    NotificationHistoryItem:
+      type: object
+      required: [id, title, body, sentAt, recipientCount, pushAccepted, pushFailed, source]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        body: { type: string }
+        sentAt: { type: string, format: date-time }
+        recipientCount: { type: integer }
+        pushAccepted: { type: integer }
+        pushFailed: { type: integer }
+        teacherId: { type: [string, "null"] }
+        source: { type: string, enum: [manual, daily] }
+    AdminNotificationsDashboard:
+      type: object
+      required: [teachers, schedule, history]
+      properties:
+        teachers:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationTeacher"
+        schedule:
+          $ref: "#/components/schemas/DailyNotificationSchedule"
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/NotificationHistoryItem"
+    TeacherNotificationInbox:
+      type: object
+      required: [notifications, pushEnabled]
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeacherNotification"
+        pushEnabled: { type: boolean }
     TeacherProfile:
       type: object
       properties:

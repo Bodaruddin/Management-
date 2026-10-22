@@ -125,7 +125,13 @@ function AppHeader({ onAvatarPress, userName }: { onAvatarPress: () => void; use
         </View>
         {/* Right: bell + avatar */}
         <View style={ah.right}>
-          <TouchableOpacity style={ah.iconBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={ah.iconBtn}
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Open notifications"
+            onPress={() => router.push('/notifications' as any)}
+          >
             <Feather name="bell" size={20} color="#64748B" />
             <View style={ah.notifDot} />
           </TouchableOpacity>
@@ -1354,6 +1360,10 @@ export default function AdminDashboard() {
               <QuickActionItem
                 icon="send" label="Send Message" gradient={['#5B21B6', '#A78BFA']}
                 onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/messaging' as any); }}
+              />
+              <QuickActionItem
+                icon="bell" label="Notifications" gradient={['#0F2456', '#2563EB']}
+                onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/notifications' as any); }}
               />
               <QuickActionItem
                 icon="calendar" label="Attendance" gradient={['#0E7490', '#22D3EE']}

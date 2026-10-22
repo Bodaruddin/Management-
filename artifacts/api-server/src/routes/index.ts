@@ -22,6 +22,7 @@ import alumniRouter from "./alumni";
 import inactivationRequestsRouter from "./inactivationRequests";
 import settingsRouter from "./settings";
 import teacherAttendanceRouter from "./teacherAttendance";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -48,5 +49,6 @@ router.use(alumniRouter);
 router.use(inactivationRequestsRouter);
 router.use(settingsRouter);
 router.use(teacherAttendanceRouter);
+router.use(notificationsRouter);
 
 export default router;
