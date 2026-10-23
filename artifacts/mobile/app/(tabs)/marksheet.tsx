@@ -952,12 +952,11 @@ function buildCombinedMarksheetHtml(
       page-break-inside:avoid;
       break-inside:avoid;
     }
+    /* Match the working single marksheet: keep the signature and its role label
+       as normal-flow siblings for the native Android print renderer. */
     .sig-block {
-      display:flex;
+      display:block;
       flex:0 0 50%;
-      flex-direction:column;
-      align-items:center;
-      justify-content:flex-end;
       min-width:0;
       text-align:center;
     }
