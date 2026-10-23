@@ -47,3 +47,6 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Firebase Android client config (provide through a local file or EAS file variable).
+artifacts/mobile/google-services.json
