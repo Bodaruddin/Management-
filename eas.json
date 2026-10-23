@@ -6,12 +6,15 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "pnpm": "10.26.1"
     },
     "preview": {
       "distribution": "internal",
+      "pnpm": "10.26.1",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "image": "latest"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://management-2-5u13.onrender.com"
@@ -19,8 +22,10 @@
     },
     "production": {
       "autoIncrement": true,
+      "pnpm": "10.26.1",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "image": "latest"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://management-2-5u13.onrender.com"
