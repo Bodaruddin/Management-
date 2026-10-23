@@ -134,6 +134,23 @@ export interface TeacherNotificationSendResult {
   inAppCount: number;
 }
 
+export interface NotificationEditRequest {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  title: string;
+  /**
+     * @minLength 1
+     * @maxLength 500
+     */
+  body: string;
+}
+
+export interface NotificationMutationResult {
+  success: boolean;
+}
+
 export type TeacherNotificationSource = typeof TeacherNotificationSource[keyof typeof TeacherNotificationSource];
 
 

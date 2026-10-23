@@ -693,6 +693,45 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TeacherNotificationSendResult"
+  /notifications/admin/{id}:
+    parameters:
+      - $ref: "#/components/parameters/RecordId"
+    patch:
+      operationId: editAdminNotification
+      tags: [notifications]
+      summary: Update a saved notification in all teacher inboxes
+      security:
+        - BearerSessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationEditRequest"
+      responses:
+        "200":
+          description: Notification updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationMutationResult"
+        "404":
+          description: Notification not found
+    delete:
+      operationId: deleteAdminNotification
+      tags: [notifications]
+      summary: Remove a notification from all teacher inboxes and admin history
+      security:
+        - BearerSessionAuth: []
+      responses:
+        "200":
+          description: Notification deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationMutationResult"
+        "404":
+          description: Notification not found
   /notifications/schedule:
     put:
       operationId: saveDailyNotificationSchedule
@@ -743,6 +782,24 @@ paths:
                 required: [success]
                 properties:
                   success: { type: boolean }
+  /notifications/inbox/{id}:
+    delete:
+      operationId: deleteTeacherInboxNotification
+      tags: [notifications]
+      summary: Hide a notification from the signed-in teacher's inbox only
+      security:
+        - BearerSessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/RecordId"
+      responses:
+        "200":
+          description: Notification hidden from this inbox
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationMutationResult"
+        "404":
+          description: Notification not found for this teacher
   /notifications/device:
     post:
       operationId: registerTeacherNotificationDevice
@@ -916,6 +973,17 @@ components:
         pushAccepted: { type: integer }
         pushFailed: { type: integer }
         inAppCount: { type: integer }
+    NotificationEditRequest:
+      type: object
+      required: [title, body]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 100 }
+        body: { type: string, minLength: 1, maxLength: 500 }
+    NotificationMutationResult:
+      type: object
+      required: [success]
+      properties:
+        success: { type: boolean }
     TeacherNotification:
       type: object
       required: [id, title, body, sentAt, read]

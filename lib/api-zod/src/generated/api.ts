@@ -735,6 +735,41 @@ export const SendTeacherNotificationResponse = zod.object({
 })
 
 
+/**
+ * @summary Update a saved notification in all teacher inboxes
+ */
+export const EditAdminNotificationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const editAdminNotificationBodyTitleMax = 100;
+
+export const editAdminNotificationBodyBodyMax = 500;
+
+
+
+export const EditAdminNotificationBody = zod.object({
+  "title": zod.string().min(1).max(editAdminNotificationBodyTitleMax),
+  "body": zod.string().min(1).max(editAdminNotificationBodyBodyMax)
+})
+
+export const EditAdminNotificationResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Remove a notification from all teacher inboxes and admin history
+ */
+export const DeleteAdminNotificationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteAdminNotificationResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
 export const saveDailyNotificationScheduleBodyTitleMax = 100;
 
 export const saveDailyNotificationScheduleBodyBodyMax = 500;
@@ -782,6 +817,18 @@ export const MarkTeacherNotificationReadParams = zod.object({
 })
 
 export const MarkTeacherNotificationReadResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary Hide a notification from the signed-in teacher's inbox only
+ */
+export const DeleteTeacherInboxNotificationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteTeacherInboxNotificationResponse = zod.object({
   "success": zod.boolean()
 })
 

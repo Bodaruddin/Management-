@@ -123,17 +123,19 @@ function AppHeader({ onAvatarPress, userName }: { onAvatarPress: () => void; use
           />
           <Text style={ah.title} numberOfLines={2}>DR. APJ ABDUL KALAM{'\n'}JATIYA VIDYALAYA</Text>
         </View>
-        {/* Right: bell + avatar */}
+        {/* Right: notifications + avatar */}
         <View style={ah.right}>
           <TouchableOpacity
-            style={ah.iconBtn}
-            activeOpacity={0.7}
+            style={ah.notificationBtn}
+            activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel="Open notifications"
-            onPress={() => router.push('/notifications' as any)}
+            onPress={async () => {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push('/notifications' as any);
+            }}
           >
-            <Feather name="bell" size={20} color="#64748B" />
-            <View style={ah.notifDot} />
+            <Feather name="bell" size={19} color="#64748B" />
           </TouchableOpacity>
           <TouchableOpacity style={ah.avatarBtn} onPress={onAvatarPress} activeOpacity={0.75}>
             <Text style={ah.avatarTxt}>{(userName ?? 'A').charAt(0).toUpperCase()}</Text>
@@ -160,11 +162,9 @@ const ah = StyleSheet.create({
   logoImg: { width: 40, height: 40 },
   title: { fontSize: 11, fontWeight: '800', color: '#0C1F4A', letterSpacing: -0.1, flexShrink: 1, lineHeight: 15 },
   right: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  iconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  notifDot: {
-    position: 'absolute', width: 8, height: 8, borderRadius: 4,
-    backgroundColor: '#C8A040', top: 7, right: 7,
-    borderWidth: 1.5, borderColor: '#fff',
+  notificationBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center',
   },
   avatarBtn: {
     width: 36, height: 36, borderRadius: 18,
@@ -1231,7 +1231,7 @@ export default function AdminDashboard() {
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
       {/* ── App Header ── */}
       <AppHeader
         onAvatarPress={() => setLogoutModal(true)}
@@ -1360,10 +1360,6 @@ export default function AdminDashboard() {
               <QuickActionItem
                 icon="send" label="Send Message" gradient={['#5B21B6', '#A78BFA']}
                 onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/messaging' as any); }}
-              />
-              <QuickActionItem
-                icon="bell" label="Notifications" gradient={['#0F2456', '#2563EB']}
-                onPress={async () => { await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/notifications' as any); }}
               />
               <QuickActionItem
                 icon="calendar" label="Attendance" gradient={['#0E7490', '#22D3EE']}
@@ -2217,7 +2213,7 @@ export default function AdminDashboard() {
           </View>
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 

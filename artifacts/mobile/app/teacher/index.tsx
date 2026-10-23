@@ -213,7 +213,6 @@ const ACTIONS: {
   { label: 'Attendance',   sub: 'Mark & View',     grad: ['#8B5CF6','#A855F7'], icon: 'check-square',    route: '/teacher/attendance-menu' },
   { label: 'Enter Marks',  sub: 'Add & Manage',    grad: ['#F59E0B','#FBBF24'], icon: 'edit-2',          route: '/teacher/marks',   permKey: 'manageResults' },
   { label: 'Salary History', sub: 'Paid payments', grad: ['#10B981','#34D399'], icon: 'credit-card', route: '/teacher/salary' },
-  { label: 'Notifications', sub: 'School inbox', grad: ['#1E3A8A','#3B82F6'], icon: 'bell', route: '/notifications' },
   // ── Permission-gated (all 6 always rendered; locked when no access) ──
   { label: 'Collect Fee',  sub: 'Add & View',      grad: ['#F43F5E','#FB7185'], icon: 'dollar-sign',     route: '/teacher/fees',    permKey: 'feeCollection',   actionKey: 'feeCollection' },
   { label: 'Students',     sub: 'Add & Manage',    grad: ['#3B82F6','#60A5FA'], icon: 'users',        route: '/teacher/students', permKey: 'addStudent' },
@@ -471,11 +470,12 @@ export default function TeacherDashboard() {
   };
 
   return (
-    <ScrollView
-      style={s.root}
-      contentContainerStyle={{ paddingBottom: botPad }}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={{ flex: 1, backgroundColor: '#EEF1FF' }}>
+      <ScrollView
+        style={s.root}
+        contentContainerStyle={{ paddingBottom: botPad }}
+        showsVerticalScrollIndicator={false}
+      >
       {/* ── HEADER ──────────────────────────────────────────────────────────── */}
       <LinearGradient
         colors={['#050D2D', '#0D2060', '#1A3A9C']}
@@ -497,10 +497,24 @@ export default function TeacherDashboard() {
             />
             <Text style={s.schoolName}>DR. APJ ABDUL KALAM{'\n'}JATIYA VIDYALAYA</Text>
           </View>
-          <TouchableOpacity style={s.avatar} onPress={() => setShowProfile(true)} activeOpacity={0.8}>
-            <Text style={s.avatarTxt}>{initials}</Text>
-            <View style={s.onlineDot} />
-          </TouchableOpacity>
+          <View style={s.topBarActions}>
+            <TouchableOpacity
+              style={s.notificationButton}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel="Open notifications"
+              onPress={async () => {
+                await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                router.push('/notifications' as any);
+              }}
+            >
+              <Feather name="bell" size={19} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity style={s.avatar} onPress={() => setShowProfile(true)} activeOpacity={0.8}>
+              <Text style={s.avatarTxt}>{initials}</Text>
+              <View style={s.onlineDot} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Greeting hero row */}
@@ -1492,7 +1506,8 @@ export default function TeacherDashboard() {
         message="The student has been added successfully."
         onDismiss={() => setShowStudentSuccess(false)}
       />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -1517,6 +1532,13 @@ const s = StyleSheet.create({
   topBar: {
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 22,
+  },
+  topBarActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  notificationButton: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
   },
   schoolBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

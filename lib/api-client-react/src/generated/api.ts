@@ -38,6 +38,8 @@ import type {
   ListTeacherAttendanceParams,
   ListTeacherLeavesParams,
   MarkTeacherNotificationRead200,
+  NotificationEditRequest,
+  NotificationMutationResult,
   PayrollCalculate,
   PayrollReport,
   RegisterTeacherNotificationDevice200,
@@ -82,8 +84,6 @@ type AwaitedInput<T> = PromiseLike<T> | T;
       type Awaited<O> = O extends AwaitedInput<infer T> ? T : never;
 
 
-type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
-
 
 
 const withQueryKey = <T extends object, K>(query: T, queryKey: K): T & { queryKey: K } => {
@@ -112,7 +112,7 @@ export const getLoginTeacherUrl = () => {
 /**
  * @summary Verify teacher credentials and start a server session
  */
-export const loginTeacher = async (teacherLoginRequest: TeacherLoginRequest, options?: Parameters<typeof customFetch>[1]): Promise<TeacherLoginResponse> => {
+export const loginTeacher = async (teacherLoginRequest: TeacherLoginRequest, options?: RequestInit): Promise<TeacherLoginResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -144,15 +144,15 @@ return customFetch<TeacherLoginResponse>(getLoginTeacherUrl(),
 export const getLoginTeacherMutationKey = () => ['loginTeacher'] as const;
 
 export const getLoginTeacherMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginTeacher>>, TError,LoginTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginTeacher>>, TError,LoginTeacherMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof loginTeacher>>, TError,LoginTeacherMutationVariables, TContext> => {
 
 const mutationKey = getLoginTeacherMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -160,7 +160,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof loginTeacher>>, LoginTeacherMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  loginTeacher(data,requestOptions)
+          return  loginTeacher(data,)
         }
 
 
@@ -179,7 +179,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Verify teacher credentials and start a server session
  */
 export const useLoginTeacher = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginTeacher>>, TError,LoginTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof loginTeacher>>, TError,LoginTeacherMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof loginTeacher>>,
         TError,
@@ -200,7 +200,7 @@ export const getVerifyAdminCredentialsUrl = () => {
 /**
  * @summary Verify administrator credentials and start a server session
  */
-export const verifyAdminCredentials = async (adminLoginRequest: AdminLoginRequest, options?: Parameters<typeof customFetch>[1]): Promise<AdminLoginResponse> => {
+export const verifyAdminCredentials = async (adminLoginRequest: AdminLoginRequest, options?: RequestInit): Promise<AdminLoginResponse> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -232,15 +232,15 @@ return customFetch<AdminLoginResponse>(getVerifyAdminCredentialsUrl(),
 export const getVerifyAdminCredentialsMutationKey = () => ['verifyAdminCredentials'] as const;
 
 export const getVerifyAdminCredentialsMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAdminCredentials>>, TError,VerifyAdminCredentialsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAdminCredentials>>, TError,VerifyAdminCredentialsMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof verifyAdminCredentials>>, TError,VerifyAdminCredentialsMutationVariables, TContext> => {
 
 const mutationKey = getVerifyAdminCredentialsMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -248,7 +248,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof verifyAdminCredentials>>, VerifyAdminCredentialsMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  verifyAdminCredentials(data,requestOptions)
+          return  verifyAdminCredentials(data,)
         }
 
 
@@ -267,7 +267,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Verify administrator credentials and start a server session
  */
 export const useVerifyAdminCredentials = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAdminCredentials>>, TError,VerifyAdminCredentialsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof verifyAdminCredentials>>, TError,VerifyAdminCredentialsMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof verifyAdminCredentials>>,
         TError,
@@ -285,7 +285,7 @@ export const getValidateAuthSessionUrl = () => {
   return `/api/auth/session`
 }
 
-export const validateAuthSession = async ( options?: Parameters<typeof customFetch>[1]): Promise<AuthSessionStatus> => {
+export const validateAuthSession = async ( options?: RequestInit): Promise<AuthSessionStatus> => {
 
   return customFetch<AuthSessionStatus>(getValidateAuthSessionUrl(),
   {
@@ -307,16 +307,16 @@ export const getValidateAuthSessionQueryKey = () => {
     }
 
 
-export const getValidateAuthSessionQueryOptions = <TData = Awaited<ReturnType<typeof validateAuthSession>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateAuthSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getValidateAuthSessionQueryOptions = <TData = Awaited<ReturnType<typeof validateAuthSession>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateAuthSession>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getValidateAuthSessionQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof validateAuthSession>>> = ({ signal }) => validateAuthSession({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof validateAuthSession>>> = ({ signal }) => validateAuthSession({ signal });
 
 
 
@@ -331,7 +331,7 @@ export type ValidateAuthSessionQueryError = ErrorType<void>
 
 
 export function useValidateAuthSession<TData = Awaited<ReturnType<typeof validateAuthSession>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateAuthSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof validateAuthSession>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -356,7 +356,7 @@ export const getLogoutAuthSessionUrl = () => {
   return `/api/auth/logout`
 }
 
-export const logoutAuthSession = async ( options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+export const logoutAuthSession = async ( options?: RequestInit): Promise<void> => {
 
   return customFetch<void>(getLogoutAuthSessionUrl(),
   {
@@ -374,15 +374,15 @@ export const logoutAuthSession = async ( options?: Parameters<typeof customFetch
 export const getLogoutAuthSessionMutationKey = () => ['logoutAuthSession'] as const;
 
 export const getLogoutAuthSessionMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAuthSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAuthSession>>, TError,void, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof logoutAuthSession>>, TError,void, TContext> => {
 
 const mutationKey = getLogoutAuthSessionMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -390,7 +390,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof logoutAuthSession>>, void> = () => {
 
 
-          return  logoutAuthSession(requestOptions)
+          return  logoutAuthSession()
         }
 
 
@@ -406,7 +406,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
     export const useLogoutAuthSession = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAuthSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof logoutAuthSession>>, TError,void, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof logoutAuthSession>>,
         TError,
@@ -427,7 +427,7 @@ export const getForceLogoutTeacherUrl = (id: string,) => {
 /**
  * @summary Revoke all active sessions for a teacher
  */
-export const forceLogoutTeacher = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<TeacherForceLogoutResult> => {
+export const forceLogoutTeacher = async (id: string, options?: RequestInit): Promise<TeacherForceLogoutResult> => {
 
   return customFetch<TeacherForceLogoutResult>(getForceLogoutTeacherUrl(id),
   {
@@ -445,15 +445,15 @@ export const forceLogoutTeacher = async (id: string, options?: Parameters<typeof
 export const getForceLogoutTeacherMutationKey = () => ['forceLogoutTeacher'] as const;
 
 export const getForceLogoutTeacherMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof forceLogoutTeacher>>, TError,ForceLogoutTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof forceLogoutTeacher>>, TError,ForceLogoutTeacherMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof forceLogoutTeacher>>, TError,ForceLogoutTeacherMutationVariables, TContext> => {
 
 const mutationKey = getForceLogoutTeacherMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -461,7 +461,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof forceLogoutTeacher>>, ForceLogoutTeacherMutationVariables> = (props) => {
           const {id} = props ?? {};
 
-          return  forceLogoutTeacher(id,requestOptions)
+          return  forceLogoutTeacher(id,)
         }
 
 
@@ -480,7 +480,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Revoke all active sessions for a teacher
  */
 export const useForceLogoutTeacher = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof forceLogoutTeacher>>, TError,ForceLogoutTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof forceLogoutTeacher>>, TError,ForceLogoutTeacherMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof forceLogoutTeacher>>,
         TError,
@@ -502,7 +502,7 @@ export const getSetTeacherFacelessAttendancePermissionUrl = (id: string,) => {
  * @summary Grant or revoke a teacher's face-free attendance permission
  */
 export const setTeacherFacelessAttendancePermission = async (id: string,
-    teacherFacelessAttendancePermissionUpdate: TeacherFacelessAttendancePermissionUpdate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherFacelessAttendancePermission> => {
+    teacherFacelessAttendancePermissionUpdate: TeacherFacelessAttendancePermissionUpdate, options?: RequestInit): Promise<TeacherFacelessAttendancePermission> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -534,15 +534,15 @@ return customFetch<TeacherFacelessAttendancePermission>(getSetTeacherFacelessAtt
 export const getSetTeacherFacelessAttendancePermissionMutationKey = () => ['setTeacherFacelessAttendancePermission'] as const;
 
 export const getSetTeacherFacelessAttendancePermissionMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, TError,SetTeacherFacelessAttendancePermissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, TError,SetTeacherFacelessAttendancePermissionMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, TError,SetTeacherFacelessAttendancePermissionMutationVariables, TContext> => {
 
 const mutationKey = getSetTeacherFacelessAttendancePermissionMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -550,7 +550,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, SetTeacherFacelessAttendancePermissionMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  setTeacherFacelessAttendancePermission(id,data,requestOptions)
+          return  setTeacherFacelessAttendancePermission(id,data,)
         }
 
 
@@ -569,7 +569,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Grant or revoke a teacher's face-free attendance permission
  */
 export const useSetTeacherFacelessAttendancePermission = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, TError,SetTeacherFacelessAttendancePermissionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>, TError,SetTeacherFacelessAttendancePermissionMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof setTeacherFacelessAttendancePermission>>,
         TError,
@@ -591,7 +591,7 @@ export const getHealthCheckUrl = () => {
  * Returns server health status
  * @summary Health check
  */
-export const healthCheck = async ( options?: Parameters<typeof customFetch>[1]): Promise<HealthStatus> => {
+export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus> => {
 
   return customFetch<HealthStatus>(getHealthCheckUrl(),
   {
@@ -613,16 +613,16 @@ export const getHealthCheckQueryKey = () => {
     }
 
 
-export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getHealthCheckQueryOptions = <TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getHealthCheckQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({ signal }) => healthCheck({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof healthCheck>>> = ({ signal }) => healthCheck({ signal });
 
 
 
@@ -640,7 +640,7 @@ export type HealthCheckQueryError = ErrorType<unknown>
  */
 
 export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof healthCheck>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -665,7 +665,7 @@ export const getGetStudentAttendanceHolidaySettingsUrl = () => {
   return `/api/student-attendance/settings`
 }
 
-export const getStudentAttendanceHolidaySettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<StudentAttendanceHolidaySettings> => {
+export const getStudentAttendanceHolidaySettings = async ( options?: RequestInit): Promise<StudentAttendanceHolidaySettings> => {
 
   return customFetch<StudentAttendanceHolidaySettings>(getGetStudentAttendanceHolidaySettingsUrl(),
   {
@@ -687,16 +687,16 @@ export const getGetStudentAttendanceHolidaySettingsQueryKey = () => {
     }
 
 
-export const getGetStudentAttendanceHolidaySettingsQueryOptions = <TData = Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetStudentAttendanceHolidaySettingsQueryOptions = <TData = Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetStudentAttendanceHolidaySettingsQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>> = ({ signal }) => getStudentAttendanceHolidaySettings({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>> = ({ signal }) => getStudentAttendanceHolidaySettings({ signal });
 
 
 
@@ -711,7 +711,7 @@ export type GetStudentAttendanceHolidaySettingsQueryError = ErrorType<unknown>
 
 
 export function useGetStudentAttendanceHolidaySettings<TData = Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStudentAttendanceHolidaySettings>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -736,7 +736,7 @@ export const getUpdateStudentAttendanceHolidaySettingsUrl = () => {
   return `/api/student-attendance/settings`
 }
 
-export const updateStudentAttendanceHolidaySettings = async (studentAttendanceHolidaySettingsUpdate: StudentAttendanceHolidaySettingsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<StudentAttendanceHolidaySettings> => {
+export const updateStudentAttendanceHolidaySettings = async (studentAttendanceHolidaySettingsUpdate: StudentAttendanceHolidaySettingsUpdate, options?: RequestInit): Promise<StudentAttendanceHolidaySettings> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -768,15 +768,15 @@ return customFetch<StudentAttendanceHolidaySettings>(getUpdateStudentAttendanceH
 export const getUpdateStudentAttendanceHolidaySettingsMutationKey = () => ['updateStudentAttendanceHolidaySettings'] as const;
 
 export const getUpdateStudentAttendanceHolidaySettingsMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, TError,UpdateStudentAttendanceHolidaySettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, TError,UpdateStudentAttendanceHolidaySettingsMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, TError,UpdateStudentAttendanceHolidaySettingsMutationVariables, TContext> => {
 
 const mutationKey = getUpdateStudentAttendanceHolidaySettingsMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -784,7 +784,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, UpdateStudentAttendanceHolidaySettingsMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  updateStudentAttendanceHolidaySettings(data,requestOptions)
+          return  updateStudentAttendanceHolidaySettings(data,)
         }
 
 
@@ -800,7 +800,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateStudentAttendanceHolidaySettingsMutationVariables = {data: BodyType<StudentAttendanceHolidaySettingsUpdate>}
 
     export const useUpdateStudentAttendanceHolidaySettings = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, TError,UpdateStudentAttendanceHolidaySettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>, TError,UpdateStudentAttendanceHolidaySettingsMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateStudentAttendanceHolidaySettings>>,
         TError,
@@ -818,7 +818,7 @@ export const getCreateStudentAttendanceHolidayUrl = () => {
   return `/api/student-attendance/holidays`
 }
 
-export const createStudentAttendanceHoliday = async (studentAttendanceHolidayCreate: StudentAttendanceHolidayCreate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherHoliday> => {
+export const createStudentAttendanceHoliday = async (studentAttendanceHolidayCreate: StudentAttendanceHolidayCreate, options?: RequestInit): Promise<TeacherHoliday> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -850,15 +850,15 @@ return customFetch<TeacherHoliday>(getCreateStudentAttendanceHolidayUrl(),
 export const getCreateStudentAttendanceHolidayMutationKey = () => ['createStudentAttendanceHoliday'] as const;
 
 export const getCreateStudentAttendanceHolidayMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, TError,CreateStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, TError,CreateStudentAttendanceHolidayMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, TError,CreateStudentAttendanceHolidayMutationVariables, TContext> => {
 
 const mutationKey = getCreateStudentAttendanceHolidayMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -866,7 +866,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, CreateStudentAttendanceHolidayMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  createStudentAttendanceHoliday(data,requestOptions)
+          return  createStudentAttendanceHoliday(data,)
         }
 
 
@@ -882,7 +882,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateStudentAttendanceHolidayMutationVariables = {data: BodyType<StudentAttendanceHolidayCreate>}
 
     export const useCreateStudentAttendanceHoliday = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, TError,CreateStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createStudentAttendanceHoliday>>, TError,CreateStudentAttendanceHolidayMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof createStudentAttendanceHoliday>>,
         TError,
@@ -901,7 +901,7 @@ export const getUpdateStudentAttendanceHolidayUrl = (id: string,) => {
 }
 
 export const updateStudentAttendanceHoliday = async (id: string,
-    studentAttendanceHolidayCreate: StudentAttendanceHolidayCreate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherHoliday> => {
+    studentAttendanceHolidayCreate: StudentAttendanceHolidayCreate, options?: RequestInit): Promise<TeacherHoliday> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -933,15 +933,15 @@ return customFetch<TeacherHoliday>(getUpdateStudentAttendanceHolidayUrl(id),
 export const getUpdateStudentAttendanceHolidayMutationKey = () => ['updateStudentAttendanceHoliday'] as const;
 
 export const getUpdateStudentAttendanceHolidayMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,UpdateStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,UpdateStudentAttendanceHolidayMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,UpdateStudentAttendanceHolidayMutationVariables, TContext> => {
 
 const mutationKey = getUpdateStudentAttendanceHolidayMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -949,7 +949,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, UpdateStudentAttendanceHolidayMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  updateStudentAttendanceHoliday(id,data,requestOptions)
+          return  updateStudentAttendanceHoliday(id,data,)
         }
 
 
@@ -965,7 +965,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateStudentAttendanceHolidayMutationVariables = {id: string;data: BodyType<StudentAttendanceHolidayCreate>}
 
     export const useUpdateStudentAttendanceHoliday = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,UpdateStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>, TError,UpdateStudentAttendanceHolidayMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateStudentAttendanceHoliday>>,
         TError,
@@ -992,7 +992,7 @@ export const getDeleteStudentAttendanceHolidayUrl = (id: string,
 }
 
 export const deleteStudentAttendanceHoliday = async (id: string,
-    params: DeleteStudentAttendanceHolidayParams, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+    params: DeleteStudentAttendanceHolidayParams, options?: RequestInit): Promise<void> => {
 
   return customFetch<void>(getDeleteStudentAttendanceHolidayUrl(id,params),
   {
@@ -1010,15 +1010,15 @@ export const deleteStudentAttendanceHoliday = async (id: string,
 export const getDeleteStudentAttendanceHolidayMutationKey = () => ['deleteStudentAttendanceHoliday'] as const;
 
 export const getDeleteStudentAttendanceHolidayMutationOptions = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,DeleteStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,DeleteStudentAttendanceHolidayMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,DeleteStudentAttendanceHolidayMutationVariables, TContext> => {
 
 const mutationKey = getDeleteStudentAttendanceHolidayMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -1026,7 +1026,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, DeleteStudentAttendanceHolidayMutationVariables> = (props) => {
           const {id,params} = props ?? {};
 
-          return  deleteStudentAttendanceHoliday(id,params,requestOptions)
+          return  deleteStudentAttendanceHoliday(id,params,)
         }
 
 
@@ -1042,7 +1042,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteStudentAttendanceHolidayMutationVariables = {id: string;params: DeleteStudentAttendanceHolidayParams}
 
     export const useDeleteStudentAttendanceHoliday = <TError = ErrorType<void>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,DeleteStudentAttendanceHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>, TError,DeleteStudentAttendanceHolidayMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteStudentAttendanceHoliday>>,
         TError,
@@ -1060,7 +1060,7 @@ export const getGetTeacherAttendanceSettingsUrl = () => {
   return `/api/settings/teacher-attendance`
 }
 
-export const getTeacherAttendanceSettings = async ( options?: Parameters<typeof customFetch>[1]): Promise<TeacherAttendanceSettings> => {
+export const getTeacherAttendanceSettings = async ( options?: RequestInit): Promise<TeacherAttendanceSettings> => {
 
   return customFetch<TeacherAttendanceSettings>(getGetTeacherAttendanceSettingsUrl(),
   {
@@ -1082,16 +1082,16 @@ export const getGetTeacherAttendanceSettingsQueryKey = () => {
     }
 
 
-export const getGetTeacherAttendanceSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherAttendanceSettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherAttendanceSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetTeacherAttendanceSettingsQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherAttendanceSettings>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherAttendanceSettings>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetTeacherAttendanceSettingsQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherAttendanceSettings>>> = ({ signal }) => getTeacherAttendanceSettings({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherAttendanceSettings>>> = ({ signal }) => getTeacherAttendanceSettings({ signal });
 
 
 
@@ -1106,7 +1106,7 @@ export type GetTeacherAttendanceSettingsQueryError = ErrorType<unknown>
 
 
 export function useGetTeacherAttendanceSettings<TData = Awaited<ReturnType<typeof getTeacherAttendanceSettings>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherAttendanceSettings>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherAttendanceSettings>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -1131,7 +1131,7 @@ export const getUpdateTeacherAttendanceSettingsUrl = () => {
   return `/api/settings/teacher-attendance`
 }
 
-export const updateTeacherAttendanceSettings = async (teacherAttendanceSettingsUpdate: TeacherAttendanceSettingsUpdate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherAttendanceSettings> => {
+export const updateTeacherAttendanceSettings = async (teacherAttendanceSettingsUpdate: TeacherAttendanceSettingsUpdate, options?: RequestInit): Promise<TeacherAttendanceSettings> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1163,15 +1163,15 @@ return customFetch<TeacherAttendanceSettings>(getUpdateTeacherAttendanceSettings
 export const getUpdateTeacherAttendanceSettingsMutationKey = () => ['updateTeacherAttendanceSettings'] as const;
 
 export const getUpdateTeacherAttendanceSettingsMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherAttendanceSettings>>, TError,UpdateTeacherAttendanceSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherAttendanceSettings>>, TError,UpdateTeacherAttendanceSettingsMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof updateTeacherAttendanceSettings>>, TError,UpdateTeacherAttendanceSettingsMutationVariables, TContext> => {
 
 const mutationKey = getUpdateTeacherAttendanceSettingsMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -1179,7 +1179,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTeacherAttendanceSettings>>, UpdateTeacherAttendanceSettingsMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  updateTeacherAttendanceSettings(data,requestOptions)
+          return  updateTeacherAttendanceSettings(data,)
         }
 
 
@@ -1195,7 +1195,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateTeacherAttendanceSettingsMutationVariables = {data: BodyType<TeacherAttendanceSettingsUpdate>}
 
     export const useUpdateTeacherAttendanceSettings = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherAttendanceSettings>>, TError,UpdateTeacherAttendanceSettingsMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherAttendanceSettings>>, TError,UpdateTeacherAttendanceSettingsMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateTeacherAttendanceSettings>>,
         TError,
@@ -1220,7 +1220,7 @@ export const getListTeacherAttendanceUrl = (params?: ListTeacherAttendanceParams
   return stringifiedParams.length > 0 ? `/api/teacher-attendance?${stringifiedParams}` : `/api/teacher-attendance`
 }
 
-export const listTeacherAttendance = async (params?: ListTeacherAttendanceParams, options?: Parameters<typeof customFetch>[1]): Promise<TeacherAttendanceRecord[]> => {
+export const listTeacherAttendance = async (params?: ListTeacherAttendanceParams, options?: RequestInit): Promise<TeacherAttendanceRecord[]> => {
 
   return customFetch<TeacherAttendanceRecord[]>(getListTeacherAttendanceUrl(params),
   {
@@ -1242,16 +1242,16 @@ export const getListTeacherAttendanceQueryKey = (params?: ListTeacherAttendanceP
     }
 
 
-export const getListTeacherAttendanceQueryOptions = <TData = Awaited<ReturnType<typeof listTeacherAttendance>>, TError = ErrorType<unknown>>(params?: ListTeacherAttendanceParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherAttendance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListTeacherAttendanceQueryOptions = <TData = Awaited<ReturnType<typeof listTeacherAttendance>>, TError = ErrorType<unknown>>(params?: ListTeacherAttendanceParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherAttendance>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getListTeacherAttendanceQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTeacherAttendance>>> = ({ signal }) => listTeacherAttendance(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTeacherAttendance>>> = ({ signal }) => listTeacherAttendance(params, { signal });
 
 
 
@@ -1266,7 +1266,7 @@ export type ListTeacherAttendanceQueryError = ErrorType<unknown>
 
 
 export function useListTeacherAttendance<TData = Awaited<ReturnType<typeof listTeacherAttendance>>, TError = ErrorType<unknown>>(
- params?: ListTeacherAttendanceParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherAttendance>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListTeacherAttendanceParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherAttendance>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -1291,7 +1291,7 @@ export const getResetTeacherAttendanceUrl = () => {
   return `/api/teacher-attendance/reset`
 }
 
-export const resetTeacherAttendance = async (teacherAttendanceReset: TeacherAttendanceReset, options?: Parameters<typeof customFetch>[1]): Promise<TeacherAttendanceResetResult> => {
+export const resetTeacherAttendance = async (teacherAttendanceReset: TeacherAttendanceReset, options?: RequestInit): Promise<TeacherAttendanceResetResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1323,15 +1323,15 @@ return customFetch<TeacherAttendanceResetResult>(getResetTeacherAttendanceUrl(),
 export const getResetTeacherAttendanceMutationKey = () => ['resetTeacherAttendance'] as const;
 
 export const getResetTeacherAttendanceMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetTeacherAttendance>>, TError,ResetTeacherAttendanceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetTeacherAttendance>>, TError,ResetTeacherAttendanceMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof resetTeacherAttendance>>, TError,ResetTeacherAttendanceMutationVariables, TContext> => {
 
 const mutationKey = getResetTeacherAttendanceMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -1339,7 +1339,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetTeacherAttendance>>, ResetTeacherAttendanceMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  resetTeacherAttendance(data,requestOptions)
+          return  resetTeacherAttendance(data,)
         }
 
 
@@ -1355,7 +1355,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ResetTeacherAttendanceMutationVariables = {data: BodyType<TeacherAttendanceReset>}
 
     export const useResetTeacherAttendance = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetTeacherAttendance>>, TError,ResetTeacherAttendanceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetTeacherAttendance>>, TError,ResetTeacherAttendanceMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof resetTeacherAttendance>>,
         TError,
@@ -1380,7 +1380,7 @@ export const getGetTeacherFaceStatusUrl = (params?: GetTeacherFaceStatusParams,)
   return stringifiedParams.length > 0 ? `/api/teacher-attendance/face-status?${stringifiedParams}` : `/api/teacher-attendance/face-status`
 }
 
-export const getTeacherFaceStatus = async (params?: GetTeacherFaceStatusParams, options?: Parameters<typeof customFetch>[1]): Promise<TeacherFaceStatus> => {
+export const getTeacherFaceStatus = async (params?: GetTeacherFaceStatusParams, options?: RequestInit): Promise<TeacherFaceStatus> => {
 
   return customFetch<TeacherFaceStatus>(getGetTeacherFaceStatusUrl(params),
   {
@@ -1402,16 +1402,16 @@ export const getGetTeacherFaceStatusQueryKey = (params?: GetTeacherFaceStatusPar
     }
 
 
-export const getGetTeacherFaceStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError = ErrorType<unknown>>(params?: GetTeacherFaceStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetTeacherFaceStatusQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError = ErrorType<unknown>>(params?: GetTeacherFaceStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetTeacherFaceStatusQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherFaceStatus>>> = ({ signal }) => getTeacherFaceStatus(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherFaceStatus>>> = ({ signal }) => getTeacherFaceStatus(params, { signal });
 
 
 
@@ -1426,7 +1426,7 @@ export type GetTeacherFaceStatusQueryError = ErrorType<unknown>
 
 
 export function useGetTeacherFaceStatus<TData = Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError = ErrorType<unknown>>(
- params?: GetTeacherFaceStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: GetTeacherFaceStatusParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFaceStatus>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -1454,7 +1454,7 @@ export const getGetTeacherFacelessAttendancePermissionUrl = () => {
 /**
  * @summary Check the signed-in teacher's face-free attendance permission
  */
-export const getTeacherFacelessAttendancePermission = async ( options?: Parameters<typeof customFetch>[1]): Promise<TeacherFacelessAttendancePermission> => {
+export const getTeacherFacelessAttendancePermission = async ( options?: RequestInit): Promise<TeacherFacelessAttendancePermission> => {
 
   return customFetch<TeacherFacelessAttendancePermission>(getGetTeacherFacelessAttendancePermissionUrl(),
   {
@@ -1476,16 +1476,16 @@ export const getGetTeacherFacelessAttendancePermissionQueryKey = () => {
     }
 
 
-export const getGetTeacherFacelessAttendancePermissionQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetTeacherFacelessAttendancePermissionQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError = ErrorType<void>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetTeacherFacelessAttendancePermissionQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>> = ({ signal }) => getTeacherFacelessAttendancePermission({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>> = ({ signal }) => getTeacherFacelessAttendancePermission({ signal });
 
 
 
@@ -1503,7 +1503,7 @@ export type GetTeacherFacelessAttendancePermissionQueryError = ErrorType<void>
  */
 
 export function useGetTeacherFacelessAttendancePermission<TData = Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError = ErrorType<void>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherFacelessAttendancePermission>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -1528,7 +1528,7 @@ export const getEnrollTeacherFaceUrl = () => {
   return `/api/teacher-attendance/face-enroll`
 }
 
-export const enrollTeacherFace = async (teacherFaceEnroll: TeacherFaceEnroll, options?: Parameters<typeof customFetch>[1]): Promise<TeacherFaceStatus> => {
+export const enrollTeacherFace = async (teacherFaceEnroll: TeacherFaceEnroll, options?: RequestInit): Promise<TeacherFaceStatus> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1560,15 +1560,15 @@ return customFetch<TeacherFaceStatus>(getEnrollTeacherFaceUrl(),
 export const getEnrollTeacherFaceMutationKey = () => ['enrollTeacherFace'] as const;
 
 export const getEnrollTeacherFaceMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enrollTeacherFace>>, TError,EnrollTeacherFaceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enrollTeacherFace>>, TError,EnrollTeacherFaceMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof enrollTeacherFace>>, TError,EnrollTeacherFaceMutationVariables, TContext> => {
 
 const mutationKey = getEnrollTeacherFaceMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -1576,7 +1576,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof enrollTeacherFace>>, EnrollTeacherFaceMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  enrollTeacherFace(data,requestOptions)
+          return  enrollTeacherFace(data,)
         }
 
 
@@ -1592,7 +1592,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type EnrollTeacherFaceMutationVariables = {data: BodyType<TeacherFaceEnroll>}
 
     export const useEnrollTeacherFace = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enrollTeacherFace>>, TError,EnrollTeacherFaceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof enrollTeacherFace>>, TError,EnrollTeacherFaceMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof enrollTeacherFace>>,
         TError,
@@ -1610,7 +1610,7 @@ export const getTeacherCheckInUrl = () => {
   return `/api/teacher-attendance/check-in`
 }
 
-export const teacherCheckIn = async (teacherCheckInBody: TeacherCheckIn, options?: Parameters<typeof customFetch>[1]): Promise<TeacherAttendanceRecord> => {
+export const teacherCheckIn = async (teacherCheckInBody: TeacherCheckIn, options?: RequestInit): Promise<TeacherAttendanceRecord> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1642,15 +1642,15 @@ return customFetch<TeacherAttendanceRecord>(getTeacherCheckInUrl(),
 export const getTeacherCheckInMutationKey = () => ['teacherCheckIn'] as const;
 
 export const getTeacherCheckInMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teacherCheckIn>>, TError,TeacherCheckInMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teacherCheckIn>>, TError,TeacherCheckInMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof teacherCheckIn>>, TError,TeacherCheckInMutationVariables, TContext> => {
 
 const mutationKey = getTeacherCheckInMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -1658,7 +1658,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof teacherCheckIn>>, TeacherCheckInMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  teacherCheckIn(data,requestOptions)
+          return  teacherCheckIn(data,)
         }
 
 
@@ -1674,7 +1674,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type TeacherCheckInMutationVariables = {data: BodyType<TeacherCheckIn>}
 
     export const useTeacherCheckIn = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teacherCheckIn>>, TError,TeacherCheckInMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teacherCheckIn>>, TError,TeacherCheckInMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof teacherCheckIn>>,
         TError,
@@ -1693,7 +1693,7 @@ export const getTeacherCheckOutUrl = (id: string,) => {
 }
 
 export const teacherCheckOut = async (id: string,
-    teacherCheckOutBody: TeacherCheckOut, options?: Parameters<typeof customFetch>[1]): Promise<TeacherAttendanceRecord> => {
+    teacherCheckOutBody: TeacherCheckOut, options?: RequestInit): Promise<TeacherAttendanceRecord> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1725,15 +1725,15 @@ return customFetch<TeacherAttendanceRecord>(getTeacherCheckOutUrl(id),
 export const getTeacherCheckOutMutationKey = () => ['teacherCheckOut'] as const;
 
 export const getTeacherCheckOutMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teacherCheckOut>>, TError,TeacherCheckOutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teacherCheckOut>>, TError,TeacherCheckOutMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof teacherCheckOut>>, TError,TeacherCheckOutMutationVariables, TContext> => {
 
 const mutationKey = getTeacherCheckOutMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -1741,7 +1741,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof teacherCheckOut>>, TeacherCheckOutMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  teacherCheckOut(id,data,requestOptions)
+          return  teacherCheckOut(id,data,)
         }
 
 
@@ -1757,7 +1757,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type TeacherCheckOutMutationVariables = {id: string;data: BodyType<TeacherCheckOut>}
 
     export const useTeacherCheckOut = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teacherCheckOut>>, TError,TeacherCheckOutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof teacherCheckOut>>, TError,TeacherCheckOutMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof teacherCheckOut>>,
         TError,
@@ -1776,7 +1776,7 @@ export const getConfigureTeacherAutoCheckoutUrl = (id: string,) => {
 }
 
 export const configureTeacherAutoCheckout = async (id: string,
-    teacherAutoCheckoutToggle: TeacherAutoCheckoutToggle, options?: Parameters<typeof customFetch>[1]): Promise<TeacherAutoCheckoutResult> => {
+    teacherAutoCheckoutToggle: TeacherAutoCheckoutToggle, options?: RequestInit): Promise<TeacherAutoCheckoutResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1808,15 +1808,15 @@ return customFetch<TeacherAutoCheckoutResult>(getConfigureTeacherAutoCheckoutUrl
 export const getConfigureTeacherAutoCheckoutMutationKey = () => ['configureTeacherAutoCheckout'] as const;
 
 export const getConfigureTeacherAutoCheckoutMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, TError,ConfigureTeacherAutoCheckoutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, TError,ConfigureTeacherAutoCheckoutMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, TError,ConfigureTeacherAutoCheckoutMutationVariables, TContext> => {
 
 const mutationKey = getConfigureTeacherAutoCheckoutMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -1824,7 +1824,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, ConfigureTeacherAutoCheckoutMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  configureTeacherAutoCheckout(id,data,requestOptions)
+          return  configureTeacherAutoCheckout(id,data,)
         }
 
 
@@ -1840,7 +1840,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ConfigureTeacherAutoCheckoutMutationVariables = {id: string;data: BodyType<TeacherAutoCheckoutToggle>}
 
     export const useConfigureTeacherAutoCheckout = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, TError,ConfigureTeacherAutoCheckoutMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof configureTeacherAutoCheckout>>, TError,ConfigureTeacherAutoCheckoutMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof configureTeacherAutoCheckout>>,
         TError,
@@ -1859,7 +1859,7 @@ export const getSubmitTeacherAttendanceLocationSamplesUrl = (id: string,) => {
 }
 
 export const submitTeacherAttendanceLocationSamples = async (id: string,
-    teacherLocationSamples: TeacherLocationSamples, options?: Parameters<typeof customFetch>[1]): Promise<TeacherAutoCheckoutResult> => {
+    teacherLocationSamples: TeacherLocationSamples, options?: RequestInit): Promise<TeacherAutoCheckoutResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -1891,15 +1891,15 @@ return customFetch<TeacherAutoCheckoutResult>(getSubmitTeacherAttendanceLocation
 export const getSubmitTeacherAttendanceLocationSamplesMutationKey = () => ['submitTeacherAttendanceLocationSamples'] as const;
 
 export const getSubmitTeacherAttendanceLocationSamplesMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, TError,SubmitTeacherAttendanceLocationSamplesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, TError,SubmitTeacherAttendanceLocationSamplesMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, TError,SubmitTeacherAttendanceLocationSamplesMutationVariables, TContext> => {
 
 const mutationKey = getSubmitTeacherAttendanceLocationSamplesMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -1907,7 +1907,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, SubmitTeacherAttendanceLocationSamplesMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  submitTeacherAttendanceLocationSamples(id,data,requestOptions)
+          return  submitTeacherAttendanceLocationSamples(id,data,)
         }
 
 
@@ -1923,7 +1923,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SubmitTeacherAttendanceLocationSamplesMutationVariables = {id: string;data: BodyType<TeacherLocationSamples>}
 
     export const useSubmitTeacherAttendanceLocationSamples = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, TError,SubmitTeacherAttendanceLocationSamplesMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>, TError,SubmitTeacherAttendanceLocationSamplesMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof submitTeacherAttendanceLocationSamples>>,
         TError,
@@ -1948,7 +1948,7 @@ export const getListTeacherLeavesUrl = (params?: ListTeacherLeavesParams,) => {
   return stringifiedParams.length > 0 ? `/api/teacher-leaves?${stringifiedParams}` : `/api/teacher-leaves`
 }
 
-export const listTeacherLeaves = async (params?: ListTeacherLeavesParams, options?: Parameters<typeof customFetch>[1]): Promise<TeacherLeave[]> => {
+export const listTeacherLeaves = async (params?: ListTeacherLeavesParams, options?: RequestInit): Promise<TeacherLeave[]> => {
 
   return customFetch<TeacherLeave[]>(getListTeacherLeavesUrl(params),
   {
@@ -1970,16 +1970,16 @@ export const getListTeacherLeavesQueryKey = (params?: ListTeacherLeavesParams,) 
     }
 
 
-export const getListTeacherLeavesQueryOptions = <TData = Awaited<ReturnType<typeof listTeacherLeaves>>, TError = ErrorType<unknown>>(params?: ListTeacherLeavesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherLeaves>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListTeacherLeavesQueryOptions = <TData = Awaited<ReturnType<typeof listTeacherLeaves>>, TError = ErrorType<unknown>>(params?: ListTeacherLeavesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherLeaves>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getListTeacherLeavesQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTeacherLeaves>>> = ({ signal }) => listTeacherLeaves(params, { signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTeacherLeaves>>> = ({ signal }) => listTeacherLeaves(params, { signal });
 
 
 
@@ -1994,7 +1994,7 @@ export type ListTeacherLeavesQueryError = ErrorType<unknown>
 
 
 export function useListTeacherLeaves<TData = Awaited<ReturnType<typeof listTeacherLeaves>>, TError = ErrorType<unknown>>(
- params?: ListTeacherLeavesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherLeaves>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ params?: ListTeacherLeavesParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherLeaves>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -2019,7 +2019,7 @@ export const getApplyForTeacherLeaveUrl = () => {
   return `/api/teacher-leaves`
 }
 
-export const applyForTeacherLeave = async (teacherLeaveCreate: TeacherLeaveCreate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherLeave> => {
+export const applyForTeacherLeave = async (teacherLeaveCreate: TeacherLeaveCreate, options?: RequestInit): Promise<TeacherLeave> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2051,15 +2051,15 @@ return customFetch<TeacherLeave>(getApplyForTeacherLeaveUrl(),
 export const getApplyForTeacherLeaveMutationKey = () => ['applyForTeacherLeave'] as const;
 
 export const getApplyForTeacherLeaveMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyForTeacherLeave>>, TError,ApplyForTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyForTeacherLeave>>, TError,ApplyForTeacherLeaveMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof applyForTeacherLeave>>, TError,ApplyForTeacherLeaveMutationVariables, TContext> => {
 
 const mutationKey = getApplyForTeacherLeaveMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2067,7 +2067,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof applyForTeacherLeave>>, ApplyForTeacherLeaveMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  applyForTeacherLeave(data,requestOptions)
+          return  applyForTeacherLeave(data,)
         }
 
 
@@ -2083,7 +2083,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ApplyForTeacherLeaveMutationVariables = {data: BodyType<TeacherLeaveCreate>}
 
     export const useApplyForTeacherLeave = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyForTeacherLeave>>, TError,ApplyForTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof applyForTeacherLeave>>, TError,ApplyForTeacherLeaveMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof applyForTeacherLeave>>,
         TError,
@@ -2102,7 +2102,7 @@ export const getUpdateTeacherLeaveUrl = (id: string,) => {
 }
 
 export const updateTeacherLeave = async (id: string,
-    teacherLeaveUpdate: TeacherLeaveUpdate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherLeave> => {
+    teacherLeaveUpdate: TeacherLeaveUpdate, options?: RequestInit): Promise<TeacherLeave> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2134,15 +2134,15 @@ return customFetch<TeacherLeave>(getUpdateTeacherLeaveUrl(id),
 export const getUpdateTeacherLeaveMutationKey = () => ['updateTeacherLeave'] as const;
 
 export const getUpdateTeacherLeaveMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherLeave>>, TError,UpdateTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherLeave>>, TError,UpdateTeacherLeaveMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof updateTeacherLeave>>, TError,UpdateTeacherLeaveMutationVariables, TContext> => {
 
 const mutationKey = getUpdateTeacherLeaveMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2150,7 +2150,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTeacherLeave>>, UpdateTeacherLeaveMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  updateTeacherLeave(id,data,requestOptions)
+          return  updateTeacherLeave(id,data,)
         }
 
 
@@ -2166,7 +2166,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateTeacherLeaveMutationVariables = {id: string;data: BodyType<TeacherLeaveUpdate>}
 
     export const useUpdateTeacherLeave = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherLeave>>, TError,UpdateTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherLeave>>, TError,UpdateTeacherLeaveMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateTeacherLeave>>,
         TError,
@@ -2193,7 +2193,7 @@ export const getDeleteTeacherLeaveUrl = (id: string,
 }
 
 export const deleteTeacherLeave = async (id: string,
-    params: DeleteTeacherLeaveParams, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+    params: DeleteTeacherLeaveParams, options?: RequestInit): Promise<void> => {
 
   return customFetch<void>(getDeleteTeacherLeaveUrl(id,params),
   {
@@ -2211,15 +2211,15 @@ export const deleteTeacherLeave = async (id: string,
 export const getDeleteTeacherLeaveMutationKey = () => ['deleteTeacherLeave'] as const;
 
 export const getDeleteTeacherLeaveMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherLeave>>, TError,DeleteTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherLeave>>, TError,DeleteTeacherLeaveMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherLeave>>, TError,DeleteTeacherLeaveMutationVariables, TContext> => {
 
 const mutationKey = getDeleteTeacherLeaveMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2227,7 +2227,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTeacherLeave>>, DeleteTeacherLeaveMutationVariables> = (props) => {
           const {id,params} = props ?? {};
 
-          return  deleteTeacherLeave(id,params,requestOptions)
+          return  deleteTeacherLeave(id,params,)
         }
 
 
@@ -2243,7 +2243,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteTeacherLeaveMutationVariables = {id: string;params: DeleteTeacherLeaveParams}
 
     export const useDeleteTeacherLeave = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherLeave>>, TError,DeleteTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherLeave>>, TError,DeleteTeacherLeaveMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteTeacherLeave>>,
         TError,
@@ -2262,7 +2262,7 @@ export const getApproveTeacherLeaveUrl = (id: string,) => {
 }
 
 export const approveTeacherLeave = async (id: string,
-    adminAction: AdminAction, options?: Parameters<typeof customFetch>[1]): Promise<TeacherLeave> => {
+    adminAction: AdminAction, options?: RequestInit): Promise<TeacherLeave> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2294,15 +2294,15 @@ return customFetch<TeacherLeave>(getApproveTeacherLeaveUrl(id),
 export const getApproveTeacherLeaveMutationKey = () => ['approveTeacherLeave'] as const;
 
 export const getApproveTeacherLeaveMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveTeacherLeave>>, TError,ApproveTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveTeacherLeave>>, TError,ApproveTeacherLeaveMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof approveTeacherLeave>>, TError,ApproveTeacherLeaveMutationVariables, TContext> => {
 
 const mutationKey = getApproveTeacherLeaveMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2310,7 +2310,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof approveTeacherLeave>>, ApproveTeacherLeaveMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  approveTeacherLeave(id,data,requestOptions)
+          return  approveTeacherLeave(id,data,)
         }
 
 
@@ -2326,7 +2326,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ApproveTeacherLeaveMutationVariables = {id: string;data: BodyType<AdminAction>}
 
     export const useApproveTeacherLeave = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveTeacherLeave>>, TError,ApproveTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof approveTeacherLeave>>, TError,ApproveTeacherLeaveMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof approveTeacherLeave>>,
         TError,
@@ -2345,7 +2345,7 @@ export const getRejectTeacherLeaveUrl = (id: string,) => {
 }
 
 export const rejectTeacherLeave = async (id: string,
-    adminAction: AdminAction, options?: Parameters<typeof customFetch>[1]): Promise<TeacherLeave> => {
+    adminAction: AdminAction, options?: RequestInit): Promise<TeacherLeave> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2377,15 +2377,15 @@ return customFetch<TeacherLeave>(getRejectTeacherLeaveUrl(id),
 export const getRejectTeacherLeaveMutationKey = () => ['rejectTeacherLeave'] as const;
 
 export const getRejectTeacherLeaveMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectTeacherLeave>>, TError,RejectTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectTeacherLeave>>, TError,RejectTeacherLeaveMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof rejectTeacherLeave>>, TError,RejectTeacherLeaveMutationVariables, TContext> => {
 
 const mutationKey = getRejectTeacherLeaveMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2393,7 +2393,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof rejectTeacherLeave>>, RejectTeacherLeaveMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  rejectTeacherLeave(id,data,requestOptions)
+          return  rejectTeacherLeave(id,data,)
         }
 
 
@@ -2409,7 +2409,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RejectTeacherLeaveMutationVariables = {id: string;data: BodyType<AdminAction>}
 
     export const useRejectTeacherLeave = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectTeacherLeave>>, TError,RejectTeacherLeaveMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof rejectTeacherLeave>>, TError,RejectTeacherLeaveMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof rejectTeacherLeave>>,
         TError,
@@ -2427,7 +2427,7 @@ export const getListTeacherHolidaysUrl = () => {
   return `/api/teacher-holidays`
 }
 
-export const listTeacherHolidays = async ( options?: Parameters<typeof customFetch>[1]): Promise<TeacherHoliday[]> => {
+export const listTeacherHolidays = async ( options?: RequestInit): Promise<TeacherHoliday[]> => {
 
   return customFetch<TeacherHoliday[]>(getListTeacherHolidaysUrl(),
   {
@@ -2449,16 +2449,16 @@ export const getListTeacherHolidaysQueryKey = () => {
     }
 
 
-export const getListTeacherHolidaysQueryOptions = <TData = Awaited<ReturnType<typeof listTeacherHolidays>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherHolidays>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListTeacherHolidaysQueryOptions = <TData = Awaited<ReturnType<typeof listTeacherHolidays>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherHolidays>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getListTeacherHolidaysQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTeacherHolidays>>> = ({ signal }) => listTeacherHolidays({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTeacherHolidays>>> = ({ signal }) => listTeacherHolidays({ signal });
 
 
 
@@ -2473,7 +2473,7 @@ export type ListTeacherHolidaysQueryError = ErrorType<unknown>
 
 
 export function useListTeacherHolidays<TData = Awaited<ReturnType<typeof listTeacherHolidays>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherHolidays>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeacherHolidays>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -2498,7 +2498,7 @@ export const getCreateTeacherHolidayUrl = () => {
   return `/api/teacher-holidays`
 }
 
-export const createTeacherHoliday = async (teacherHolidayCreate: TeacherHolidayCreate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherHoliday> => {
+export const createTeacherHoliday = async (teacherHolidayCreate: TeacherHolidayCreate, options?: RequestInit): Promise<TeacherHoliday> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2530,15 +2530,15 @@ return customFetch<TeacherHoliday>(getCreateTeacherHolidayUrl(),
 export const getCreateTeacherHolidayMutationKey = () => ['createTeacherHoliday'] as const;
 
 export const getCreateTeacherHolidayMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTeacherHoliday>>, TError,CreateTeacherHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTeacherHoliday>>, TError,CreateTeacherHolidayMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof createTeacherHoliday>>, TError,CreateTeacherHolidayMutationVariables, TContext> => {
 
 const mutationKey = getCreateTeacherHolidayMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2546,7 +2546,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTeacherHoliday>>, CreateTeacherHolidayMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  createTeacherHoliday(data,requestOptions)
+          return  createTeacherHoliday(data,)
         }
 
 
@@ -2562,7 +2562,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateTeacherHolidayMutationVariables = {data: BodyType<TeacherHolidayCreate>}
 
     export const useCreateTeacherHoliday = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTeacherHoliday>>, TError,CreateTeacherHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTeacherHoliday>>, TError,CreateTeacherHolidayMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof createTeacherHoliday>>,
         TError,
@@ -2581,7 +2581,7 @@ export const getUpdateTeacherHolidayUrl = (id: string,) => {
 }
 
 export const updateTeacherHoliday = async (id: string,
-    teacherHolidayCreate: TeacherHolidayCreate, options?: Parameters<typeof customFetch>[1]): Promise<TeacherHoliday> => {
+    teacherHolidayCreate: TeacherHolidayCreate, options?: RequestInit): Promise<TeacherHoliday> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2613,15 +2613,15 @@ return customFetch<TeacherHoliday>(getUpdateTeacherHolidayUrl(id),
 export const getUpdateTeacherHolidayMutationKey = () => ['updateTeacherHoliday'] as const;
 
 export const getUpdateTeacherHolidayMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherHoliday>>, TError,UpdateTeacherHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherHoliday>>, TError,UpdateTeacherHolidayMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof updateTeacherHoliday>>, TError,UpdateTeacherHolidayMutationVariables, TContext> => {
 
 const mutationKey = getUpdateTeacherHolidayMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2629,7 +2629,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTeacherHoliday>>, UpdateTeacherHolidayMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  updateTeacherHoliday(id,data,requestOptions)
+          return  updateTeacherHoliday(id,data,)
         }
 
 
@@ -2645,7 +2645,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateTeacherHolidayMutationVariables = {id: string;data: BodyType<TeacherHolidayCreate>}
 
     export const useUpdateTeacherHoliday = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherHoliday>>, TError,UpdateTeacherHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTeacherHoliday>>, TError,UpdateTeacherHolidayMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateTeacherHoliday>>,
         TError,
@@ -2672,7 +2672,7 @@ export const getDeleteTeacherHolidayUrl = (id: string,
 }
 
 export const deleteTeacherHoliday = async (id: string,
-    params: DeleteTeacherHolidayParams, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+    params: DeleteTeacherHolidayParams, options?: RequestInit): Promise<void> => {
 
   return customFetch<void>(getDeleteTeacherHolidayUrl(id,params),
   {
@@ -2690,15 +2690,15 @@ export const deleteTeacherHoliday = async (id: string,
 export const getDeleteTeacherHolidayMutationKey = () => ['deleteTeacherHoliday'] as const;
 
 export const getDeleteTeacherHolidayMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherHoliday>>, TError,DeleteTeacherHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherHoliday>>, TError,DeleteTeacherHolidayMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherHoliday>>, TError,DeleteTeacherHolidayMutationVariables, TContext> => {
 
 const mutationKey = getDeleteTeacherHolidayMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2706,7 +2706,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTeacherHoliday>>, DeleteTeacherHolidayMutationVariables> = (props) => {
           const {id,params} = props ?? {};
 
-          return  deleteTeacherHoliday(id,params,requestOptions)
+          return  deleteTeacherHoliday(id,params,)
         }
 
 
@@ -2722,7 +2722,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteTeacherHolidayMutationVariables = {id: string;params: DeleteTeacherHolidayParams}
 
     export const useDeleteTeacherHoliday = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherHoliday>>, TError,DeleteTeacherHolidayMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherHoliday>>, TError,DeleteTeacherHolidayMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteTeacherHoliday>>,
         TError,
@@ -2740,7 +2740,7 @@ export const getCalculateTeacherPayrollUrl = () => {
   return `/api/teacher-attendance/payroll/calculate`
 }
 
-export const calculateTeacherPayroll = async (payrollCalculate: PayrollCalculate, options?: Parameters<typeof customFetch>[1]): Promise<PayrollReport> => {
+export const calculateTeacherPayroll = async (payrollCalculate: PayrollCalculate, options?: RequestInit): Promise<PayrollReport> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2772,15 +2772,15 @@ return customFetch<PayrollReport>(getCalculateTeacherPayrollUrl(),
 export const getCalculateTeacherPayrollMutationKey = () => ['calculateTeacherPayroll'] as const;
 
 export const getCalculateTeacherPayrollMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calculateTeacherPayroll>>, TError,CalculateTeacherPayrollMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calculateTeacherPayroll>>, TError,CalculateTeacherPayrollMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof calculateTeacherPayroll>>, TError,CalculateTeacherPayrollMutationVariables, TContext> => {
 
 const mutationKey = getCalculateTeacherPayrollMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2788,7 +2788,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof calculateTeacherPayroll>>, CalculateTeacherPayrollMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  calculateTeacherPayroll(data,requestOptions)
+          return  calculateTeacherPayroll(data,)
         }
 
 
@@ -2804,7 +2804,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CalculateTeacherPayrollMutationVariables = {data: BodyType<PayrollCalculate>}
 
     export const useCalculateTeacherPayroll = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calculateTeacherPayroll>>, TError,CalculateTeacherPayrollMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof calculateTeacherPayroll>>, TError,CalculateTeacherPayrollMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof calculateTeacherPayroll>>,
         TError,
@@ -2822,7 +2822,7 @@ export const getListAdminUsersUrl = () => {
   return `/api/settings/admin-users`
 }
 
-export const listAdminUsers = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminUser[]> => {
+export const listAdminUsers = async ( options?: RequestInit): Promise<AdminUser[]> => {
 
   return customFetch<AdminUser[]>(getListAdminUsersUrl(),
   {
@@ -2844,16 +2844,16 @@ export const getListAdminUsersQueryKey = () => {
     }
 
 
-export const getListAdminUsersQueryOptions = <TData = Awaited<ReturnType<typeof listAdminUsers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getListAdminUsersQueryOptions = <TData = Awaited<ReturnType<typeof listAdminUsers>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsers>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getListAdminUsersQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminUsers>>> = ({ signal }) => listAdminUsers({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAdminUsers>>> = ({ signal }) => listAdminUsers({ signal });
 
 
 
@@ -2868,7 +2868,7 @@ export type ListAdminUsersQueryError = ErrorType<unknown>
 
 
 export function useListAdminUsers<TData = Awaited<ReturnType<typeof listAdminUsers>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsers>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAdminUsers>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -2893,7 +2893,7 @@ export const getCreateAdminUserUrl = () => {
   return `/api/settings/admin-users`
 }
 
-export const createAdminUser = async (adminUserCreate: AdminUserCreate, options?: Parameters<typeof customFetch>[1]): Promise<AdminUser> => {
+export const createAdminUser = async (adminUserCreate: AdminUserCreate, options?: RequestInit): Promise<AdminUser> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -2925,15 +2925,15 @@ return customFetch<AdminUser>(getCreateAdminUserUrl(),
 export const getCreateAdminUserMutationKey = () => ['createAdminUser'] as const;
 
 export const getCreateAdminUserMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminUser>>, TError,CreateAdminUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminUser>>, TError,CreateAdminUserMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof createAdminUser>>, TError,CreateAdminUserMutationVariables, TContext> => {
 
 const mutationKey = getCreateAdminUserMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -2941,7 +2941,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAdminUser>>, CreateAdminUserMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  createAdminUser(data,requestOptions)
+          return  createAdminUser(data,)
         }
 
 
@@ -2957,7 +2957,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateAdminUserMutationVariables = {data: BodyType<AdminUserCreate>}
 
     export const useCreateAdminUser = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminUser>>, TError,CreateAdminUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAdminUser>>, TError,CreateAdminUserMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof createAdminUser>>,
         TError,
@@ -2976,7 +2976,7 @@ export const getUpdateAdminUserUrl = (id: string,) => {
 }
 
 export const updateAdminUser = async (id: string,
-    adminUserUpdate: AdminUserUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AdminUser> => {
+    adminUserUpdate: AdminUserUpdate, options?: RequestInit): Promise<AdminUser> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3008,15 +3008,15 @@ return customFetch<AdminUser>(getUpdateAdminUserUrl(id),
 export const getUpdateAdminUserMutationKey = () => ['updateAdminUser'] as const;
 
 export const getUpdateAdminUserMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminUser>>, TError,UpdateAdminUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminUser>>, TError,UpdateAdminUserMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof updateAdminUser>>, TError,UpdateAdminUserMutationVariables, TContext> => {
 
 const mutationKey = getUpdateAdminUserMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -3024,7 +3024,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminUser>>, UpdateAdminUserMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  updateAdminUser(id,data,requestOptions)
+          return  updateAdminUser(id,data,)
         }
 
 
@@ -3040,7 +3040,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateAdminUserMutationVariables = {id: string;data: BodyType<AdminUserUpdate>}
 
     export const useUpdateAdminUser = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminUser>>, TError,UpdateAdminUserMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminUser>>, TError,UpdateAdminUserMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof updateAdminUser>>,
         TError,
@@ -3059,7 +3059,7 @@ export const getSwitchAdminToTeacherUrl = (id: string,) => {
 }
 
 export const switchAdminToTeacher = async (id: string,
-    switchAdminToTeacherBody: SwitchAdminToTeacherBody, options?: Parameters<typeof customFetch>[1]): Promise<TeacherProfile> => {
+    switchAdminToTeacherBody: SwitchAdminToTeacherBody, options?: RequestInit): Promise<TeacherProfile> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3091,15 +3091,15 @@ return customFetch<TeacherProfile>(getSwitchAdminToTeacherUrl(id),
 export const getSwitchAdminToTeacherMutationKey = () => ['switchAdminToTeacher'] as const;
 
 export const getSwitchAdminToTeacherMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof switchAdminToTeacher>>, TError,SwitchAdminToTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof switchAdminToTeacher>>, TError,SwitchAdminToTeacherMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof switchAdminToTeacher>>, TError,SwitchAdminToTeacherMutationVariables, TContext> => {
 
 const mutationKey = getSwitchAdminToTeacherMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -3107,7 +3107,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof switchAdminToTeacher>>, SwitchAdminToTeacherMutationVariables> = (props) => {
           const {id,data} = props ?? {};
 
-          return  switchAdminToTeacher(id,data,requestOptions)
+          return  switchAdminToTeacher(id,data,)
         }
 
 
@@ -3123,7 +3123,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SwitchAdminToTeacherMutationVariables = {id: string;data: BodyType<SwitchAdminToTeacherBody>}
 
     export const useSwitchAdminToTeacher = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof switchAdminToTeacher>>, TError,SwitchAdminToTeacherMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof switchAdminToTeacher>>, TError,SwitchAdminToTeacherMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof switchAdminToTeacher>>,
         TError,
@@ -3141,7 +3141,7 @@ export const getGetAdminNotificationsUrl = () => {
   return `/api/notifications/admin`
 }
 
-export const getAdminNotifications = async ( options?: Parameters<typeof customFetch>[1]): Promise<AdminNotificationsDashboard> => {
+export const getAdminNotifications = async ( options?: RequestInit): Promise<AdminNotificationsDashboard> => {
 
   return customFetch<AdminNotificationsDashboard>(getGetAdminNotificationsUrl(),
   {
@@ -3163,16 +3163,16 @@ export const getGetAdminNotificationsQueryKey = () => {
     }
 
 
-export const getGetAdminNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminNotifications>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAdminNotificationsQueryOptions = <TData = Awaited<ReturnType<typeof getAdminNotifications>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminNotifications>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetAdminNotificationsQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminNotifications>>> = ({ signal }) => getAdminNotifications({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminNotifications>>> = ({ signal }) => getAdminNotifications({ signal });
 
 
 
@@ -3187,7 +3187,7 @@ export type GetAdminNotificationsQueryError = ErrorType<unknown>
 
 
 export function useGetAdminNotifications<TData = Awaited<ReturnType<typeof getAdminNotifications>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminNotifications>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminNotifications>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -3212,7 +3212,7 @@ export const getSendTeacherNotificationUrl = () => {
   return `/api/notifications/send`
 }
 
-export const sendTeacherNotification = async (teacherNotificationSend: TeacherNotificationSend, options?: Parameters<typeof customFetch>[1]): Promise<TeacherNotificationSendResult> => {
+export const sendTeacherNotification = async (teacherNotificationSend: TeacherNotificationSend, options?: RequestInit): Promise<TeacherNotificationSendResult> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3244,15 +3244,15 @@ return customFetch<TeacherNotificationSendResult>(getSendTeacherNotificationUrl(
 export const getSendTeacherNotificationMutationKey = () => ['sendTeacherNotification'] as const;
 
 export const getSendTeacherNotificationMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendTeacherNotification>>, TError,SendTeacherNotificationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendTeacherNotification>>, TError,SendTeacherNotificationMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof sendTeacherNotification>>, TError,SendTeacherNotificationMutationVariables, TContext> => {
 
 const mutationKey = getSendTeacherNotificationMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -3260,7 +3260,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof sendTeacherNotification>>, SendTeacherNotificationMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  sendTeacherNotification(data,requestOptions)
+          return  sendTeacherNotification(data,)
         }
 
 
@@ -3276,7 +3276,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SendTeacherNotificationMutationVariables = {data: BodyType<TeacherNotificationSend>}
 
     export const useSendTeacherNotification = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendTeacherNotification>>, TError,SendTeacherNotificationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof sendTeacherNotification>>, TError,SendTeacherNotificationMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof sendTeacherNotification>>,
         TError,
@@ -3284,6 +3284,169 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getSendTeacherNotificationMutationOptions(options));
+    }
+
+export const getEditAdminNotificationUrl = (id: string,) => {
+
+
+
+
+  return `/api/notifications/admin/${id}`
+}
+
+/**
+ * @summary Update a saved notification in all teacher inboxes
+ */
+export const editAdminNotification = async (id: string,
+    notificationEditRequest: NotificationEditRequest, options?: RequestInit): Promise<NotificationMutationResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<NotificationMutationResult>(getEditAdminNotificationUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(notificationEditRequest)
+  }
+);}
+
+
+
+
+
+export const getEditAdminNotificationMutationKey = () => ['editAdminNotification'] as const;
+
+export const getEditAdminNotificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editAdminNotification>>, TError,EditAdminNotificationMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof editAdminNotification>>, TError,EditAdminNotificationMutationVariables, TContext> => {
+
+const mutationKey = getEditAdminNotificationMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof editAdminNotification>>, EditAdminNotificationMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  editAdminNotification(id,data,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EditAdminNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof editAdminNotification>>>
+    export type EditAdminNotificationMutationBody = BodyType<NotificationEditRequest>
+    export type EditAdminNotificationMutationError = ErrorType<void>
+    export type EditAdminNotificationMutationVariables = {id: string;data: BodyType<NotificationEditRequest>}
+
+    /**
+ * @summary Update a saved notification in all teacher inboxes
+ */
+export const useEditAdminNotification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof editAdminNotification>>, TError,EditAdminNotificationMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof editAdminNotification>>,
+        TError,
+        EditAdminNotificationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getEditAdminNotificationMutationOptions(options));
+    }
+
+export const getDeleteAdminNotificationUrl = (id: string,) => {
+
+
+
+
+  return `/api/notifications/admin/${id}`
+}
+
+/**
+ * @summary Remove a notification from all teacher inboxes and admin history
+ */
+export const deleteAdminNotification = async (id: string, options?: RequestInit): Promise<NotificationMutationResult> => {
+
+  return customFetch<NotificationMutationResult>(getDeleteAdminNotificationUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteAdminNotificationMutationKey = () => ['deleteAdminNotification'] as const;
+
+export const getDeleteAdminNotificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminNotification>>, TError,DeleteAdminNotificationMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAdminNotification>>, TError,DeleteAdminNotificationMutationVariables, TContext> => {
+
+const mutationKey = getDeleteAdminNotificationMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAdminNotification>>, DeleteAdminNotificationMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteAdminNotification(id,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAdminNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAdminNotification>>>
+
+    export type DeleteAdminNotificationMutationError = ErrorType<void>
+    export type DeleteAdminNotificationMutationVariables = {id: string}
+
+    /**
+ * @summary Remove a notification from all teacher inboxes and admin history
+ */
+export const useDeleteAdminNotification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAdminNotification>>, TError,DeleteAdminNotificationMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAdminNotification>>,
+        TError,
+        DeleteAdminNotificationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteAdminNotificationMutationOptions(options));
     }
 
 export const getSaveDailyNotificationScheduleUrl = () => {
@@ -3294,7 +3457,7 @@ export const getSaveDailyNotificationScheduleUrl = () => {
   return `/api/notifications/schedule`
 }
 
-export const saveDailyNotificationSchedule = async (dailyNotificationScheduleUpdate: DailyNotificationScheduleUpdate, options?: Parameters<typeof customFetch>[1]): Promise<DailyNotificationSchedule> => {
+export const saveDailyNotificationSchedule = async (dailyNotificationScheduleUpdate: DailyNotificationScheduleUpdate, options?: RequestInit): Promise<DailyNotificationSchedule> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3326,15 +3489,15 @@ return customFetch<DailyNotificationSchedule>(getSaveDailyNotificationScheduleUr
 export const getSaveDailyNotificationScheduleMutationKey = () => ['saveDailyNotificationSchedule'] as const;
 
 export const getSaveDailyNotificationScheduleMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDailyNotificationSchedule>>, TError,SaveDailyNotificationScheduleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDailyNotificationSchedule>>, TError,SaveDailyNotificationScheduleMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof saveDailyNotificationSchedule>>, TError,SaveDailyNotificationScheduleMutationVariables, TContext> => {
 
 const mutationKey = getSaveDailyNotificationScheduleMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -3342,7 +3505,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveDailyNotificationSchedule>>, SaveDailyNotificationScheduleMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  saveDailyNotificationSchedule(data,requestOptions)
+          return  saveDailyNotificationSchedule(data,)
         }
 
 
@@ -3358,7 +3521,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SaveDailyNotificationScheduleMutationVariables = {data: BodyType<DailyNotificationScheduleUpdate>}
 
     export const useSaveDailyNotificationSchedule = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDailyNotificationSchedule>>, TError,SaveDailyNotificationScheduleMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDailyNotificationSchedule>>, TError,SaveDailyNotificationScheduleMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof saveDailyNotificationSchedule>>,
         TError,
@@ -3376,7 +3539,7 @@ export const getGetTeacherNotificationInboxUrl = () => {
   return `/api/notifications/inbox`
 }
 
-export const getTeacherNotificationInbox = async ( options?: Parameters<typeof customFetch>[1]): Promise<TeacherNotificationInbox> => {
+export const getTeacherNotificationInbox = async ( options?: RequestInit): Promise<TeacherNotificationInbox> => {
 
   return customFetch<TeacherNotificationInbox>(getGetTeacherNotificationInboxUrl(),
   {
@@ -3398,16 +3561,16 @@ export const getGetTeacherNotificationInboxQueryKey = () => {
     }
 
 
-export const getGetTeacherNotificationInboxQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherNotificationInbox>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherNotificationInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetTeacherNotificationInboxQueryOptions = <TData = Awaited<ReturnType<typeof getTeacherNotificationInbox>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherNotificationInbox>>, TError, TData>, }
 ) => {
 
-const {query: queryOptions, request: requestOptions} = options ?? {};
+const {query: queryOptions} = options ?? {};
 
   const queryKey =  queryOptions?.queryKey ?? getGetTeacherNotificationInboxQueryKey();
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherNotificationInbox>>> = ({ signal }) => getTeacherNotificationInbox({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTeacherNotificationInbox>>> = ({ signal }) => getTeacherNotificationInbox({ signal });
 
 
 
@@ -3422,7 +3585,7 @@ export type GetTeacherNotificationInboxQueryError = ErrorType<unknown>
 
 
 export function useGetTeacherNotificationInbox<TData = Awaited<ReturnType<typeof getTeacherNotificationInbox>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherNotificationInbox>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTeacherNotificationInbox>>, TError, TData>, }
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -3447,7 +3610,7 @@ export const getMarkTeacherNotificationReadUrl = (id: string,) => {
   return `/api/notifications/inbox/${id}/read`
 }
 
-export const markTeacherNotificationRead = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<MarkTeacherNotificationRead200> => {
+export const markTeacherNotificationRead = async (id: string, options?: RequestInit): Promise<MarkTeacherNotificationRead200> => {
 
   return customFetch<MarkTeacherNotificationRead200>(getMarkTeacherNotificationReadUrl(id),
   {
@@ -3465,15 +3628,15 @@ export const markTeacherNotificationRead = async (id: string, options?: Paramete
 export const getMarkTeacherNotificationReadMutationKey = () => ['markTeacherNotificationRead'] as const;
 
 export const getMarkTeacherNotificationReadMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markTeacherNotificationRead>>, TError,MarkTeacherNotificationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markTeacherNotificationRead>>, TError,MarkTeacherNotificationReadMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof markTeacherNotificationRead>>, TError,MarkTeacherNotificationReadMutationVariables, TContext> => {
 
 const mutationKey = getMarkTeacherNotificationReadMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -3481,7 +3644,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof markTeacherNotificationRead>>, MarkTeacherNotificationReadMutationVariables> = (props) => {
           const {id} = props ?? {};
 
-          return  markTeacherNotificationRead(id,requestOptions)
+          return  markTeacherNotificationRead(id,)
         }
 
 
@@ -3497,7 +3660,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type MarkTeacherNotificationReadMutationVariables = {id: string}
 
     export const useMarkTeacherNotificationRead = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markTeacherNotificationRead>>, TError,MarkTeacherNotificationReadMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markTeacherNotificationRead>>, TError,MarkTeacherNotificationReadMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof markTeacherNotificationRead>>,
         TError,
@@ -3505,6 +3668,80 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
         TContext
       > => {
       return useMutation(getMarkTeacherNotificationReadMutationOptions(options));
+    }
+
+export const getDeleteTeacherInboxNotificationUrl = (id: string,) => {
+
+
+
+
+  return `/api/notifications/inbox/${id}`
+}
+
+/**
+ * @summary Hide a notification from the signed-in teacher's inbox only
+ */
+export const deleteTeacherInboxNotification = async (id: string, options?: RequestInit): Promise<NotificationMutationResult> => {
+
+  return customFetch<NotificationMutationResult>(getDeleteTeacherInboxNotificationUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteTeacherInboxNotificationMutationKey = () => ['deleteTeacherInboxNotification'] as const;
+
+export const getDeleteTeacherInboxNotificationMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherInboxNotification>>, TError,DeleteTeacherInboxNotificationMutationVariables, TContext>, }
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherInboxNotification>>, TError,DeleteTeacherInboxNotificationMutationVariables, TContext> => {
+
+const mutationKey = getDeleteTeacherInboxNotificationMutationKey();
+const {mutation: mutationOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTeacherInboxNotification>>, DeleteTeacherInboxNotificationMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteTeacherInboxNotification(id,)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTeacherInboxNotificationMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTeacherInboxNotification>>>
+
+    export type DeleteTeacherInboxNotificationMutationError = ErrorType<void>
+    export type DeleteTeacherInboxNotificationMutationVariables = {id: string}
+
+    /**
+ * @summary Hide a notification from the signed-in teacher's inbox only
+ */
+export const useDeleteTeacherInboxNotification = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTeacherInboxNotification>>, TError,DeleteTeacherInboxNotificationMutationVariables, TContext>, }
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTeacherInboxNotification>>,
+        TError,
+        DeleteTeacherInboxNotificationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteTeacherInboxNotificationMutationOptions(options));
     }
 
 export const getRegisterTeacherNotificationDeviceUrl = () => {
@@ -3515,7 +3752,7 @@ export const getRegisterTeacherNotificationDeviceUrl = () => {
   return `/api/notifications/device`
 }
 
-export const registerTeacherNotificationDevice = async (registerTeacherNotificationDeviceBody: RegisterTeacherNotificationDeviceBody, options?: Parameters<typeof customFetch>[1]): Promise<RegisterTeacherNotificationDevice200> => {
+export const registerTeacherNotificationDevice = async (registerTeacherNotificationDeviceBody: RegisterTeacherNotificationDeviceBody, options?: RequestInit): Promise<RegisterTeacherNotificationDevice200> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -3547,15 +3784,15 @@ return customFetch<RegisterTeacherNotificationDevice200>(getRegisterTeacherNotif
 export const getRegisterTeacherNotificationDeviceMutationKey = () => ['registerTeacherNotificationDevice'] as const;
 
 export const getRegisterTeacherNotificationDeviceMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerTeacherNotificationDevice>>, TError,RegisterTeacherNotificationDeviceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerTeacherNotificationDevice>>, TError,RegisterTeacherNotificationDeviceMutationVariables, TContext>, }
 ): UseMutationOptions<Awaited<ReturnType<typeof registerTeacherNotificationDevice>>, TError,RegisterTeacherNotificationDeviceMutationVariables, TContext> => {
 
 const mutationKey = getRegisterTeacherNotificationDeviceMutationKey();
-const {mutation: mutationOptions, request: requestOptions} = options ?
+const {mutation: mutationOptions} = options ?
       options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
       options
       : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
+      : {mutation: { mutationKey, }};
 
 
 
@@ -3563,7 +3800,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerTeacherNotificationDevice>>, RegisterTeacherNotificationDeviceMutationVariables> = (props) => {
           const {data} = props ?? {};
 
-          return  registerTeacherNotificationDevice(data,requestOptions)
+          return  registerTeacherNotificationDevice(data,)
         }
 
 
@@ -3579,7 +3816,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type RegisterTeacherNotificationDeviceMutationVariables = {data: BodyType<RegisterTeacherNotificationDeviceBody>}
 
     export const useRegisterTeacherNotificationDevice = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerTeacherNotificationDevice>>, TError,RegisterTeacherNotificationDeviceMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerTeacherNotificationDevice>>, TError,RegisterTeacherNotificationDeviceMutationVariables, TContext>, }
  ): UseMutationResult<
         Awaited<ReturnType<typeof registerTeacherNotificationDevice>>,
         TError,

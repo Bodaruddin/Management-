@@ -30,6 +30,7 @@ interface StoredNotification {
   sentAt: string;
   teacherIds: string[];
   readAt: Record<string, string>;
+  hiddenFor?: string[];
   source: "manual" | "daily";
   pushAccepted: number;
   pushFailed: number;
@@ -124,6 +125,8 @@ async function loadState(): Promise<NotificationState> {
       && Array.isArray(item.teacherIds)
       && item.teacherIds.every((id) => typeof id === "string")
       && isRecord(item.readAt)
+       && (item.hiddenFor === undefined
+         || (Array.isArray(item.hiddenFor) && item.hiddenFor.every((id: unknown) => typeof id === "string")))
       && (item.source === "manual" || item.source === "daily")
     )).slice(0, MAX_HISTORY)
     : [];
@@ -318,6 +321,39 @@ export async function markNotificationRead(id: string, teacherId: string): Promi
     const notification = state.notifications.find((item) => item.id === id);
     if (!notification || !notification.teacherIds.includes(teacherId)) return false;
     notification.readAt[teacherId] = new Date().toISOString();
+    return true;
+  });
+}
+
+export async function editStoredNotification(
+  id: string,
+  title: string,
+  body: string,
+): Promise<boolean> {
+  return updateState((state) => {
+    const notification = state.notifications.find((item) => item.id === id);
+    if (!notification) return false;
+    notification.title = title;
+    notification.body = body;
+    return true;
+  }, (updated) => updated);
+}
+
+export async function deleteStoredNotification(id: string): Promise<boolean> {
+  return updateState((state) => {
+    const index = state.notifications.findIndex((item) => item.id === id);
+    if (index === -1) return false;
+    state.notifications.splice(index, 1);
+    return true;
+  }, (deleted) => deleted);
+}
+
+export async function hideNotificationForTeacher(id: string, teacherId: string): Promise<boolean> {
+  return updateState((state) => {
+    const notification = state.notifications.find((item) => item.id === id);
+    if (!notification || !notification.teacherIds.includes(teacherId)) return false;
+    notification.hiddenFor ??= [];
+    if (!notification.hiddenFor.includes(teacherId)) notification.hiddenFor.push(teacherId);
     return true;
   });
 }

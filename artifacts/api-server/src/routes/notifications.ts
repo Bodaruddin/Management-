@@ -3,6 +3,9 @@ import { getAdapter } from "../lib/dbManager.js";
 import { bearerToken, findAuthSession } from "../lib/authSessions.js";
 import {
   getNotificationState,
+  deleteStoredNotification,
+  editStoredNotification,
+  hideNotificationForTeacher,
   isExpoToken,
   markNotificationRead,
   registerNotificationDevice,
@@ -97,6 +100,37 @@ router.post("/notifications/send", async (req, res) => {
   res.json(result);
 });
 
+router.patch("/notifications/admin/:id", async (req, res) => {
+  if (!await requireRole(req.get("authorization"), "admin", res)) return;
+  const { title, body } = req.body ?? {};
+  if (typeof title !== "string" || typeof body !== "string") {
+    res.status(400).json({ error: "A title and message are required" });
+    return;
+  }
+  const cleanTitle = title.trim();
+  const cleanBody = body.trim();
+  if (!cleanTitle || cleanTitle.length > 100 || !cleanBody || cleanBody.length > 500) {
+    res.status(400).json({ error: "Title must be 1–100 characters and message 1–500 characters" });
+    return;
+  }
+  const updated = await editStoredNotification(req.params.id, cleanTitle, cleanBody);
+  if (!updated) {
+    res.status(404).json({ error: "Notification not found" });
+    return;
+  }
+  res.json({ success: true });
+});
+
+router.delete("/notifications/admin/:id", async (req, res) => {
+  if (!await requireRole(req.get("authorization"), "admin", res)) return;
+  const deleted = await deleteStoredNotification(req.params.id);
+  if (!deleted) {
+    res.status(404).json({ error: "Notification not found" });
+    return;
+  }
+  res.json({ success: true });
+});
+
 router.put("/notifications/schedule", async (req, res) => {
   if (!await requireRole(req.get("authorization"), "admin", res)) return;
   const { enabled, title, body, time } = req.body ?? {};
@@ -142,7 +176,10 @@ router.get("/notifications/inbox", async (req, res) => {
   const state = await getNotificationState();
   res.json({
     notifications: state.notifications
-      .filter((notification) => notification.teacherIds.includes(session.userId))
+      .filter((notification) => (
+        notification.teacherIds.includes(session.userId)
+        && !notification.hiddenFor?.includes(session.userId)
+      ))
       .slice(0, 100)
       .map((notification) => ({
         id: notification.id,
@@ -161,6 +198,17 @@ router.patch("/notifications/inbox/:id/read", async (req, res) => {
   if (!session) return;
   const success = await markNotificationRead(req.params.id, session.userId);
   if (!success) {
+    res.status(404).json({ error: "Notification not found for this teacher" });
+    return;
+  }
+  res.json({ success: true });
+});
+
+router.delete("/notifications/inbox/:id", async (req, res) => {
+  const session = await requireRole(req.get("authorization"), "teacher", res);
+  if (!session) return;
+  const deleted = await hideNotificationForTeacher(req.params.id, session.userId);
+  if (!deleted) {
     res.status(404).json({ error: "Notification not found for this teacher" });
     return;
   }

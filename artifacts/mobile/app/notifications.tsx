@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -17,6 +18,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getGetAdminNotificationsQueryKey,
   getGetTeacherNotificationInboxQueryKey,
+  useDeleteAdminNotification,
+  useDeleteTeacherInboxNotification,
+  useEditAdminNotification,
   useGetAdminNotifications,
   useGetTeacherNotificationInbox,
   useMarkTeacherNotificationRead,
@@ -25,6 +29,12 @@ import {
   useSendTeacherNotification,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
+
+type DeleteTarget = {
+  id: string;
+  title: string;
+  scope: "all" | "mine";
+};
 
 const C = {
   navy: "#0F2456",
@@ -135,6 +145,16 @@ export default function NotificationsScreen() {
   const [scheduleTime, setScheduleTime] = useState("08:00");
   const [scheduleTeacherId, setScheduleTeacherId] = useState<string | null>(null);
   const didHydrateSchedule = useRef(false);
+  const [editingNotification, setEditingNotification] = useState<{ id: string } | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<DeleteTarget | null>(null);
+  const [actionError, setActionError] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [isDeletingNotification, setIsDeletingNotification] = useState(false);
+  const editMutation = useEditAdminNotification();
+  const deleteAdminMutation = useDeleteAdminNotification();
+  const deleteTeacherMutation = useDeleteTeacherInboxNotification();
 
   useEffect(() => {
     const schedule = adminQuery.data?.schedule;
@@ -249,6 +269,66 @@ export default function NotificationsScreen() {
     }
   };
 
+  const openEdit = (item: { id: string; title: string; body: string }) => {
+    setActionError("");
+    setEditingNotification({ id: item.id });
+    setEditTitle(item.title);
+    setEditBody(item.body);
+  };
+
+  const saveEdit = async () => {
+    if (!editingNotification || isSavingEdit) return;
+    const title = editTitle.trim();
+    const body = editBody.trim();
+    if (!title || !body) {
+      setActionError("Add a title and message before saving.");
+      return;
+    }
+    if (title.length > 100 || body.length > 500) {
+      setActionError("Title must be 1–100 characters and message 1–500 characters.");
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setActionError("");
+    try {
+      await editMutation.mutateAsync({
+        id: editingNotification.id,
+        data: { title, body },
+      });
+      setEditingNotification(null);
+      setFeedback("Updated the saved inbox message. Push alerts already delivered are unchanged.");
+      await adminQuery.refetch();
+    } catch (error) {
+      setActionError(errorText(error, "Could not update the notification."));
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const deleteNotification = async () => {
+    if (!pendingDelete || isDeletingNotification) return;
+    const target = pendingDelete;
+
+    setIsDeletingNotification(true);
+    setActionError("");
+    try {
+      const mutation = target.scope === "all" ? deleteAdminMutation : deleteTeacherMutation;
+      await mutation.mutateAsync({ id: target.id });
+      setPendingDelete(null);
+      setFeedback(
+        target.scope === "all"
+          ? "Removed from all teacher inboxes and admin history. Delivered push alerts cannot be recalled."
+          : "Removed from your inbox. Other recipients are not affected.",
+      );
+      await (target.scope === "all" ? adminQuery.refetch() : inboxQuery.refetch());
+    } catch (error) {
+      setActionError(errorText(error, "Could not delete the notification."));
+    } finally {
+      setIsDeletingNotification(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={s.center}>
@@ -270,12 +350,13 @@ export default function NotificationsScreen() {
   }
 
   return (
-    <ScrollView
-      style={s.page}
-      contentContainerStyle={[s.pageContent, { paddingTop: contentTop, paddingBottom: contentBottom }]}
-      keyboardShouldPersistTaps="handled"
-      showsVerticalScrollIndicator={false}
-    >
+    <>
+      <ScrollView
+        style={s.page}
+        contentContainerStyle={[s.pageContent, { paddingTop: contentTop, paddingBottom: contentBottom }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
       <View style={s.container}>
         <View style={s.header}>
           <Pressable
@@ -472,6 +553,9 @@ export default function NotificationsScreen() {
                   <Text style={s.cardSubtitle}>Latest immediate and daily notifications.</Text>
                 </View>
               </View>
+              <Text style={s.historyActionNote}>
+                Edits change the saved inbox message only. Push alerts already delivered and future daily schedules are unchanged.
+              </Text>
               {(adminQuery.data?.history.length ?? 0) === 0 ? (
                 <Text style={s.emptyInline}>No notifications have been sent yet.</Text>
               ) : (
@@ -490,6 +574,29 @@ export default function NotificationsScreen() {
                         : `${item.recipientCount} teacher${item.recipientCount === 1 ? "" : "s"}`}
                       {" · "}{formatDate(item.sentAt)}
                     </Text>
+                    <View style={s.itemActions}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit notification: ${item.title}`}
+                        onPress={() => openEdit(item)}
+                        style={s.editAction}
+                      >
+                        <Feather name="edit-2" size={13} color={C.blue} />
+                        <Text style={s.editActionText}>Edit</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete notification: ${item.title}`}
+                        onPress={() => {
+                          setActionError("");
+                          setPendingDelete({ id: item.id, title: item.title, scope: "all" });
+                        }}
+                        style={[s.editAction, s.deleteAction]}
+                      >
+                        <Feather name="trash-2" size={13} color={C.red} />
+                        <Text style={s.deleteActionText}>Delete</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 ))
               )}
@@ -563,18 +670,30 @@ export default function NotificationsScreen() {
                     </View>
                     <Text style={s.inboxBody}>{item.body}</Text>
                     <View style={s.inboxBottom}>
-                      <Text style={s.historyMeta}>
+                      <Text style={[s.historyMeta, { flex: 1 }]}>
                         {item.source === "daily" ? "Daily reminder" : "School announcement"} · {formatDate(item.sentAt)}
                       </Text>
-                      {!item.read && (
+                      <View style={s.inboxActions}>
+                        {!item.read && (
+                          <Pressable
+                            accessibilityRole="button"
+                            disabled={markReadMutation.isPending}
+                            onPress={() => markReadMutation.mutate({ id: item.id })}
+                          >
+                            <Text style={s.markReadText}>Mark read</Text>
+                          </Pressable>
+                        )}
                         <Pressable
                           accessibilityRole="button"
-                          disabled={markReadMutation.isPending}
-                          onPress={() => markReadMutation.mutate({ id: item.id })}
+                          accessibilityLabel={`Remove notification: ${item.title}`}
+                          onPress={() => {
+                            setActionError("");
+                            setPendingDelete({ id: item.id, title: item.title, scope: "mine" });
+                          }}
                         >
-                          <Text style={s.markReadText}>Mark read</Text>
+                          <Text style={s.deleteActionText}>Delete</Text>
                         </Pressable>
-                      )}
+                      </View>
                     </View>
                   </View>
                 ))
@@ -589,7 +708,140 @@ export default function NotificationsScreen() {
             : "Your inbox refreshes automatically while this screen is open."}
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+
+      <Modal
+        visible={!!editingNotification}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isSavingEdit) {
+            setEditingNotification(null);
+            setActionError("");
+          }
+        }}
+      >
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <View style={s.modalHeader}>
+              <Text style={s.modalTitle}>Edit notification</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close edit notification"
+                disabled={isSavingEdit}
+                onPress={() => {
+                  setEditingNotification(null);
+                  setActionError("");
+                }}
+              >
+                <Feather name="x" size={21} color={C.muted} />
+              </Pressable>
+            </View>
+            <Text style={s.modalBody}>
+              This updates the saved inbox message only. Push alerts already delivered and future daily schedules are unchanged.
+            </Text>
+            <Text style={s.fieldLabel}>Title</Text>
+            <TextInput
+              value={editTitle}
+              onChangeText={setEditTitle}
+              placeholder="Notification title"
+              placeholderTextColor="#94A3B8"
+              maxLength={100}
+              style={inputStyle}
+            />
+            <Text style={s.fieldLabel}>Message</Text>
+            <TextInput
+              value={editBody}
+              onChangeText={setEditBody}
+              placeholder="Notification message"
+              placeholderTextColor="#94A3B8"
+              maxLength={500}
+              multiline
+              textAlignVertical="top"
+              style={[inputStyle, { minHeight: 110 }]}
+            />
+            {!!actionError && <Text style={s.modalError}>{actionError}</Text>}
+            <View style={s.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSavingEdit}
+                onPress={() => {
+                  setEditingNotification(null);
+                  setActionError("");
+                }}
+                style={[s.modalButton, s.cancelModalButton]}
+              >
+                <Text style={s.cancelModalText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isSavingEdit}
+                onPress={() => void saveEdit()}
+                style={[s.modalButton, s.saveModalButton, isSavingEdit && s.disabledButton]}
+              >
+                {isSavingEdit
+                  ? <ActivityIndicator color={C.white} size="small" />
+                  : <Feather name="save" size={15} color={C.white} />}
+                <Text style={s.modalActionText}>{isSavingEdit ? "Saving…" : "Save changes"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={!!pendingDelete}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!isDeletingNotification) {
+            setPendingDelete(null);
+            setActionError("");
+          }
+        }}
+      >
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <View style={s.deleteIcon}>
+              <Feather name="trash-2" size={22} color={C.red} />
+            </View>
+            <Text style={s.modalTitle}>
+              {pendingDelete ? `Delete “${pendingDelete.title}”?` : "Delete notification?"}
+            </Text>
+            <Text style={s.modalBody}>
+              {pendingDelete?.scope === "all"
+                ? "This removes the notification from admin history and every recipient’s inbox. Push alerts already delivered cannot be recalled. This cannot be undone."
+                : "This removes the notification from your inbox only. Other recipients will still see it. This cannot be undone."}
+            </Text>
+            {!!actionError && <Text style={s.modalError}>{actionError}</Text>}
+            <View style={s.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isDeletingNotification}
+                onPress={() => {
+                  setPendingDelete(null);
+                  setActionError("");
+                }}
+                style={[s.modalButton, s.cancelModalButton]}
+              >
+                <Text style={s.cancelModalText}>Keep notification</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                disabled={isDeletingNotification}
+                onPress={() => void deleteNotification()}
+                style={[s.modalButton, s.confirmDeleteButton, isDeletingNotification && s.disabledButton]}
+              >
+                {isDeletingNotification
+                  ? <ActivityIndicator color={C.white} size="small" />
+                  : <Feather name="trash-2" size={15} color={C.white} />}
+                <Text style={s.modalActionText}>{isDeletingNotification ? "Deleting…" : "Delete"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -634,6 +886,12 @@ const s = {
   historyBadgeText: { color: C.blue, fontSize: 9, fontWeight: "800" as const, letterSpacing: 0.5 },
   historyBody: { color: "#475569", fontSize: 13, lineHeight: 19 },
   historyMeta: { color: "#94A3B8", fontSize: 10, lineHeight: 15 },
+  historyActionNote: { color: C.muted, fontSize: 11, lineHeight: 16 },
+  itemActions: { flexDirection: "row" as const, alignItems: "center" as const, gap: 8, marginTop: 3 },
+  editAction: { minHeight: 34, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "center" as const, gap: 6, paddingHorizontal: 11, borderRadius: 10, backgroundColor: C.paleBlue },
+  editActionText: { color: C.blue, fontSize: 11, fontWeight: "800" as const },
+  deleteAction: { backgroundColor: C.paleRed },
+  deleteActionText: { color: C.red, fontSize: 11, fontWeight: "800" as const },
   emptyInline: { color: C.muted, fontSize: 13, paddingVertical: 8 },
   pushCard: { flexDirection: "row" as const, alignItems: "center" as const, gap: 11, padding: 15, borderRadius: 18, backgroundColor: C.navy },
   pushTitle: { color: C.white, fontSize: 14, fontWeight: "800" as const },
@@ -649,8 +907,23 @@ const s = {
   inboxTitle: { flex: 1, color: C.ink, fontSize: 15, fontWeight: "800" as const },
   unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.blue },
   inboxBody: { color: "#475569", fontSize: 13, lineHeight: 20 },
-  inboxBottom: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const, gap: 8 },
+  inboxBottom: { flexDirection: "row" as const, alignItems: "flex-start" as const, justifyContent: "space-between" as const, gap: 8 },
+  inboxActions: { flexDirection: "row" as const, alignItems: "center" as const, gap: 12 },
   markReadText: { color: C.blue, fontSize: 11, fontWeight: "800" as const },
+  modalOverlay: { flex: 1 as const, backgroundColor: "rgba(15, 36, 86, 0.48)", justifyContent: "center" as const, padding: 18 },
+  modalCard: { width: "100%" as const, maxWidth: 520, alignSelf: "center" as const, borderRadius: 20, padding: 20, backgroundColor: C.white, gap: 12 },
+  modalHeader: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-between" as const },
+  modalTitle: { color: C.navy, fontSize: 18, fontWeight: "800" as const },
+  modalBody: { color: C.muted, fontSize: 13, lineHeight: 19 },
+  modalError: { color: C.red, fontSize: 12, lineHeight: 18, fontWeight: "700" as const },
+  modalActions: { flexDirection: "row" as const, gap: 10, marginTop: 4 },
+  modalButton: { flex: 1, minHeight: 46, borderRadius: 12, flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "center" as const, gap: 7, paddingHorizontal: 10 },
+  cancelModalButton: { backgroundColor: C.paleBlue, borderWidth: 1, borderColor: "#BFDBFE" },
+  cancelModalText: { color: C.navy, fontSize: 12, fontWeight: "800" as const, textAlign: "center" as const },
+  saveModalButton: { backgroundColor: C.blue },
+  confirmDeleteButton: { backgroundColor: C.red },
+  modalActionText: { color: C.white, fontSize: 12, fontWeight: "800" as const },
+  deleteIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: C.paleRed, alignItems: "center" as const, justifyContent: "center" as const },
   loadingRow: { flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "center" as const, gap: 9, padding: 12 },
   mutedText: { color: C.muted, fontSize: 12, lineHeight: 18 },
   errorCard: { flexDirection: "row" as const, gap: 9, alignItems: "center" as const, borderRadius: 12, padding: 13, backgroundColor: C.paleRed },
