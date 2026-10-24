@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.schoolmanagement.app",
+      "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
