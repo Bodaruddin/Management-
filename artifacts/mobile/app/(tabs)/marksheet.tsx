@@ -938,13 +938,11 @@ function buildCombinedMarksheetHtml(
     */
     .sigs {
       position:relative;
-      display:flex;
+       display:block;
       width:100%;
       flex:0 0 80px;
       height:80px;
       min-height:80px;
-      align-items:flex-end;
-      justify-content:space-around;
       margin:6px 0 0;
       padding:0;
       text-align:center;
@@ -952,17 +950,23 @@ function buildCombinedMarksheetHtml(
       page-break-inside:avoid;
       break-inside:avoid;
     }
+     /* Table cells keep both signature labels visible in Android's print WebView. */
+     .sigs-table {
+       width:100%;
+       height:80px;
+       table-layout:fixed;
+       border-collapse:collapse;
+       text-align:center;
+     }
     .sig-block {
-      display:flex;
-      flex:0 0 50%;
-      flex-direction:column;
-      align-items:center;
-      justify-content:flex-end;
-      min-width:0;
-      text-align:center;
+       display:table-cell;
+       width:50%;
+       vertical-align:bottom;
+       text-align:center;
+       padding:0 4px;
     }
-  .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin-bottom:3px; min-width:130px; line-height:1.2; }
-  .sig-block .role { display:block; min-height:14px; font-size:11px; font-weight:700; color:#0c1f4a; line-height:14px; letter-spacing:0.2px; white-space:nowrap; }
+     .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin:0 auto 3px; min-width:130px; line-height:1.2; }
+     .sig-block .role { position:relative; display:block; height:14px; min-height:14px; font-size:11px; font-weight:700; color:#0c1f4a; line-height:14px; letter-spacing:0.2px; white-space:nowrap; }
 
 /* footer — flex-shrink:0 always pins it at page bottom */
    .footer { position:absolute; left:8px; right:8px; bottom:8px; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin:0; min-height:32px; padding:8px 22px; text-align:center; }
@@ -1180,14 +1184,20 @@ function buildCombinedMarksheetHtml(
        Keep this inside the scaled content wrapper so native print measures the
        remarks, signatures, and table as one fixed A4 layout. -->
   <div class="sigs">
-    <div class="sig-block">
-      ${marksheetSignatureHtml('teacher', branding)}
-      <div class="role">Class Teacher</div>
-    </div>
-    <div class="sig-block">
-      ${marksheetSignatureHtml('principal', branding)}
-      <div class="role">Principal</div>
-    </div>
+    <table class="sigs-table" role="presentation">
+      <tbody>
+        <tr>
+          <td class="sig-block">
+            ${marksheetSignatureHtml('teacher', branding)}
+            <div class="role">Class Teacher</div>
+          </td>
+          <td class="sig-block">
+            ${marksheetSignatureHtml('principal', branding)}
+            <div class="role">Principal</div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
    </div><!-- /inner-content -->
