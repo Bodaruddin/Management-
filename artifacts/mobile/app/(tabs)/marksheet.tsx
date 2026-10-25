@@ -862,7 +862,12 @@ function buildCombinedMarksheetHtml(
     * the page.
     */
    .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px 8px 48px; overflow:hidden; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; position:relative; }
-  .inner-content { display:flex; flex:1 1 auto; min-height:0; overflow:visible; flex-direction:column; ${_innerZoomCss} }
+   /*
+    * Native print transforms this wrapper, creating a stacking context. Keep
+    * that context above the absolutely positioned footer so signature labels
+    * at the bottom of the content are not painted behind the footer.
+    */
+   .inner-content { position:relative; z-index:12; display:flex; flex:1 1 auto; min-height:0; overflow:visible; flex-direction:column; ${_innerZoomCss} }
   /* header */
    .hdr { display:table; width:100%; table-layout:fixed; padding-bottom:7px; border-bottom:3px solid #0c1f4a; }
    .hdr > div:first-child { display:table-cell; width:132px; vertical-align:top; }
@@ -961,12 +966,12 @@ function buildCombinedMarksheetHtml(
     .sig-block {
        display:table-cell;
        width:50%;
-       vertical-align:bottom;
+        vertical-align:top;
        text-align:center;
-       padding:0 4px;
+        padding:8px 4px 0;
     }
      .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin:0 auto 3px; min-width:130px; line-height:1.2; }
-     .sig-block .role { position:relative; display:block; height:14px; min-height:14px; font-size:11px; font-weight:700; color:#0c1f4a; line-height:14px; letter-spacing:0.2px; white-space:nowrap; }
+     .sig-block .role { position:relative; display:block; padding-top:2px; font-size:11px; font-weight:700; color:#0c1f4a; line-height:1.2; letter-spacing:0.2px; white-space:nowrap; }
 
 /* footer — flex-shrink:0 always pins it at page bottom */
    .footer { position:absolute; left:8px; right:8px; bottom:8px; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin:0; min-height:32px; padding:8px 22px; text-align:center; }
