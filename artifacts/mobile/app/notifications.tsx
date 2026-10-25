@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -12,7 +13,6 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -29,6 +29,11 @@ import {
   useSendTeacherNotification,
 } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
+import {
+  configureAndroidNotificationChannel,
+  getExpoPushToken,
+  isAndroidExpoGo,
+} from "@/utils/pushNotifications";
 
 type DeleteTarget = {
   id: string;
@@ -136,6 +141,7 @@ export default function NotificationsScreen() {
     },
   });
   const [feedback, setFeedback] = useState("");
+  const [notificationSettingsBlocked, setNotificationSettingsBlocked] = useState(false);
   const [sendTitle, setSendTitle] = useState("");
   const [sendBody, setSendBody] = useState("");
   const [sendTeacherId, setSendTeacherId] = useState<string | null>(null);
@@ -170,9 +176,10 @@ export default function NotificationsScreen() {
   const sendMutation = useSendTeacherNotification({
     mutation: {
       onSuccess: (result) => {
-        setFeedback(
-          `Sent to ${result.inAppCount} teacher${result.inAppCount === 1 ? "" : "s"}. Push accepted: ${result.pushAccepted}.`,
-        );
+        const pushStatus = result.pushAccepted === 0 && result.pushFailed === 0
+          ? "No recipient phone is registered for push yet. Teachers must enable alerts in the installed app."
+          : `Expo accepted ${result.pushAccepted} push alert${result.pushAccepted === 1 ? "" : "s"}; ${result.pushFailed} failed.`;
+        setFeedback(`Saved for ${result.inAppCount} teacher${result.inAppCount === 1 ? "" : "s"}. ${pushStatus}`);
         setSendTitle("");
         setSendBody("");
         void adminQuery.refetch();
@@ -241,31 +248,45 @@ export default function NotificationsScreen() {
 
   const enablePush = async () => {
     setFeedback("");
+    setNotificationSettingsBlocked(false);
     if (Platform.OS === "web") {
       setFeedback("Push setup is available in the installed mobile app. Your in-app inbox still works here.");
       return;
     }
+    if (isAndroidExpoGo()) {
+      setFeedback(
+        "Android remote push is unavailable in Expo Go. Install a development or release build to receive phone alerts.",
+      );
+      return;
+    }
     try {
-      if (Platform.OS === "android") {
-        await Notifications.setNotificationChannelAsync("default", {
-          name: "School notifications",
-          importance: Notifications.AndroidImportance.DEFAULT,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: C.blue,
-        });
-      }
+      await configureAndroidNotificationChannel();
       let permission = await Notifications.getPermissionsAsync();
-      if (!permission.granted) permission = await Notifications.requestPermissionsAsync();
+      if (!permission.granted && permission.canAskAgain) {
+        permission = await Notifications.requestPermissionsAsync();
+      }
       if (!permission.granted) {
-        setFeedback("Allow notifications in your device settings to receive push alerts.");
+        const blocked = !permission.canAskAgain;
+        setNotificationSettingsBlocked(blocked);
+        setFeedback(
+          blocked
+            ? "Notifications are blocked for this app. Open phone settings to allow school alerts."
+            : "Allow notifications in your device settings to receive push alerts.",
+        );
         return;
       }
-      const projectId = Constants.easConfig?.projectId ?? Constants.expoConfig?.extra?.eas?.projectId;
-      if (!projectId) throw new Error("Push notification project is not configured.");
-      const pushToken = await Notifications.getExpoPushTokenAsync({ projectId });
-      await registerMutation.mutateAsync({ data: { token: pushToken.data } });
+      const token = await getExpoPushToken();
+      await registerMutation.mutateAsync({ data: { token } });
     } catch (error) {
       setFeedback(errorText(error, "Could not enable push notifications on this device."));
+    }
+  };
+
+  const openNotificationSettings = async () => {
+    try {
+      await Linking.openSettings();
+    } catch {
+      setFeedback("Open this app’s notification settings from your phone settings.");
     }
   };
 
@@ -416,6 +437,15 @@ export default function NotificationsScreen() {
                 <RecipientChooser teachers={teachers} selected={sendTeacherId} onSelect={setSendTeacherId} />
               ) : (
                 <Text style={s.mutedText}>No teacher accounts are available yet.</Text>
+              )}
+              {teachers.length > 0 && (
+                <Text style={s.helperText}>
+                  {sendTeacherId
+                    ? teachers.find((teacher) => teacher.id === sendTeacherId)?.hasPushToken
+                      ? "This teacher has a phone registered for push alerts."
+                      : "This teacher has not registered a phone for push alerts."
+                    : `${teachers.filter((teacher) => teacher.hasPushToken).length} of ${teachers.length} teachers have a phone registered for push alerts.`}
+                </Text>
               )}
               <Text style={s.fieldLabel}>Title</Text>
               <TextInput
@@ -574,6 +604,11 @@ export default function NotificationsScreen() {
                         : `${item.recipientCount} teacher${item.recipientCount === 1 ? "" : "s"}`}
                       {" · "}{formatDate(item.sentAt)}
                     </Text>
+                    <Text style={s.historyMeta}>
+                      {item.pushAccepted === 0 && item.pushFailed === 0
+                        ? "No registered recipient phones at send time"
+                        : `Push service: ${item.pushAccepted} accepted · ${item.pushFailed} failed`}
+                    </Text>
                     <View style={s.itemActions}>
                       <Pressable
                         accessibilityRole="button"
@@ -613,19 +648,21 @@ export default function NotificationsScreen() {
                   {inboxQuery.data?.pushEnabled ? "Push notifications are on" : "Get school alerts"}
                 </Text>
                 <Text style={s.pushSubtitle}>
-                  Enable push alerts on this phone. Messages also stay in your inbox.
+                  {isAndroidExpoGo()
+                    ? "Android remote push needs the installed app build; Expo Go preview cannot receive it."
+                    : "Enable push alerts on this phone. Messages also stay in your inbox."}
                 </Text>
               </View>
               <Pressable
                 accessibilityRole="button"
                 disabled={registerMutation.isPending}
-                onPress={() => void enablePush()}
+                onPress={() => void (notificationSettingsBlocked ? openNotificationSettings() : enablePush())}
                 style={s.pushButton}
               >
                 {registerMutation.isPending
                   ? <ActivityIndicator color={C.navy} size="small" />
                   : <Text style={s.pushButtonText}>
-                    {inboxQuery.data?.pushEnabled ? "Refresh" : "Enable"}
+                    {notificationSettingsBlocked ? "Open Settings" : inboxQuery.data?.pushEnabled ? "Refresh" : "Enable"}
                   </Text>}
               </Pressable>
             </View>

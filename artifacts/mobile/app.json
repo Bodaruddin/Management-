@@ -53,7 +53,13 @@
           "isIosBackgroundLocationEnabled": true
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default",
+          "color": "#2563EB"
+        }
+      ],
       "expo-sharing"
     ],
     "experiments": {

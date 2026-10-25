@@ -182,6 +182,7 @@ async function sendPushMessages(
           sound: "default",
           title: notification.title,
           body: notification.body,
+          channelId: "default",
           data: { notificationId: notification.id, screen: "notifications" },
         }))),
         signal: AbortSignal.timeout(12_000),
@@ -197,16 +198,25 @@ async function sendPushMessages(
         details?: { error?: string };
       }> };
       const tickets = Array.isArray(payload.data) ? payload.data : [];
+      const ticketErrors: Record<string, number> = {};
       for (let index = 0; index < batch.length; index += 1) {
         const ticket = tickets[index];
         if (ticket?.status === "ok") {
           result.accepted += 1;
         } else {
           result.failed += 1;
-          if (ticket?.details?.error === "DeviceNotRegistered") {
+          const errorCode = ticket?.details?.error ?? ticket?.status ?? "MissingPushTicket";
+          ticketErrors[errorCode] = (ticketErrors[errorCode] ?? 0) + 1;
+          if (errorCode === "DeviceNotRegistered") {
             result.invalidTokens.add(batch[index].token);
           }
         }
+      }
+      if (Object.keys(ticketErrors).length > 0) {
+        logger.warn(
+          { errorCounts: ticketErrors },
+          "Expo push tickets returned errors",
+        );
       }
     } catch (error) {
       result.failed += batch.length;
