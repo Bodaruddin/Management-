@@ -20,6 +20,7 @@ import {
   STUDENT_CASTE_OPTIONS,
 } from '@/context/AppContext';
 import { isBirthdayToday, daysUntilBirthday, extractMMDD } from '@/utils/dateUtils';
+import { mergeBirthdayPeople } from '@/utils/birthdayPeople';
 import { sendBirthdayCardWhatsApp, sendReminderWhatsApp } from '@/utils/reminder';
 import PremiumAlert from '@/components/PremiumAlert';
 
@@ -33,19 +34,6 @@ function calcFinalPayable(annualFee: string, discountType: 'fixed' | 'percent', 
 }
 function genAdmissionNo(count: number): string {
   return `ADM${new Date().getFullYear()}${String(count).padStart(4, '0')}`;
-}
-
-function birthdayStudentIdentityKeys(student: Student): string[] {
-  const keys = [`id:${student.id}`];
-  const admissionNo = student.admissionNo?.trim().toLowerCase();
-  if (admissionNo) keys.push(`admission:${admissionNo}`);
-
-  const name = student.name.trim().toLowerCase().replace(/\s+/g, ' ');
-  const fatherName = student.fatherName.trim().toLowerCase().replace(/\s+/g, ' ');
-  const dateOfBirth = student.dateOfBirth.trim();
-  if (name && dateOfBirth) keys.push(`person:${name}|${fatherName}|${dateOfBirth}`);
-
-  return keys;
 }
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -274,23 +262,10 @@ export default function TeacherDashboard() {
     [exams, todayStr],
   );
 
-  const birthdayEligibleStudents = useMemo(() => {
-    const seen = new Set<string>();
-    const candidates = [
-      ...students,
-      ...alumni.map(alumnus => ({
-        ...alumniToStudent(alumnus),
-        class: alumnus.class?.trim() || alumnus.passOutClass?.trim() || '',
-      })),
-    ];
-    return candidates.filter(student => {
-      if (!student.class.trim()) return false;
-      const identities = birthdayStudentIdentityKeys(student);
-      if (identities.some(identity => seen.has(identity))) return false;
-      identities.forEach(identity => seen.add(identity));
-      return true;
-    });
-  }, [students, alumni]);
+  const birthdayEligibleStudents = useMemo(
+    () => mergeBirthdayPeople(students, alumni.map(alumniToStudent)),
+    [students, alumni],
+  );
   const birthdayStudents = useMemo(() =>
     birthdayEligibleStudents.filter(s => isBirthdayToday(s.dateOfBirth)),
     [birthdayEligibleStudents],
