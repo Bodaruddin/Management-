@@ -590,7 +590,7 @@ function getAttendanceErrorCopy(rawMessage: string): AttendanceErrorCopy {
       eyebrow: 'LOCATION CHECK',
       title: 'Location Verification Required',
       description: `You’re outside the approved ${isCheckOutError ? 'check-out' : 'check-in'} area.`,
-      detail: `${isCheckOutError ? 'Check-out' : 'Check-in'} is protected by your school’s location boundary.`,
+      detail: 'Turn on Precise Location and retry outdoors. If it still fails on campus, ask an administrator to verify the school pin.',
       distance: `${Math.round(Number(locationMatch[1]))}m`,
       radius: `${Math.round(Number(locationMatch[2]))}m`,
     };
@@ -987,7 +987,7 @@ export default function MyTeacherAttendance() {
       }
       // Browser geolocation commonly reports ±300m even with high accuracy.
       // Let the server's school-boundary check decide attendance eligibility.
-      const coordinates = await readCurrentLocation({ allowCoarse: true });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
       if (purpose === 'check-in') {
         await checkInTeacher({
           teacherId: user.id,
@@ -1045,7 +1045,7 @@ export default function MyTeacherAttendance() {
     }
     runAction(async () => {
       if (!user) throw new Error('Please sign in again');
-      const coordinates = await readCurrentLocation({ allowCoarse: true });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
       await checkInTeacher({
         teacherId: user.id,
         teacherName: user.name,
@@ -1064,7 +1064,7 @@ export default function MyTeacherAttendance() {
     setLastAttendanceAction('check-in-no-face');
     runAction(async () => {
       if (!user) throw new Error('Please sign in again');
-      const coordinates = await readCurrentLocation({ allowCoarse: true });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
       await checkInTeacher({
         teacherId: user.id,
         teacherName: user.name,
@@ -1091,7 +1091,7 @@ export default function MyTeacherAttendance() {
     }
     runAction(async () => {
       if (!todayRecord?.checkInAt) throw new Error('No check-in found for today');
-      const coordinates = await readCurrentLocation({ allowCoarse: true });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
       await checkOutTeacher(todayRecord.id, { teacherId: user?.id ?? '', ...coordinates });
     });
   };
@@ -1108,7 +1108,7 @@ export default function MyTeacherAttendance() {
     setLastAttendanceAction('check-out-no-face');
     runAction(async () => {
       if (!user) throw new Error('Please sign in again');
-      const coordinates = await readCurrentLocation({ allowCoarse: true });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
       await checkOutTeacher(todayRecord.id, {
         teacherId: user.id,
         ...coordinates,
