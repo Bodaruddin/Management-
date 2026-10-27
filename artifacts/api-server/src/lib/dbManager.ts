@@ -143,7 +143,21 @@ const poolCache = new Map<string, pg.Pool>();
 
 function getOrCreatePool(id: string, url: string): pg.Pool {
   if (!poolCache.has(id)) {
-    poolCache.set(id, new Pool({ connectionString: url, max: 5, connectionTimeoutMillis: 10_000 }));
+    const pool = new Pool({
+      connectionString: url,
+      max: 5,
+      connectionTimeoutMillis: 10_000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10_000,
+      maxLifetimeSeconds: 60 * 60,
+    });
+    pool.on("error", (err) => {
+      logger.warn(
+        { err, connectionId: id },
+        "DB Manager: idle PostgreSQL client failed; the pool will replace it on the next query",
+      );
+    });
+    poolCache.set(id, pool);
   }
   return poolCache.get(id)!;
 }
