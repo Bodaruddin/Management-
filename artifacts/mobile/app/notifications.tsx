@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import * as Notifications from "expo-notifications";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   getGetAdminNotificationsQueryKey,
@@ -30,9 +29,9 @@ import {
 } from "@workspace/api-client-react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  configureAndroidNotificationChannel,
   getExpoPushToken,
   isAndroidExpoGo,
+  requestPushPermission,
 } from "@/utils/pushNotifications";
 
 type DeleteTarget = {
@@ -260,11 +259,7 @@ export default function NotificationsScreen() {
       return;
     }
     try {
-      await configureAndroidNotificationChannel();
-      let permission = await Notifications.getPermissionsAsync();
-      if (!permission.granted && permission.canAskAgain) {
-        permission = await Notifications.requestPermissionsAsync();
-      }
+      const permission = await requestPushPermission();
       if (!permission.granted) {
         const blocked = !permission.canAskAgain;
         setNotificationSettingsBlocked(blocked);
