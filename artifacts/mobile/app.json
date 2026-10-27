@@ -12,6 +12,7 @@
     },
     "android": {
       "package": "com.schoolmanagement.app",
+      "googleServicesFile": "./google-services.json",
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -52,7 +53,13 @@
           "isIosBackgroundLocationEnabled": true
         }
       ],
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default",
+          "color": "#2563EB"
+        }
+      ],
       "expo-sharing"
     ],
     "experiments": {

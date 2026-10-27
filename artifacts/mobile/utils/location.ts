@@ -10,6 +10,7 @@ export type LocationCoordinates = {
 
 export type LocationReadOptions = {
   allowCoarse?: boolean;
+  targetAccuracyMeters?: number;
 };
 
 const TARGET_ACCURACY_METERS = 80;
@@ -18,6 +19,12 @@ const MAX_LOCATION_AGE_MS = 30_000;
 const NATIVE_SAMPLES = 3;
 const SAMPLE_DELAY_MS = 500;
 const LIVE_LOCATION_TIMEOUT_MS = 12_000;
+
+function getTargetAccuracyMeters(requested?: number): number {
+  return typeof requested === 'number' && Number.isFinite(requested) && requested > 0
+    ? Math.min(TARGET_ACCURACY_METERS, requested)
+    : TARGET_ACCURACY_METERS;
+}
 
 function wait(milliseconds: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -145,6 +152,7 @@ async function readNativeLocation(options: LocationReadOptions = {}): Promise<Lo
 
   let best: LocationCoordinates | null = null;
   let lastError: any;
+  const targetAccuracyMeters = getTargetAccuracyMeters(options.targetAccuracyMeters);
 
   for (let attempt = 0; attempt < NATIVE_SAMPLES; attempt += 1) {
     try {
@@ -157,21 +165,26 @@ async function readNativeLocation(options: LocationReadOptions = {}): Promise<Lo
       );
       const current = toCoordinates(location);
       if (isFreshLocation(current)) best = chooseBetterLocation(best, current);
-      if (best && best.accuracy !== undefined && best.accuracy <= TARGET_ACCURACY_METERS) break;
+      if (best && best.accuracy !== undefined && best.accuracy <= targetAccuracyMeters) break;
     } catch (error) {
       lastError = error;
     }
     if (attempt < NATIVE_SAMPLES - 1) await wait(SAMPLE_DELAY_MS);
   }
 
-  if (!best) {
+  if (
+    !best
+    || (best.accuracy !== undefined && best.accuracy > targetAccuracyMeters)
+  ) {
     try {
-      best = await readLiveNativeLocation();
+      best = await readLiveNativeLocation(best, targetAccuracyMeters);
     } catch {
-      throw new Error(
-        lastError?.message
-          || 'Could not get a fresh GPS fix. Turn on precise location, wait a moment, and try again.',
-      );
+      if (!best) {
+        throw new Error(
+          lastError?.message
+            || 'Could not get a fresh GPS fix. Turn on precise location, wait a moment, and try again.',
+        );
+      }
     }
   }
 
@@ -181,8 +194,11 @@ async function readNativeLocation(options: LocationReadOptions = {}): Promise<Lo
   return ensureUsableAccuracy(best, options.allowCoarse);
 }
 
-async function readLiveNativeLocation(): Promise<LocationCoordinates> {
-  let best: LocationCoordinates | null = null;
+async function readLiveNativeLocation(
+  initialBest: LocationCoordinates | null = null,
+  targetAccuracyMeters = TARGET_ACCURACY_METERS,
+): Promise<LocationCoordinates> {
+  let best: LocationCoordinates | null = initialBest;
   let subscription: Location.LocationSubscription | null = null;
   let settled = false;
 
@@ -209,7 +225,7 @@ async function readLiveNativeLocation(): Promise<LocationCoordinates> {
         const current = toCoordinates(location);
         if (!isFreshLocation(current)) return;
         best = chooseBetterLocation(best, current);
-        if (best.accuracy !== undefined && best.accuracy <= TARGET_ACCURACY_METERS) {
+        if (best.accuracy !== undefined && best.accuracy <= targetAccuracyMeters) {
           clearTimeout(timeout);
           finish();
         }
