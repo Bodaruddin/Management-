@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import '@/utils/teacherAutoCheckout';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -19,10 +20,15 @@ import {
 import { router, Stack } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
-import { getExpoPushToken, isAndroidExpoGo } from '@/utils/pushNotifications';
+import {
+  getExpoPushToken,
+  isAndroidExpoGo,
+  requestPushPermission,
+} from '@/utils/pushNotifications';
 
 SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
+const PUSH_PERMISSION_PROMPTED_KEY = '@school_push_permission_prompted';
 
 function RootLayoutNav() {
   const { user } = useAuth();
@@ -52,11 +58,20 @@ function RootLayoutNav() {
     if (Platform.OS === 'web' || user?.role !== 'teacher' || isAndroidExpoGo()) return;
 
     let mounted = true;
-    const registerIfPermissionGranted = async () => {
+    const registerIfPermissionGranted = async (requestPermission = false) => {
       if (!mounted || isRegisteringDevice.current) return;
       isRegisteringDevice.current = true;
       try {
-        const permission = await Notifications.getPermissionsAsync();
+        let shouldRequestPermission = false;
+        if (requestPermission) {
+          shouldRequestPermission = await AsyncStorage.getItem(PUSH_PERMISSION_PROMPTED_KEY) !== '1';
+        }
+        if (shouldRequestPermission) {
+          await AsyncStorage.setItem(PUSH_PERMISSION_PROMPTED_KEY, '1');
+        }
+        const permission = shouldRequestPermission
+          ? await requestPushPermission()
+          : await Notifications.getPermissionsAsync();
         if (!mounted || !permission.granted) return;
         const token = await getExpoPushToken();
         if (!mounted) return;
@@ -71,7 +86,7 @@ function RootLayoutNav() {
       }
     };
 
-    void registerIfPermissionGranted();
+    void registerIfPermissionGranted(true);
     const appStateSubscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') void registerIfPermissionGranted();
     });

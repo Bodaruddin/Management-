@@ -19,6 +19,14 @@ export async function configureAndroidNotificationChannel(): Promise<void> {
   });
 }
 
+export async function requestPushPermission() {
+  let permission = await Notifications.getPermissionsAsync();
+  if (!permission.granted && permission.canAskAgain) {
+    permission = await Notifications.requestPermissionsAsync();
+  }
+  return permission;
+}
+
 export async function getExpoPushToken(): Promise<string> {
   if (Platform.OS === "web") {
     throw new Error("Push notifications are available in the installed mobile app.");
