@@ -326,34 +326,34 @@ function applyNativePrintMargins(html: string, marginMm: number): string {
    * Combined marksheets have a dense table and their page content is
    * deliberately compacted in the template. Keep the page fixed and
    * non-breaking so native print cannot move signatures and the footer to page 2.
+   * Flex layout ensures the footer is pinned flush against the bottom border
+   * with zero unwanted white space below it.
    */
-   .page.combined-page {
-     height: auto !important;
-     max-height: ${pageHeight} !important;
-     min-height: 0 !important;
-     overflow: hidden !important;
-     page-break-inside: avoid !important;
-     break-inside: avoid !important;
-   }
+  .page.combined-page {
+    width: ${pageWidth} !important;
+    height: ${pageHeight} !important;
+    max-height: ${pageHeight} !important;
+    min-height: ${pageHeight} !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
   .page.combined-page .inner {
-     height: auto !important;
-     min-height: 0 !important;
-     overflow: hidden !important;
-   }
-   /*
-    * Android print can ignore CSS zoom while still using the unscaled
-    * content height for pagination. Scale the complete inner content as one
-    * transformed unit and give its layout box the inverse dimensions.
-    */
-   .page.combined-page .inner-content {
-     zoom: 1 !important;
-     width: calc(100% / var(--native-scale, 0.82)) !important;
-      height: calc(100% / var(--native-scale, 0.82)) !important;
-      min-height: 0 !important;
-      max-height: calc(100% / var(--native-scale, 0.82)) !important;
-      overflow: visible !important;
-     transform: scale(var(--native-scale, 0.82)) !important;
-     transform-origin: top left !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    padding-bottom: 0 !important;
+  }
+  .page.combined-page .footer {
+    margin-top: auto !important;
   }
 </style>`;
 
