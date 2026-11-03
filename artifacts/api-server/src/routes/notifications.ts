@@ -216,16 +216,14 @@ router.delete("/notifications/inbox/:id", async (req, res) => {
 });
 
 router.post("/notifications/device", async (req, res) => {
-  const session = await requireRole(req.get("authorization"), "teacher", res);
-  if (!session) return;
+  const session = await findAuthSession(bearerToken(req.get("authorization")));
+  if (!session) {
+    res.status(401).json({ error: "A valid session is required" });
+    return;
+  }
   const token = req.body?.token;
   if (!isExpoToken(token)) {
     res.status(400).json({ error: "A valid Expo push token is required" });
-    return;
-  }
-  const teachers = await getAdapter().teachers.list();
-  if (!teachers.some((teacher) => String(teacher.id) === session.userId)) {
-    res.status(404).json({ error: "Teacher account not found" });
     return;
   }
   await registerNotificationDevice(session.userId, token);

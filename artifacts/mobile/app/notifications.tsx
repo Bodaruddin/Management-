@@ -150,6 +150,9 @@ export default function NotificationsScreen() {
   const [scheduleTime, setScheduleTime] = useState("08:00");
   const [scheduleTeacherId, setScheduleTeacherId] = useState<string | null>(null);
   const didHydrateSchedule = useRef(false);
+  const unreadInboxCount = inboxQuery.data?.notifications?.filter((item) => !item.read).length ?? 0;
+  const adminNotificationCount = adminQuery.data?.history?.length ?? 0;
+  const bellCount = isAdmin ? adminNotificationCount : unreadInboxCount;
   const [editingNotification, setEditingNotification] = useState<{ id: string } | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
@@ -230,19 +233,37 @@ export default function NotificationsScreen() {
       setFeedback("Enter a valid time in 24-hour format, such as 08:30.");
       return;
     }
-    if (scheduleEnabled && (!scheduleTitle.trim() || !scheduleBody.trim())) {
-      setFeedback("Add a title and message before enabling the daily schedule.");
+    const cleanTitle = scheduleTitle.trim();
+    const cleanBody = scheduleBody.trim();
+    if (!cleanTitle || !cleanBody) {
+      setFeedback("Add a title and message for the daily notification.");
       return;
     }
+    setScheduleEnabled(true);
     scheduleMutation.mutate({
       data: {
-        enabled: scheduleEnabled,
-        title: scheduleTitle.trim(),
-        body: scheduleBody.trim(),
+        enabled: true,
+        title: cleanTitle,
+        body: cleanBody,
         time: scheduleTime,
         teacherId: scheduleTeacherId,
       },
     });
+  };
+
+  const onToggleSchedule = (enabled: boolean) => {
+    setScheduleEnabled(enabled);
+    if (!enabled && adminQuery.data?.schedule?.enabled) {
+      scheduleMutation.mutate({
+        data: {
+          enabled: false,
+          title: scheduleTitle.trim() || adminQuery.data.schedule.title,
+          body: scheduleBody.trim() || adminQuery.data.schedule.body,
+          time: scheduleTime,
+          teacherId: scheduleTeacherId,
+        },
+      });
+    }
   };
 
   const enablePush = async () => {
@@ -389,6 +410,11 @@ export default function NotificationsScreen() {
           </View>
           <View style={s.headerIcon}>
             <Feather name="bell" size={19} color={C.blue} />
+            {bellCount > 0 && (
+              <View style={s.bellBadge}>
+                <Text style={s.bellBadgeText}>{bellCount > 99 ? "99+" : bellCount}</Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -491,12 +517,28 @@ export default function NotificationsScreen() {
               </View>
               <View style={s.switchRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.fieldLabelNoMargin}>Daily schedule</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <Text style={s.fieldLabelNoMargin}>Daily schedule</Text>
+                    <View style={{
+                      paddingHorizontal: 7,
+                      paddingVertical: 2,
+                      borderRadius: 6,
+                      backgroundColor: scheduleEnabled ? C.paleGreen : "#F1F5F9",
+                    }}>
+                      <Text style={{
+                        fontSize: 10,
+                        fontWeight: "800",
+                        color: scheduleEnabled ? C.green : C.muted,
+                      }}>
+                        {scheduleEnabled ? "ACTIVE" : "PAUSED"}
+                      </Text>
+                    </View>
+                  </View>
                   <Text style={s.helperText}>Server time zone: {adminQuery.data?.schedule.timeZone ?? "Asia/Kolkata"}</Text>
                 </View>
                 <Switch
                   value={scheduleEnabled}
-                  onValueChange={setScheduleEnabled}
+                  onValueChange={onToggleSchedule}
                   trackColor={{ false: "#CBD5E1", true: C.blue }}
                   thumbColor={C.white}
                   accessibilityLabel="Enable daily notification"
@@ -542,19 +584,44 @@ export default function NotificationsScreen() {
                 textAlignVertical="top"
                 style={[inputStyle, { minHeight: 104 }]}
               />
-              <Pressable
-                accessibilityRole="button"
-                disabled={scheduleMutation.isPending}
-                onPress={saveSchedule}
-                style={[s.secondaryButton, scheduleMutation.isPending && s.disabledSecondaryButton]}
-              >
-                {scheduleMutation.isPending
-                  ? <ActivityIndicator color={C.navy} />
-                  : <Feather name="save" size={16} color={C.navy} />}
-                <Text style={s.secondaryButtonText}>
-                  {scheduleMutation.isPending ? "Saving…" : "Save daily schedule"}
-                </Text>
-              </Pressable>
+              <View style={{ flexDirection: "row", gap: 10 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={scheduleMutation.isPending}
+                  onPress={saveSchedule}
+                  style={[s.secondaryButton, { flex: 1 }, scheduleMutation.isPending && s.disabledSecondaryButton]}
+                >
+                  {scheduleMutation.isPending
+                    ? <ActivityIndicator color={C.navy} />
+                    : <Feather name="save" size={16} color={C.navy} />}
+                  <Text style={s.secondaryButtonText}>
+                    {scheduleMutation.isPending ? "Saving…" : "Save daily schedule"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={sendMutation.isPending || !scheduleTitle.trim() || !scheduleBody.trim()}
+                  onPress={() => {
+                    const title = scheduleTitle.trim();
+                    const body = scheduleBody.trim();
+                    if (!title || !body) {
+                      setFeedback("Add a title and message first to test the alert.");
+                      return;
+                    }
+                    sendMutation.mutate({
+                      data: {
+                        title: `[Daily Alert] ${title}`,
+                        body,
+                        teacherId: scheduleTeacherId,
+                      },
+                    });
+                  }}
+                  style={[s.testAlertButton, (sendMutation.isPending || !scheduleTitle.trim() || !scheduleBody.trim()) && s.disabledSecondaryButton]}
+                >
+                  <Feather name="bell" size={15} color={C.blue} />
+                  <Text style={s.testAlertButtonText}>Test popup</Text>
+                </Pressable>
+              </View>
               {adminQuery.data?.schedule.enabled && (
                 <View style={s.scheduleStatus}>
                   <Feather name="check-circle" size={15} color={C.green} />
@@ -886,7 +953,43 @@ const s = {
   backButton: { width: 44, height: 44, borderRadius: 14, backgroundColor: C.white, alignItems: "center" as const, justifyContent: "center" as const, borderWidth: 1, borderColor: C.border },
   eyebrow: { color: C.gold, fontSize: 10, fontWeight: "800" as const, letterSpacing: 1.3 },
   pageTitle: { color: C.navy, fontSize: 24, fontWeight: "800" as const, marginTop: 2 },
-  headerIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: C.paleBlue, alignItems: "center" as const, justifyContent: "center" as const },
+  headerIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: C.paleBlue, alignItems: "center" as const, justifyContent: "center" as const, position: "relative" as const },
+  bellBadge: {
+    position: "absolute" as const,
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: C.red,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: C.white,
+  },
+  bellBadgeText: {
+    color: C.white,
+    fontSize: 10,
+    fontWeight: "800" as const,
+  },
+  testAlertButton: {
+    minHeight: 48,
+    borderRadius: 13,
+    backgroundColor: "#F1F5F9",
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 7,
+    paddingHorizontal: 14,
+  },
+  testAlertButtonText: {
+    color: C.blue,
+    fontSize: 13,
+    fontWeight: "700" as const,
+  },
   feedback: { flexDirection: "row" as const, alignItems: "center" as const, gap: 9, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, backgroundColor: "#E8F0FF" },
   feedbackText: { color: C.navy, fontSize: 13, fontWeight: "600" as const, flex: 1, lineHeight: 19 },
   card: { padding: 17, borderRadius: 18, borderWidth: 1, borderColor: C.border, backgroundColor: C.white, gap: 12 },

@@ -23,6 +23,10 @@ import { isBirthdayToday, daysUntilBirthday, extractMMDD } from '@/utils/dateUti
 import { mergeBirthdayPeople } from '@/utils/birthdayPeople';
 import { sendBirthdayCardWhatsApp, sendReminderWhatsApp } from '@/utils/reminder';
 import PremiumAlert from '@/components/PremiumAlert';
+import {
+  useGetTeacherNotificationInbox,
+  getGetTeacherNotificationInboxQueryKey,
+} from '@workspace/api-client-react';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function calcFinalPayable(annualFee: string, discountType: 'fixed' | 'percent', discountValue: string) {
@@ -222,6 +226,14 @@ const EMPTY_STUDENT = {
 export default function TeacherDashboard() {
   const insets = useSafeAreaInsets();
   const { user, isLoading, logout, switchToAdmin } = useAuth();
+  const inboxQuery = useGetTeacherNotificationInbox({
+    query: {
+      queryKey: getGetTeacherNotificationInboxQueryKey(),
+      enabled: Boolean(user?.role === 'teacher'),
+      refetchInterval: 15_000,
+    },
+  });
+  const unreadCount = inboxQuery.data?.notifications?.filter((item) => !item.read).length ?? 0;
   const { students, exams, classes, sections, attendanceRecords, alumni, addStudent, addSection, updateSection, deleteSection } = useApp();
   const signingOutRef = useRef(false);
 
@@ -477,13 +489,18 @@ export default function TeacherDashboard() {
               style={s.notificationButton}
               activeOpacity={0.8}
               accessibilityRole="button"
-              accessibilityLabel="Open notifications"
+              accessibilityLabel={`Open notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
               onPress={async () => {
                 await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push('/notifications' as any);
               }}
             >
               <Feather name="bell" size={19} color="#fff" />
+              {unreadCount > 0 && (
+                <View style={s.bellBadge}>
+                  <Text style={s.bellBadgeTxt}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={s.avatar} onPress={() => setShowProfile(true)} activeOpacity={0.8}>
               <Text style={s.avatarTxt}>{initials}</Text>
@@ -1514,6 +1531,26 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center', justifyContent: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)',
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1.5,
+    borderColor: '#1A237E',
+  },
+  bellBadgeTxt: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800',
   },
   schoolBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

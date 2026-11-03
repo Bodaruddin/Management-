@@ -17,6 +17,12 @@ import { daysUntilBirthday, isBirthdayToday, extractMMDD } from '@/utils/dateUti
 import { mergeBirthdayPeople } from '@/utils/birthdayPeople';
 import { sendBirthdayCardWhatsApp, sendReminderWhatsApp } from '@/utils/reminder';
 import { getApiBase } from '@/constants/api';
+import {
+  useGetAdminNotifications,
+  getGetAdminNotificationsQueryKey,
+  useGetTeacherNotificationInbox,
+  getGetTeacherNotificationInboxQueryKey,
+} from '@workspace/api-client-react';
 
 // ─── DB status hook ───────────────────────────────────────────────────────────
 function useDbStatus() {
@@ -112,6 +118,24 @@ function FadeSlide({ delay = 0, children }: { delay?: number; children: React.Re
 function AppHeader({ onAvatarPress, userName }: { onAvatarPress: () => void; userName: string }) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 0 : insets.top;
+  const { user } = useAuth();
+  const adminNotificationQuery = useGetAdminNotifications({
+    query: {
+      queryKey: getGetAdminNotificationsQueryKey(),
+      enabled: user?.role === 'admin',
+      refetchInterval: 20_000,
+    },
+  });
+  const inboxQuery = useGetTeacherNotificationInbox({
+    query: {
+      queryKey: getGetTeacherNotificationInboxQueryKey(),
+      enabled: user?.role === 'teacher',
+      refetchInterval: 20_000,
+    },
+  });
+  const notificationCount = user?.role === 'teacher'
+    ? (inboxQuery.data?.notifications?.filter((n) => !n.read).length ?? 0)
+    : (adminNotificationQuery.data?.history?.length ?? 0);
   return (
     <View style={[ah.wrap, { paddingTop: topPad + 10 }]}>
       <View style={ah.inner}>
@@ -130,13 +154,18 @@ function AppHeader({ onAvatarPress, userName }: { onAvatarPress: () => void; use
             style={ah.notificationBtn}
             activeOpacity={0.75}
             accessibilityRole="button"
-            accessibilityLabel="Open notifications"
+            accessibilityLabel={`Open notifications${notificationCount > 0 ? `, ${notificationCount} new` : ''}`}
             onPress={async () => {
               await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               router.push('/notifications' as any);
             }}
           >
             <Feather name="bell" size={19} color="#64748B" />
+            {notificationCount > 0 && (
+              <View style={ah.bellBadge}>
+                <Text style={ah.bellBadgeTxt}>{notificationCount > 99 ? '99+' : notificationCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={ah.avatarBtn} onPress={onAvatarPress} activeOpacity={0.75}>
             <Text style={ah.avatarTxt}>{(userName ?? 'A').charAt(0).toUpperCase()}</Text>
@@ -166,6 +195,26 @@ const ah = StyleSheet.create({
   notificationBtn: {
     width: 36, height: 36, borderRadius: 18,
     backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center',
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -3,
+    right: -3,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 8.5,
+    backgroundColor: '#EF4444',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  bellBadgeTxt: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '800',
   },
   avatarBtn: {
     width: 36, height: 36, borderRadius: 18,

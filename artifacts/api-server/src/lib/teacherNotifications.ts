@@ -312,6 +312,12 @@ export async function saveDailyNotificationSchedule(input: {
   teacherId: string | null;
 }): Promise<DailyNotificationSchedule> {
   return updateState((state) => {
+    const isConfigChanged =
+      state.schedule.time !== input.time ||
+      state.schedule.title !== input.title ||
+      state.schedule.body !== input.body ||
+      state.schedule.teacherId !== input.teacherId;
+
     state.schedule = {
       ...state.schedule,
       enabled: input.enabled,
@@ -319,6 +325,8 @@ export async function saveDailyNotificationSchedule(input: {
       body: input.body,
       time: input.time,
       teacherId: input.teacherId,
+      // If the schedule was modified, reset lastSentDate so today's daily alert can deliver on schedule
+      lastSentDate: isConfigChanged ? null : state.schedule.lastSentDate,
     };
     return state.schedule;
   });
