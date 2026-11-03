@@ -33,10 +33,64 @@ const DEFAULT_SETTINGS = {
 };
 
 function asDate(value: unknown): string {
-  return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
-    ? value : new Intl.DateTimeFormat("en-CA", {
-      timeZone: SCHOOL_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
-    }).format(new Date());
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value;
+  }
+  const date = value instanceof Date ? value : (value ? new Date(String(value)) : new Date());
+  const validDate = Number.isFinite(date.getTime()) ? date : new Date();
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: SCHOOL_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(validDate);
+}
+
+function schoolTimeToDate(dateStr: string, timeStr: string, timeZone: string = SCHOOL_TIME_ZONE): Date {
+  const [hours, minutes] = (timeStr || "17:00").split(":").map(Number);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const isoLocal = `${dateStr}T${pad(hours)}:${pad(minutes)}:00`;
+
+  try {
+    const tempDate = new Date(`${dateStr}T12:00:00Z`);
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      timeZoneName: "longOffset",
+    });
+    const parts = formatter.formatToParts(tempDate);
+    const tzName = parts.find((p) => p.type === "timeZoneName")?.value || "";
+    const match = tzName.match(/GMT([+-])(\d{1,2}):?(\d{2})?/);
+    let offsetStr = "+05:30";
+    if (match) {
+      const sign = match[1];
+      const offH = pad(Number(match[2]));
+      const offM = pad(Number(match[3] || "00"));
+      offsetStr = `${sign}${offH}:${offM}`;
+    }
+    const result = new Date(`${isoLocal}${offsetStr}`);
+    if (Number.isFinite(result.getTime())) return result;
+  } catch {
+    // fallback
+  }
+  return new Date(`${isoLocal}+05:30`);
+}
+
+function sanitizeAttendanceRecord(record: any, settings: any): any {
+  if (!record || !record.checkOutAt) return record;
+  const checkOutMs = Date.parse(record.checkOutAt);
+  const nowMs = Date.now();
+  // If checkOutAt is in the future, it was corrupted by the unoffset UTC bug (e.g. 14:00 UTC = 19:30 IST)
+  if (Number.isFinite(checkOutMs) && checkOutMs > nowMs + 60_000) {
+    const localEnd = schoolTimeToDate(String(record.date), settings?.checkOutEnd || "14:00", SCHOOL_TIME_ZONE);
+    const correctedMs = Number.isFinite(localEnd.getTime()) && localEnd.getTime() <= nowMs
+      ? localEnd.getTime()
+      : nowMs;
+    return {
+      ...record,
+      checkOutAt: new Date(correctedMs).toISOString(),
+    };
+  }
+  return record;
 }
 
 function timeToMinutes(value: string): number {
@@ -378,27 +432,60 @@ export async function markForgottenTeacherCheckouts() {
         if (record.checkOutAt) continue;
         const checkInAt = toIsoTimestamp(record.checkInAt);
         if (!checkInAt || String(record.date) !== attendanceDate) continue;
+        const checkInMs = Date.parse(checkInAt);
+        const lastSchoolIso = toIsoTimestamp(record.lastSchoolAt);
+        const lastSchoolMs = lastSchoolIso ? Date.parse(lastSchoolIso) : 0;
 
-        let checkOutAt = toIsoTimestamp(record.lastSchoolAt);
-        if (!checkOutAt || Date.parse(checkOutAt) <= Date.parse(checkInAt)) {
-          const [endH, endM] = (settings.checkOutEnd || "17:00").split(":").map(Number);
-          const endAt = new Date(`${attendanceDate}T${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}:00`);
-          checkOutAt = Number.isFinite(endAt.getTime()) && endAt.getTime() > Date.parse(checkInAt)
+        let checkOutAt: string;
+        let checkOutMethod = "automatic_end_of_day";
+
+        // If the teacher has a verified point inside school clearly after check-in (> 15 min),
+        // use that last point inside school. Otherwise, use the school checkout end time in local timezone.
+        if (lastSchoolIso && lastSchoolMs > checkInMs + 15 * 60 * 1000) {
+          checkOutAt = lastSchoolIso;
+          checkOutMethod = "automatic_location";
+        } else {
+          const endAt = schoolTimeToDate(attendanceDate, settings.checkOutEnd || "17:00", SCHOOL_TIME_ZONE);
+          checkOutAt = Number.isFinite(endAt.getTime()) && endAt.getTime() > checkInMs
             ? endAt.toISOString()
-            : new Date(Date.parse(checkInAt) + 8 * 3600 * 1000).toISOString();
+            : new Date(checkInMs + 8 * 3600 * 1000).toISOString();
+          checkOutMethod = "automatic_end_of_day";
+        }
+
+        // Never set a checkout timestamp in the future
+        if (Date.parse(checkOutAt) > Date.now()) {
+          checkOutAt = new Date().toISOString();
         }
 
         const latitude = Number(record.lastSchoolLatitude ?? record.checkInLatitude ?? settings.schoolLatitude ?? 0);
         const longitude = Number(record.lastSchoolLongitude ?? record.checkInLongitude ?? settings.schoolLongitude ?? 0);
         if (!isValidCoordinate(latitude, -90, 90) || !isValidCoordinate(longitude, -180, 180)) continue;
-
         const row = await adapter.teacherAttendance.autoCheckOutIfOpen(String(record.id), {
           checkOutAt,
           checkOutLatitude: latitude,
           checkOutLongitude: longitude,
-          checkOutMethod: "automatic_end_of_day",
+          checkOutMethod,
         });
         if (row) closed += 1;
+      }
+
+      // Also clean up any lingering records that were corrupted by the future 7:30 UTC bug
+      try {
+        const existingList = await adapter.teacherAttendance.list({ month: attendanceDate.slice(0, 7) });
+        for (const existingRecord of existingList as any[]) {
+          if (existingRecord.checkOutAt && Date.parse(existingRecord.checkOutAt) > Date.now() + 60_000) {
+            const correctedEnd = schoolTimeToDate(String(existingRecord.date), settings.checkOutEnd || "14:00", SCHOOL_TIME_ZONE);
+            const correctedIso = Number.isFinite(correctedEnd.getTime()) && correctedEnd.getTime() <= Date.now()
+              ? correctedEnd.toISOString()
+              : new Date().toISOString();
+            await adapter.teacherAttendance.updateCheckOut(String(existingRecord.id), {
+              checkOutAt: correctedIso,
+              checkOutMethod: existingRecord.checkOutMethod || "automatic_location",
+            });
+          }
+        }
+      } catch {
+        // Non-fatal cleanup
       }
     }
     return { date, closed, skipped: false };
@@ -472,7 +559,8 @@ router.get("/teacher-attendance", async (req, res) => {
   const adapter = getAdapter();
   const settings = await getSettings();
   await syncTeacherSundayAttendance(adapter, settings.sundayHoliday !== false);
-  res.json(await adapter.teacherAttendance.list({ teacherId, month }));
+  const rawRows = await adapter.teacherAttendance.list({ teacherId, month });
+  res.json(rawRows.map((r: any) => sanitizeAttendanceRecord(r, settings)));
 });
 
 router.post("/teacher-attendance/reset", async (req, res) => {
@@ -752,8 +840,15 @@ router.post("/teacher-attendance/:id/auto-checkout", async (req, res) => {
     return;
   }
   if (record.checkOutAt) {
-    res.json({ checkedOut: true, record });
-    return;
+    const existingCheckOutMs = Date.parse(record.checkOutAt);
+    if (Number.isFinite(existingCheckOutMs) && existingCheckOutMs > Date.now() + 60_000) {
+      // The previous checkout timestamp was mistakenly in the future due to the UTC bug;
+      // allow this real departure sample to record the correct departure checkout time.
+      record.checkOutAt = null;
+    } else {
+      res.json({ checkedOut: true, record });
+      return;
+    }
   }
   if (!record.checkInAt) {
     res.status(409).json({ error: "Automatic checkout requires a recorded check-in", record });
@@ -875,7 +970,32 @@ router.post("/teacher-attendance/:id/location-samples", async (req, res) => {
     // the edge does not close attendance prematurely.
     const exitMargin = Math.max(30, Math.min(sample.accuracy ?? 30, 100));
     if (distance <= schoolRadius + exitMargin) continue;
-    const lastSchoolAt = toIsoTimestamp(record.lastSchoolAt) || toIsoTimestamp(record.checkInAt) || sampleAt;
+    // Teacher has exited the school location geofence!
+    const lastSchoolIso = toIsoTimestamp(record.lastSchoolAt);
+    const checkInIso = toIsoTimestamp(record.checkInAt);
+    const checkInMs = checkInIso ? Date.parse(checkInIso) : 0;
+    const sampleMs = sample.at.getTime();
+    const lastSchoolMs = lastSchoolIso ? Date.parse(lastSchoolIso) : 0;
+
+    // Determine checkout time upon departure:
+    // 1. If we have a verified point inside school that is clearly after check-in (> 5 mins)
+    //    and within 45 mins of the exit sample, use that last inside-school point.
+    // 2. Otherwise use the departure sample time (when the exit outside school was detected).
+    let departureAt: string;
+    if (
+      lastSchoolIso
+      && lastSchoolMs > checkInMs + 5 * 60 * 1000
+      && (sampleMs - lastSchoolMs) <= 45 * 60 * 1000
+    ) {
+      departureAt = lastSchoolIso;
+    } else {
+      departureAt = sampleAt;
+    }
+
+    // Clamp checkout time: never before check-in and never in the future
+    const departureMs = Math.min(Date.now(), Math.max(checkInMs, Date.parse(departureAt)));
+    const checkOutAt = new Date(departureMs).toISOString();
+
     const lastSchoolLatitude = isValidCoordinate(Number(record.lastSchoolLatitude), -90, 90)
       ? Number(record.lastSchoolLatitude)
       : isValidCoordinate(Number(record.checkInLatitude), -90, 90)
@@ -888,7 +1008,7 @@ router.post("/teacher-attendance/:id/location-samples", async (req, res) => {
         : sample.longitude;
 
     const closed = await adapter.teacherAttendance.autoCheckOutIfOpen(String(record.id), {
-      checkOutAt: lastSchoolAt,
+      checkOutAt,
       checkOutLatitude: lastSchoolLatitude,
       checkOutLongitude: lastSchoolLongitude,
       checkOutMethod: "automatic_location",

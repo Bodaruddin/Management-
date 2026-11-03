@@ -772,7 +772,17 @@ function AttendanceErrorModal({
 function formatTime(value?: string) {
   if (!value) return '—';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  if (Number.isNaN(date.getTime())) return value;
+  const now = Date.now();
+  // Guard against future timestamps saved by unoffset UTC bug (e.g. 14:00 UTC = 19:30 IST)
+  if (date.getTime() > now + 60_000) {
+    const adjusted = new Date(date.getTime() - 5.5 * 3600 * 1000);
+    if (adjusted.getTime() <= now) {
+      return adjusted.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return new Date(now).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatIsoDate(date: Date): string {
@@ -850,6 +860,7 @@ export default function MyTeacherAttendance() {
   );
   const todayRecord = myRecords.find(record => record.date === today);
   const hasCheckedInToday = Boolean(todayRecord?.checkInAt);
+  const hasCheckedOutToday = Boolean(todayRecord?.checkOutAt);
   const isTodayHoliday = todayRecord?.status === 'holiday';
   const myLeaves = useMemo(
     () => teacherLeaves.filter(leave => leave.teacherId === user?.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
@@ -1355,20 +1366,24 @@ export default function MyTeacherAttendance() {
               <View style={s.heroDecorOne} />
               <View style={s.heroDecorTwo} />
               <View style={s.heroTopRow}>
-                <View style={s.heroIcon}><Feather name="shield" size={23} color="#173B92" /></View>
-                <View style={s.heroSecurePill}>
-                  <View style={s.heroSecureDot} />
-                  <Text style={s.heroSecureText}>SECURE CHECK-IN</Text>
+                <View style={s.heroIcon}><Feather name={hasCheckedOutToday ? 'check-circle' : 'shield'} size={23} color="#173B92" /></View>
+                <View style={[s.heroSecurePill, hasCheckedOutToday ? { backgroundColor: 'rgba(34, 197, 94, 0.25)' } : null]}>
+                  <View style={[s.heroSecureDot, hasCheckedOutToday ? { backgroundColor: '#4ADE80' } : null]} />
+                  <Text style={s.heroSecureText}>{hasCheckedOutToday ? 'CHECKED OUT' : 'SECURE CHECK-IN'}</Text>
                 </View>
               </View>
               <Text style={s.heroKicker}>TODAY’S ATTENDANCE</Text>
               <Text style={s.heroTitle}>
-                {hasCheckedInToday
+                {hasCheckedOutToday
+                  ? 'Attendance complete'
+                  : hasCheckedInToday
                   ? (todayRecord?.status === 'late' ? 'Checked in late' : 'Checked in')
                   : isTodayHoliday ? 'Sunday holiday' : todayRecord?.status === 'absent' ? 'Marked absent' : 'Ready to check in?'}
               </Text>
               <Text style={s.heroCopy}>
-                {isTodayHoliday
+                {hasCheckedOutToday
+                  ? 'You have checked out for today.'
+                  : isTodayHoliday
                   ? 'School is closed today.'
                   : `Your location must be within ${teacherAttendanceSettings.radiusMeters}m of school.`}
               </Text>
@@ -1440,7 +1455,9 @@ export default function MyTeacherAttendance() {
                 <View style={[s.distanceRow, { borderTopColor: colors.border }]}>
                   <Feather name="map-pin" size={13} color={colors.primary} />
                   <Text style={[s.distance, { color: colors.mutedForeground }]}>
-                    Automatically checked out using the last GPS point inside school.
+                    {todayRecord.checkOutMethod === 'automatic_location'
+                      ? 'Automatically checked out upon leaving school.'
+                      : 'Automatically checked out at end of school day.'}
                   </Text>
                 </View>
               )}
