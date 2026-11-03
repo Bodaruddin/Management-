@@ -28,6 +28,7 @@
 import { Platform, Alert } from 'react-native';
 import * as Print from 'expo-print';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 
 /* ─── Type stubs (dynamic imports keep native bundle clean) ───────────────── */
 
@@ -574,22 +575,41 @@ export async function downloadHtmlAsPdf(
     const nativeHtml = compactNativeHtml(
       await preEmbedQrCodes(applyNativePrintMargins(html, marginMm), QRCode, 1),
     );
-    const { uri } = await Print.printToFileAsync({
+    const printPromise = Print.printToFileAsync({
       html: nativeHtml,
     });
-    const safeName = filename.replace(/['"\\<>]/g, '').trim() || 'school-documents';
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('PDF generation timed out (20s). Please check your connection.')), 20000),
+    );
+    const { uri } = await Promise.race([printPromise, timeoutPromise]);
+    const safeName = filename
+      .replace(/[^\w\s\-\.]/g, '')
+      .replace(/\s+/g, '_')
+      .trim() || 'school-marksheet';
     const destUri = `${FileSystem.documentDirectory}${safeName}.pdf`;
-    // Explicitly check and delete any existing file before copying to avoid
-    // "file already exists" errors on Android when downloading the same marksheet again.
+
     const existingFile = await FileSystem.getInfoAsync(destUri);
     if (existingFile.exists) {
-      await FileSystem.deleteAsync(destUri);
+      await FileSystem.deleteAsync(destUri, { idempotent: true });
     }
     await FileSystem.copyAsync({ from: uri, to: destUri });
+
+    if (await Sharing.isAvailableAsync()) {
+      try {
+        await Sharing.shareAsync(destUri, {
+          mimeType: 'application/pdf',
+          dialogTitle: `${safeName}.pdf`,
+          UTI: 'com.adobe.pdf',
+        });
+      } catch (shareErr) {
+        console.warn('[PDF] shareAsync dismissed or failed:', shareErr);
+      }
+    }
+
     if (onSaved) {
       onSaved(`${safeName}.pdf`, destUri);
     } else {
-      Alert.alert('PDF Saved', `"${safeName}.pdf" has been saved to your Files app.`);
+      Alert.alert('PDF Saved', `"${safeName}.pdf" has been saved to your device.`);
     }
     return destUri;
   }
@@ -840,10 +860,20 @@ export async function downloadMultipleHtmlsAsPdf(
       if (existingFile.exists) await FileSystem.deleteAsync(destUri);
       await FileSystem.copyAsync({ from: generatedUri, to: destUri });
 
+      if (await Sharing.isAvailableAsync()) {
+        try {
+          await Sharing.shareAsync(destUri, {
+            mimeType: 'application/pdf',
+            dialogTitle: `${safeName}.pdf`,
+            UTI: 'com.adobe.pdf',
+          });
+        } catch { /* ignored */ }
+      }
+
       if (onSaved) {
         onSaved(`${safeName}.pdf`, destUri);
       } else {
-        Alert.alert('PDF Saved', `"${safeName}.pdf" has been saved to your Files app.`);
+        Alert.alert('PDF Saved', `"${safeName}.pdf" has been saved to your device.`);
       }
       return destUri;
     } finally {

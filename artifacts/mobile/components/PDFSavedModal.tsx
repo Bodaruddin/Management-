@@ -179,7 +179,7 @@ export default function PDFSavedModal({ visible, filename, fileUri, onDismiss }:
           </View>
 
           {/* Hint */}
-          <Text style={styles.hint}>Find it in your Files app › Downloads</Text>
+          <Text style={styles.hint}>Saved to device • Tap "Open File" to view or share</Text>
         </View>
       </Animated.View>
     </Modal>
