@@ -939,7 +939,6 @@ export function createPgAdapter(db: DB): DataAdapter {
           eq(teacherAttendanceRecordsTable.autoCheckoutEnabled, true),
           inArray(teacherAttendanceRecordsTable.status, ["present", "late"]),
           isNull(teacherAttendanceRecordsTable.checkOutAt),
-          isNotNull(teacherAttendanceRecordsTable.lastSchoolAt),
         ));
       },
       async reset(teacherId) {

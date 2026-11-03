@@ -216,3 +216,46 @@ export async function stopTeacherAutoCheckout(attendanceId?: string): Promise<vo
   if (attendanceId && activeAttendanceId !== attendanceId) return;
   await clearTrackingState();
 }
+
+export async function syncTeacherAutoCheckoutLocation(
+  attendanceId: string,
+  date: string,
+  authenticatedFetch: AuthenticatedFetch,
+): Promise<{ checkedOut?: boolean; record?: any } | null> {
+  if (Platform.OS === "web") return null;
+  try {
+    const foreground = await Location.getForegroundPermissionsAsync();
+    if (!foreground.granted) return null;
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+    const { latitude, longitude, accuracy } = location.coords;
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+    const response = await authenticatedFetch(
+      `/teacher-attendance/${encodeURIComponent(attendanceId)}/location-samples`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date,
+          locations: [{
+            latitude,
+            longitude,
+            accuracy: accuracy ?? null,
+            timestamp: new Date(location.timestamp || Date.now()).toISOString(),
+          }],
+        }),
+      },
+    );
+    if (!response.ok) return null;
+    const result = await response.json() as { checkedOut?: boolean; record?: any };
+    if (result.checkedOut) {
+      await clearTrackingState();
+    }
+    return result;
+  } catch (error) {
+    console.warn("[TeacherAutoCheckout] foreground sync error:", error);
+    return null;
+  }
+}

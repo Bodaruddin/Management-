@@ -1047,8 +1047,7 @@ export function createFirebaseAdapter(fs: Firestore): DataAdapter {
         return snapshot.docs.map(mapDoc).filter((row: any) =>
           row.autoCheckoutEnabled === true
           && ["present", "late"].includes(String(row.status))
-          && !row.checkOutAt
-          && Boolean(row.lastSchoolAt),
+          && !row.checkOutAt,
         );
       },
       async reset(teacherId) {

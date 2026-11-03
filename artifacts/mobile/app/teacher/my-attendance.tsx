@@ -18,6 +18,7 @@ import {
 } from '@/context/AppContext';
 import EmptyState from '@/components/EmptyState';
 import { readCurrentLocation } from '@/utils/location';
+import { syncTeacherAutoCheckoutLocation } from '@/utils/teacherAutoCheckout';
 
 type Tab = 'today' | 'history' | 'leave';
 type HistoryFilter = 'weekly' | 'monthly' | 'yearly' | 'custom';
@@ -808,7 +809,7 @@ function parseDisplayDate(value: string): string | null {
 export default function MyTeacherAttendance() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, authenticatedFetch } = useAuth();
   const {
     teacherAttendanceRecords, teacherLeaves, teacherHolidays, teacherAttendanceSettings,
     refreshTeacherAttendance, getTeacherFaceStatus, getFacelessAttendancePermission, enrollTeacherFace,
@@ -1227,8 +1228,30 @@ export default function MyTeacherAttendance() {
     teacherAttendanceSettings.requireFaceVerification && canUseFacelessAttendance;
   const showFaceAttendanceOption =
     !teacherAttendanceSettings.requireFaceVerification || faceEnrolled === true;
+  useEffect(() => {
+    if (!todayRecord?.id || !todayRecord?.autoCheckoutEnabled || todayRecord?.checkOutAt || !authenticatedFetch) return;
+    let active = true;
+    syncTeacherAutoCheckoutLocation(todayRecord.id, todayRecord.date, authenticatedFetch)
+      .then((res) => {
+        if (active && res?.checkedOut) {
+          refreshTeacherAttendance(user?.id).catch(() => {});
+        }
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [todayRecord?.id, todayRecord?.autoCheckoutEnabled, todayRecord?.checkOutAt, todayRecord?.date, authenticatedFetch, refreshTeacherAttendance, user?.id]);
+
   const refreshAttendanceView = () => {
     refreshTeacherAttendance(user?.id).catch(error => console.error('[TeacherAttendance]', error));
+    if (todayRecord?.id && todayRecord?.autoCheckoutEnabled && !todayRecord?.checkOutAt && authenticatedFetch) {
+      syncTeacherAutoCheckoutLocation(todayRecord.id, todayRecord.date, authenticatedFetch)
+        .then((res) => {
+          if (res?.checkedOut) {
+            refreshTeacherAttendance(user?.id).catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
     setCanUseFacelessAttendance(null);
     getFacelessAttendancePermission()
       .then(setCanUseFacelessAttendance)

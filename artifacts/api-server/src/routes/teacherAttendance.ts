@@ -375,22 +375,25 @@ export async function markForgottenTeacherCheckouts() {
       if (attendanceDate === date && currentMinutes < fallbackMinute) continue;
       const candidates = await adapter.teacherAttendance.listAutoCheckoutCandidates(attendanceDate);
       for (const record of candidates as any[]) {
-        const lastSchoolAt = toIsoTimestamp(record.lastSchoolAt);
+        if (record.checkOutAt) continue;
         const checkInAt = toIsoTimestamp(record.checkInAt);
-        const latitude = Number(record.lastSchoolLatitude);
-        const longitude = Number(record.lastSchoolLongitude);
-        if (
-          !lastSchoolAt
-          || !checkInAt
-          || String(record.date) !== attendanceDate
-          || asDate(lastSchoolAt) !== attendanceDate
-          || Date.parse(lastSchoolAt) <= Date.parse(checkInAt)
-          || !isValidCoordinate(latitude, -90, 90)
-          || !isValidCoordinate(longitude, -180, 180)
-        ) continue;
+        if (!checkInAt || String(record.date) !== attendanceDate) continue;
+
+        let checkOutAt = toIsoTimestamp(record.lastSchoolAt);
+        if (!checkOutAt || Date.parse(checkOutAt) <= Date.parse(checkInAt)) {
+          const [endH, endM] = (settings.checkOutEnd || "17:00").split(":").map(Number);
+          const endAt = new Date(`${attendanceDate}T${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}:00`);
+          checkOutAt = Number.isFinite(endAt.getTime()) && endAt.getTime() > Date.parse(checkInAt)
+            ? endAt.toISOString()
+            : new Date(Date.parse(checkInAt) + 8 * 3600 * 1000).toISOString();
+        }
+
+        const latitude = Number(record.lastSchoolLatitude ?? record.checkInLatitude ?? settings.schoolLatitude ?? 0);
+        const longitude = Number(record.lastSchoolLongitude ?? record.checkInLongitude ?? settings.schoolLongitude ?? 0);
+        if (!isValidCoordinate(latitude, -90, 90) || !isValidCoordinate(longitude, -180, 180)) continue;
 
         const row = await adapter.teacherAttendance.autoCheckOutIfOpen(String(record.id), {
-          checkOutAt: lastSchoolAt,
+          checkOutAt,
           checkOutLatitude: latitude,
           checkOutLongitude: longitude,
           checkOutMethod: "automatic_end_of_day",
@@ -643,13 +646,17 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
    try {
       const result = await adapter.teacherAttendance.createIfAbsent(teacherId, date, {
         id: body.id, teacherId, teacherName: attendanceTeacherName, date,
-       status: late ? "late" : "present",
-       checkInAt: body.checkInAt ?? new Date().toISOString(),
-       checkInLatitude: latitude, checkInLongitude: longitude,
-        distanceFromSchool: distance, faceVerified,
+        status: late ? "late" : "present",
+        checkInAt: body.checkInAt ?? new Date().toISOString(),
+        checkInLatitude: latitude, checkInLongitude: longitude,
+        distanceFromSchool: distance,
+        lastSchoolAt: body.checkInAt ?? new Date().toISOString(),
+        lastSchoolLatitude: latitude,
+        lastSchoolLongitude: longitude,
+        faceVerified,
         faceVerificationMethod,
-       note: typeof body.note === "string" ? body.note.trim() : null,
-     });
+        note: typeof body.note === "string" ? body.note.trim() : null,
+      });
      if (!result.created) {
        res.status(409).json({ error: "Attendance has already been checked in for today", record: result.row });
        return;
@@ -761,6 +768,17 @@ router.post("/teacher-attendance/:id/auto-checkout", async (req, res) => {
     res.status(409).json({ error: "Automatic checkout could not be enabled for this attendance record" });
     return;
   }
+  if (body.enabled && !record.lastSchoolAt && record.checkInAt) {
+    await getAdapter().teacherAttendance.updateLastSchoolLocation(
+      String(record.id),
+      session.userId,
+      {
+        at: toIsoTimestamp(record.checkInAt) || new Date().toISOString(),
+        latitude: Number(record.checkInLatitude || 0),
+        longitude: Number(record.checkInLongitude || 0),
+      },
+    );
+  }
   res.json({ checkedOut: false, record: updated });
 });
 
@@ -842,7 +860,7 @@ router.post("/teacher-attendance/:id/location-samples", async (req, res) => {
       sample.latitude,
       sample.longitude,
     );
-    const schoolRadius = Math.max(settings.radiusMeters, 500);
+    const schoolRadius = Math.max(settings.radiusMeters || 100, 100);
     if (distance <= schoolRadius) {
       const updated = await adapter.teacherAttendance.updateLastSchoolLocation(
         String(record.id),
@@ -855,18 +873,19 @@ router.post("/teacher-attendance/:id/location-samples", async (req, res) => {
 
     // Require the location to be clearly outside the boundary so GPS jitter at
     // the edge does not close attendance prematurely.
-    const exitMargin = Math.max(50, Math.min(sample.accuracy ?? 50, 200));
+    const exitMargin = Math.max(30, Math.min(sample.accuracy ?? 30, 100));
     if (distance <= schoolRadius + exitMargin) continue;
-    const lastSchoolAt = toIsoTimestamp(record.lastSchoolAt);
-    const lastSchoolLatitude = Number(record.lastSchoolLatitude);
-    const lastSchoolLongitude = Number(record.lastSchoolLongitude);
-    if (
-      !lastSchoolAt
-      || asDate(lastSchoolAt) !== date
-      || Date.parse(lastSchoolAt) >= sample.at.getTime()
-      || !isValidCoordinate(lastSchoolLatitude, -90, 90)
-      || !isValidCoordinate(lastSchoolLongitude, -180, 180)
-    ) continue;
+    const lastSchoolAt = toIsoTimestamp(record.lastSchoolAt) || toIsoTimestamp(record.checkInAt) || sampleAt;
+    const lastSchoolLatitude = isValidCoordinate(Number(record.lastSchoolLatitude), -90, 90)
+      ? Number(record.lastSchoolLatitude)
+      : isValidCoordinate(Number(record.checkInLatitude), -90, 90)
+        ? Number(record.checkInLatitude)
+        : sample.latitude;
+    const lastSchoolLongitude = isValidCoordinate(Number(record.lastSchoolLongitude), -180, 180)
+      ? Number(record.lastSchoolLongitude)
+      : isValidCoordinate(Number(record.checkInLongitude), -180, 180)
+        ? Number(record.checkInLongitude)
+        : sample.longitude;
 
     const closed = await adapter.teacherAttendance.autoCheckOutIfOpen(String(record.id), {
       checkOutAt: lastSchoolAt,
