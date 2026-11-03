@@ -350,6 +350,9 @@ export default function AdminTeacherAttendance() {
             {field('School longitude', 'schoolLongitude', 'numeric')}
           </View>
           {field('Allowed radius (meters)', 'radiusMeters', 'numeric')}
+          <Text style={[s.mutedText, { color: colors.mutedForeground, marginTop: -8, marginBottom: 12 }]}>
+            Recommended: 500m for campus coverage and indoor mobile GPS reliability.
+          </Text>
           <View style={s.twoCol}>
             {field('Check-in starts', 'checkInStart')}
             {field('Check-in closes', 'checkInEnd')}

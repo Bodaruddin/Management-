@@ -9,10 +9,10 @@ const TEMPLATE_SIZE = 24;
 // crop, mirror orientation, and autofocus between two captures. Keep the
 // threshold strict enough to reject unrelated faces, but do not require the
 // same pixel crop twice.
-const MATCH_THRESHOLD = 0.54;
-const MULTI_SAMPLE_THRESHOLD = 0.47;
-const CONSISTENT_SAMPLE_THRESHOLD = 0.50;
-const MAX_STORED_TEMPLATES = 96;
+const MATCH_THRESHOLD = 0.40;
+const MULTI_SAMPLE_THRESHOLD = 0.35;
+const CONSISTENT_SAMPLE_THRESHOLD = 0.38;
+const MAX_STORED_TEMPLATES = 128;
 const MAX_ENROLLMENT_SAMPLES = 5;
 const MIN_IMAGE_SIDE = 160;
 
@@ -118,14 +118,14 @@ function inspectImageQuality(image: DecodedImage): FaceImageQuality {
 
 function assertUsableFaceImage(image: DecodedImage): FaceImageQuality {
   const quality = inspectImageQuality(image);
-  if (quality.score < 0.16) {
-    if (quality.brightness < 16) {
+  if (quality.score < 0.10) {
+    if (quality.brightness < 12) {
       throw new FaceImageQualityError("The selfie is too dark. Face a light source without placing it behind you.");
     }
-    if (quality.brightness > 242) {
+    if (quality.brightness > 246) {
       throw new FaceImageQualityError("The selfie is overexposed. Move away from direct light and try again.");
     }
-    if (quality.sharpness < 1.5) {
+    if (quality.sharpness < 1.0) {
       throw new FaceImageQualityError("The selfie is blurry. Hold the phone steady and try again.");
     }
     throw new FaceImageQualityError("The face is not clear enough. Center it in the frame and try again.");
@@ -145,25 +145,32 @@ const TEMPLATE_VARIANTS: NormalizationOptions[] = [
   // always vertically centered in a portrait Android frame.
   { zoom: 1 },
   { zoom: 1.12 },
-  { zoom: 1.28 },
-  { zoom: 1.45 },
-  { zoom: 1.65 },
-  { zoom: 1.9 },
+  { zoom: 1.25 },
+  { zoom: 1.38 },
+  { zoom: 1.52 },
+  { zoom: 1.70 },
+  { zoom: 1.90 },
   { zoom: 2.15 },
-  // Wider translations handle a face that is inside the guide but not
-  // perfectly centered. This is especially important for tall phone frames.
-  { zoom: 1.28, shiftX: -0.16 },
-  { zoom: 1.28, shiftX: 0.16 },
-  { zoom: 1.28, shiftY: -0.20 },
-  { zoom: 1.28, shiftY: 0.20 },
-  { zoom: 1.45, shiftX: -0.16 },
-  { zoom: 1.45, shiftX: 0.16 },
-  { zoom: 1.45, shiftY: -0.20 },
-  { zoom: 1.45, shiftY: 0.20 },
-  { zoom: 1.65, shiftX: -0.16 },
-  { zoom: 1.65, shiftX: 0.16 },
-  { zoom: 1.65, shiftY: -0.20 },
-  { zoom: 1.65, shiftY: 0.20 },
+  // Natural translations to reliably handle camera angle and face height offsets
+  { zoom: 1.25, shiftX: -0.10 },
+  { zoom: 1.25, shiftX: 0.10 },
+  { zoom: 1.38, shiftX: -0.12 },
+  { zoom: 1.38, shiftX: 0.12 },
+  { zoom: 1.52, shiftX: -0.15 },
+  { zoom: 1.52, shiftX: 0.15 },
+  { zoom: 1.25, shiftY: -0.10 },
+  { zoom: 1.25, shiftY: 0.10 },
+  { zoom: 1.38, shiftY: -0.12 },
+  { zoom: 1.38, shiftY: 0.12 },
+  { zoom: 1.52, shiftY: -0.16 },
+  { zoom: 1.52, shiftY: 0.16 },
+  { zoom: 1.70, shiftY: -0.16 },
+  { zoom: 1.70, shiftY: 0.16 },
+  // Wider translations
+  { zoom: 1.38, shiftX: -0.16 },
+  { zoom: 1.38, shiftX: 0.16 },
+  { zoom: 1.38, shiftY: -0.20 },
+  { zoom: 1.38, shiftY: 0.20 },
 ];
 
 function normalizedPixelsWithOptions(

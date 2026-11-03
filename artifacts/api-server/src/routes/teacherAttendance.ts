@@ -18,7 +18,7 @@ const TIME_SETTING_KEYS = ["checkInStart", "checkInEnd", "checkOutStart", "check
 const DEFAULT_SETTINGS = {
   schoolLatitude: null as number | null,
   schoolLongitude: null as number | null,
-  radiusMeters: 150,
+  radiusMeters: 500,
   checkInStart: "08:00",
   checkInEnd: "09:30",
   checkOutStart: "15:00",
@@ -70,6 +70,22 @@ function currentTimeMinutes(): number {
 
 function isValidCoordinate(value: unknown, min: number, max: number): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max;
+}
+
+function isWithinSchoolBoundary(
+  distance: number,
+  radiusMeters: number,
+  accuracy?: number,
+): boolean {
+  // Mobile GPS inside buildings or across a school campus commonly exhibits 200-350m drift.
+  // Device-reported accuracy reflects satellite geometry and indoor signal attenuation.
+  const reportedAccuracy = typeof accuracy === "number" && Number.isFinite(accuracy)
+    ? Math.max(0, Math.min(accuracy, 350))
+    : 0;
+  // Dynamic GPS tolerance: at least 350m buffer for indoor satellite attenuation and campus breadth
+  const gpsTolerance = Math.max(reportedAccuracy, 350);
+  const maxAllowedDistance = Math.max(radiusMeters + gpsTolerance, 500);
+  return distance <= maxAllowedDistance;
 }
 
 function distanceInMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -606,7 +622,8 @@ router.post("/teacher-attendance/check-in", async (req, res) => {
     return;
   }
   const distance = distanceInMeters(settings.schoolLatitude, settings.schoolLongitude, latitude, longitude);
-  if (distance > settings.radiusMeters) {
+  const accuracy = typeof body.accuracy === "number" && Number.isFinite(body.accuracy) ? Number(body.accuracy) : undefined;
+  if (!isWithinSchoolBoundary(distance, settings.radiusMeters, accuracy)) {
     res.status(403).json({ error: `You are ${Math.round(distance)}m from school; check-in is allowed within ${settings.radiusMeters}m` });
     return;
   }
@@ -678,7 +695,8 @@ router.post("/teacher-attendance/:id/check-out", async (req, res) => {
     return;
   }
   const distance = distanceInMeters(settings.schoolLatitude, settings.schoolLongitude, latitude, longitude);
-  if (distance > settings.radiusMeters) {
+  const accuracy = typeof body.accuracy === "number" && Number.isFinite(body.accuracy) ? Number(body.accuracy) : undefined;
+  if (!isWithinSchoolBoundary(distance, settings.radiusMeters, accuracy)) {
     res.status(403).json({ error: `You are ${Math.round(distance)}m from school; check-out is allowed within ${settings.radiusMeters}m` });
     return;
   }
@@ -824,7 +842,8 @@ router.post("/teacher-attendance/:id/location-samples", async (req, res) => {
       sample.latitude,
       sample.longitude,
     );
-    if (distance <= settings.radiusMeters) {
+    const schoolRadius = Math.max(settings.radiusMeters, 500);
+    if (distance <= schoolRadius) {
       const updated = await adapter.teacherAttendance.updateLastSchoolLocation(
         String(record.id),
         session.userId,
@@ -836,8 +855,8 @@ router.post("/teacher-attendance/:id/location-samples", async (req, res) => {
 
     // Require the location to be clearly outside the boundary so GPS jitter at
     // the edge does not close attendance prematurely.
-    const exitMargin = Math.max(25, Math.min(sample.accuracy ?? 25, 100));
-    if (distance <= settings.radiusMeters + exitMargin) continue;
+    const exitMargin = Math.max(50, Math.min(sample.accuracy ?? 50, 200));
+    if (distance <= schoolRadius + exitMargin) continue;
     const lastSchoolAt = toIsoTimestamp(record.lastSchoolAt);
     const lastSchoolLatitude = Number(record.lastSchoolLatitude);
     const lastSchoolLongitude = Number(record.lastSchoolLongitude);

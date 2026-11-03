@@ -545,11 +545,13 @@ interface AppContextType extends AppState {
   setTeacherFacelessAttendancePermission: (teacherId: string, enabled: boolean) => Promise<void>;
   checkInTeacher: (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
+    accuracy?: number;
     faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string;
     faceSamplesBase64?: string[]; date?: string; skipFaceVerification?: boolean;
   }) => Promise<TeacherAttendanceRecord>;
   checkOutTeacher: (id: string, data: {
     teacherId: string; latitude: number; longitude: number;
+    accuracy?: number;
     faceImageBase64?: string; faceSamplesBase64?: string[];
     skipFaceVerification?: boolean;
   }) => Promise<TeacherAttendanceRecord>;
@@ -628,7 +630,7 @@ const DEFAULT_STATE: AppState = {
   teacherAttendanceRecords: [], teacherLeaves: [], teacherHolidays: [],
   studentAttendanceHolidaySettings: { sundayHoliday: true, holidays: [] },
   teacherAttendanceSettings: {
-    schoolLatitude: null, schoolLongitude: null, radiusMeters: 150,
+    schoolLatitude: null, schoolLongitude: null, radiusMeters: 500,
     checkInStart: '08:00', checkInEnd: '09:30', checkOutStart: '15:00', checkOutEnd: '18:00',
     requireFaceVerification: true, allowLateCheckIn: false, sundayHoliday: true, workingDaysPerMonth: 26, lateGraceMinutes: 0,
     lateDeductionAmount: 0, deductionType: 'daily_rate',
@@ -1627,6 +1629,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const checkInTeacher = useCallback(async (data: {
     teacherId: string; teacherName: string; latitude: number; longitude: number;
+    accuracy?: number;
     faceVerified: boolean; faceVerificationMethod?: string; faceImageBase64?: string;
     faceSamplesBase64?: string[]; date?: string; skipFaceVerification?: boolean;
   }) => {
@@ -1655,6 +1658,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const checkOutTeacher = useCallback(async (id: string, data: {
     teacherId: string; latitude: number; longitude: number;
+    accuracy?: number;
     faceImageBase64?: string; faceSamplesBase64?: string[];
     skipFaceVerification?: boolean;
   }) => {

@@ -178,23 +178,19 @@ function FaceCaptureModal({
     setCameraError('');
     setCapturing(true);
     try {
-      const sampleCount = purpose === 'enroll' ? 5 : 3;
+      const sampleCount = purpose === 'enroll' ? 5 : 4;
       const images: string[] = [];
       for (let index = 0; index < sampleCount; index += 1) {
         setCaptureNumber(index + 1);
-        // Give Android autofocus and exposure a moment to settle after the
-        // camera modal opens, especially in dim rooms.
-        if (index === 0) await wait(850);
+        if (index === 0) await wait(700);
         const photo = await cameraRef.current.takePictureAsync({
-          // A short burst lets the server choose the clearest frame while
-          // keeping the enrollment template independent from one photo.
           base64: true,
           quality: 0.92,
           imageType: 'jpg',
           skipProcessing: false,
         });
         images.push(await getFaceImageBase64(photo));
-        if (index < sampleCount - 1) await wait(350);
+        if (index < sampleCount - 1) await wait(280);
       }
       onStageChange('detected');
       await wait(160);
@@ -376,6 +372,10 @@ function FaceResultModal({
   kind,
   purpose,
   message,
+  canFaceless,
+  onFaceless,
+  canReEnroll,
+  onReEnroll,
   onRetry,
   onDismiss,
 }: {
@@ -383,6 +383,10 @@ function FaceResultModal({
   kind: FaceResultKind;
   purpose: 'check-in' | 'check-out';
   message: string;
+  canFaceless?: boolean;
+  onFaceless?: () => void;
+  canReEnroll?: boolean;
+  onReEnroll?: () => void;
   onRetry: () => void;
   onDismiss: () => void;
 }) {
@@ -452,6 +456,32 @@ function FaceResultModal({
                 <Feather name="camera" size={17} color={colors.primaryForeground} />
                 <Text style={[resultStyles.retryButtonText, { color: colors.primaryForeground }]}>Try again</Text>
               </TouchableOpacity>
+              {canFaceless && onFaceless ? (
+                <TouchableOpacity
+                  style={[resultStyles.altButton, { borderColor: colors.primary, backgroundColor: colors.primary + '10' }]}
+                  onPress={onFaceless}
+                  accessibilityRole="button"
+                  accessibilityLabel={purpose === 'check-in' ? 'Check in without face' : 'Check out without face'}
+                >
+                  <Feather name="map-pin" size={16} color={colors.primary} />
+                  <Text style={[resultStyles.altButtonText, { color: colors.primary }]}>
+                    {purpose === 'check-in' ? 'Check in without face' : 'Check out without face'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+              {canReEnroll && onReEnroll ? (
+                <TouchableOpacity
+                  style={[resultStyles.altButton, { borderColor: colors.border }]}
+                  onPress={onReEnroll}
+                  accessibilityRole="button"
+                  accessibilityLabel="Re-enroll face profile"
+                >
+                  <Feather name="refresh-cw" size={15} color={colors.mutedForeground} />
+                  <Text style={[resultStyles.altButtonText, { color: colors.mutedForeground }]}>
+                    Re-enroll face
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity
                 style={resultStyles.dismissButton}
                 onPress={onDismiss}
@@ -987,7 +1017,7 @@ export default function MyTeacherAttendance() {
       }
       // Browser geolocation commonly reports ±300m even with high accuracy.
       // Let the server's school-boundary check decide attendance eligibility.
-      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 60 });
       if (purpose === 'check-in') {
         await checkInTeacher({
           teacherId: user.id,
@@ -1045,7 +1075,7 @@ export default function MyTeacherAttendance() {
     }
     runAction(async () => {
       if (!user) throw new Error('Please sign in again');
-      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 60 });
       await checkInTeacher({
         teacherId: user.id,
         teacherName: user.name,
@@ -1064,7 +1094,7 @@ export default function MyTeacherAttendance() {
     setLastAttendanceAction('check-in-no-face');
     runAction(async () => {
       if (!user) throw new Error('Please sign in again');
-      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 60 });
       await checkInTeacher({
         teacherId: user.id,
         teacherName: user.name,
@@ -1091,7 +1121,7 @@ export default function MyTeacherAttendance() {
     }
     runAction(async () => {
       if (!todayRecord?.checkInAt) throw new Error('No check-in found for today');
-      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 60 });
       await checkOutTeacher(todayRecord.id, { teacherId: user?.id ?? '', ...coordinates });
     });
   };
@@ -1108,7 +1138,7 @@ export default function MyTeacherAttendance() {
     setLastAttendanceAction('check-out-no-face');
     runAction(async () => {
       if (!user) throw new Error('Please sign in again');
-      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 25 });
+      const coordinates = await readCurrentLocation({ allowCoarse: true, targetAccuracyMeters: 60 });
       await checkOutTeacher(todayRecord.id, {
         teacherId: user.id,
         ...coordinates,
@@ -1714,6 +1744,24 @@ export default function MyTeacherAttendance() {
         kind={faceResult ?? 'error'}
         purpose={faceResultPurpose}
         message={faceResultMessage}
+        canFaceless={canUseFacelessAttendance}
+        onFaceless={() => {
+          setFaceResult(null);
+          setFaceResultMessage('');
+          setError('');
+          if (faceResultPurpose === 'check-in') {
+            handleFacelessCheckIn();
+          } else {
+            handleFacelessCheckOut();
+          }
+        }}
+        canReEnroll={canReEnrollFace}
+        onReEnroll={() => {
+          setFaceResult(null);
+          setFaceResultMessage('');
+          setError('');
+          startFaceReEnrollment();
+        }}
         onRetry={() => {
           setFaceResult(null);
           setFaceResultMessage('');
@@ -2336,6 +2384,21 @@ const resultStyles = StyleSheet.create({
   retryButtonText: {
     fontSize: 15,
     fontWeight: '800',
+  },
+  altButton: {
+    width: '100%',
+    minHeight: 48,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  altButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   dismissButton: {
     paddingHorizontal: 18,

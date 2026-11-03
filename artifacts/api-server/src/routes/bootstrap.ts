@@ -23,7 +23,7 @@ const EMPTY_DOCUMENT_BRANDING = {
 const DEFAULT_TEACHER_ATTENDANCE_SETTINGS = {
   schoolLatitude: null,
   schoolLongitude: null,
-  radiusMeters: 150,
+  radiusMeters: 500,
   checkInStart: "08:00",
   checkInEnd: "09:30",
   checkOutStart: "15:00",

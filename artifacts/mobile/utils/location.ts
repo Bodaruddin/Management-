@@ -13,8 +13,8 @@ export type LocationReadOptions = {
   targetAccuracyMeters?: number;
 };
 
-const TARGET_ACCURACY_METERS = 80;
-const MAX_ACCEPTABLE_ACCURACY_METERS = 250;
+const TARGET_ACCURACY_METERS = 100;
+const MAX_ACCEPTABLE_ACCURACY_METERS = 350;
 const MAX_LOCATION_AGE_MS = 30_000;
 const NATIVE_SAMPLES = 3;
 const SAMPLE_DELAY_MS = 500;
@@ -158,10 +158,10 @@ async function readNativeLocation(options: LocationReadOptions = {}): Promise<Lo
     try {
       const location = await withTimeout(
         Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.BestForNavigation,
+          accuracy: Location.Accuracy.High,
           mayShowUserSettingsDialog: true,
         }),
-        12000,
+        10000,
       );
       const current = toCoordinates(location);
       if (isFreshLocation(current)) best = chooseBetterLocation(best, current);
@@ -216,7 +216,7 @@ async function readLiveNativeLocation(
 
     Location.watchPositionAsync(
       {
-        accuracy: Location.Accuracy.BestForNavigation,
+        accuracy: Location.Accuracy.High,
         timeInterval: 1000,
         distanceInterval: 0,
         mayShowUserSettingsDialog: true,
