@@ -832,8 +832,8 @@ function buildCombinedMarksheetHtml(
   // marksheet scale. Only the dense marks table should need to be compacted.
   // The old hard cap of 0.82 made every part of the combined document visibly
   // smaller, even when there was enough vertical space.
-  const _innerContentH = 814 + subjectRows.length * 27;
-  const _innerZoomVal = Math.min(0.93, 940 / _innerContentH);
+  const _innerContentH = 860 + subjectRows.length * 26;
+  const _innerZoomVal = Math.min(0.94, 940 / _innerContentH);
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
   return `<!DOCTYPE html>
@@ -861,7 +861,7 @@ function buildCombinedMarksheetHtml(
     * signature row from being painted on top of it when native print scales
     * the page.
     */
-   .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px 8px 48px; overflow:hidden; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; position:relative; }
+   .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:hidden; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; position:relative; }
   .inner-content { display:flex; flex:1 1 auto; min-height:0; overflow:visible; flex-direction:column; ${_innerZoomCss} }
   /* header */
    .hdr { display:table; width:100%; table-layout:fixed; padding-bottom:7px; border-bottom:3px solid #0c1f4a; }
@@ -939,31 +939,29 @@ function buildCombinedMarksheetHtml(
     .sigs {
       position:relative;
       display:flex;
-      align-items:flex-end;
+      align-items:flex-start;
       justify-content:space-around;
       width:100%;
-      flex:0 0 80px;
-      height:80px;
-      min-height:80px;
-      margin:6px 0 0;
+      margin:6px 0 4px;
       padding:0;
       text-align:center;
-      z-index:12;
+      flex-shrink:0;
       page-break-inside:avoid;
       break-inside:avoid;
-      overflow:visible;
     }
     .sig-block {
-      display:block;
-      flex:0 0 50%;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      flex:0 0 45%;
       min-width:0;
       text-align:center;
     }
-     .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin:0 auto 3px; min-width:130px; line-height:1.2; }
-     .sig-block .role { position:relative; display:block; height:14px; min-height:14px; font-size:11px; font-weight:700; color:#0c1f4a; line-height:14px; letter-spacing:0.2px; white-space:nowrap; }
+    .sig-block .cursive { font-family:'Brush Script MT','Segoe Script',cursive; font-size:22px; color:#0c1f4a; display:block; border-bottom:1.5px solid #333; padding-bottom:2px; margin:0 auto 3px; min-width:130px; line-height:1.2; }
+    .sig-block .role { position:relative; display:block; font-size:11px; font-weight:700; color:#0c1f4a; line-height:1.3; margin-top:2px; letter-spacing:0.3px; white-space:nowrap; }
 
-/* footer — flex-shrink:0 always pins it at page bottom */
-   .footer { position:absolute; left:8px; right:8px; bottom:8px; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin:0; min-height:32px; padding:8px 22px; text-align:center; }
+/* footer — flex-shrink:0 pins it after signatures and at bottom via margin-top:auto */
+   .footer { position:relative; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin-top:auto; min-height:30px; padding:7px 18px; text-align:center; flex-shrink:0; }
    .footer-quote { font-size:10px; line-height:normal; color:#c8a040; letter-spacing:1.2px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; white-space:nowrap; }
 </style>
 </head>
@@ -1188,11 +1186,12 @@ function buildCombinedMarksheetHtml(
     </div>
   </div>
 
-   </div><!-- /inner-content -->
-
+  <!-- ══ FOOTER (in document flow after signatures) ══ -->
   <div class="footer">
     <div class="footer-quote">Education is the most powerful weapon which you can use to change the world.</div>
   </div>
+
+   </div><!-- /inner-content -->
 
   </div><!-- /inner -->
 
