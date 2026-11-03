@@ -80,9 +80,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isExpoToken(value: unknown): value is string {
-  return typeof value === "string"
-    && value.length <= 200
-    && /^(Expo|Exponent)PushToken\[[^\]\s]+\]$/.test(value);
+  if (typeof value !== "string" || value.length === 0 || value.length > 200) return false;
+  return (
+    /^(Expo|Exponent)PushToken\[[^\]\s]+\]$/.test(value) ||
+    /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(value)
+  );
 }
 
 async function loadState(): Promise<NotificationState> {
@@ -182,7 +184,10 @@ async function sendPushMessages(
           sound: "default",
           title: notification.title,
           body: notification.body,
-          channelId: "default",
+          priority: "high",
+          channelId: "school_alerts_v2",
+          badge: 1,
+          _displayInForeground: true,
           data: { notificationId: notification.id, screen: "notifications" },
         }))),
         signal: AbortSignal.timeout(12_000),

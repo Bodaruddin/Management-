@@ -21,6 +21,7 @@ import { router, Stack } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import {
+  configureAndroidNotificationChannel,
   getExpoPushToken,
   isAndroidExpoGo,
   requestPushPermission,
@@ -28,20 +29,24 @@ import {
 
 SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
-const PUSH_PERMISSION_PROMPTED_KEY = '@school_push_permission_prompted';
-
 function RootLayoutNav() {
   const { user } = useAuth();
   const registerDeviceMutation = useRegisterTeacherNotificationDevice();
   const registerDeviceRef = useRef(registerDeviceMutation.mutateAsync);
   const isRegisteringDevice = useRef(false);
+  const lastRegisteredTokenRef = useRef<string | null>(null);
   registerDeviceRef.current = registerDeviceMutation.mutateAsync;
 
   useEffect(() => {
     setBaseUrl(getApiBase() || null);
     if (Platform.OS === 'web') return;
+
+    // Immediately configure Android notification channels on app startup
+    void configureAndroidNotificationChannel();
+
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
+        shouldShowAlert: true,
         shouldShowBanner: true,
         shouldShowList: true,
         shouldPlaySound: true,
@@ -58,24 +63,26 @@ function RootLayoutNav() {
     if (Platform.OS === 'web' || user?.role !== 'teacher' || isAndroidExpoGo()) return;
 
     let mounted = true;
-    const registerIfPermissionGranted = async (requestPermission = false) => {
+    const registerTeacherDevice = async () => {
       if (!mounted || isRegisteringDevice.current) return;
       isRegisteringDevice.current = true;
       try {
-        let shouldRequestPermission = false;
-        if (requestPermission) {
-          shouldRequestPermission = await AsyncStorage.getItem(PUSH_PERMISSION_PROMPTED_KEY) !== '1';
+        let permission = await Notifications.getPermissionsAsync();
+        if (!permission.granted && permission.canAskAgain) {
+          permission = await requestPushPermission();
         }
-        if (shouldRequestPermission) {
-          await AsyncStorage.setItem(PUSH_PERMISSION_PROMPTED_KEY, '1');
-        }
-        const permission = shouldRequestPermission
-          ? await requestPushPermission()
-          : await Notifications.getPermissionsAsync();
         if (!mounted || !permission.granted) return;
+
         const token = await getExpoPushToken();
-        if (!mounted) return;
+        if (!mounted || !token) return;
+
+        const registrationKey = `${user.id}:${token}`;
+        if (lastRegisteredTokenRef.current === registrationKey) {
+          return;
+        }
+
         await registerDeviceRef.current({ data: { token } });
+        lastRegisteredTokenRef.current = registrationKey;
       } catch (error) {
         console.warn(
           '[push] Device registration will retry when the app is reopened.',
@@ -86,9 +93,9 @@ function RootLayoutNav() {
       }
     };
 
-    void registerIfPermissionGranted(true);
+    void registerTeacherDevice();
     const appStateSubscription = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void registerIfPermissionGranted();
+      if (state === 'active') void registerTeacherDevice();
     });
 
     return () => {

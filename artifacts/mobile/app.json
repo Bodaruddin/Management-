@@ -56,7 +56,7 @@
       [
         "expo-notifications",
         {
-          "defaultChannel": "default",
+          "defaultChannel": "school_alerts_v2",
           "color": "#2563EB"
         }
       ],
