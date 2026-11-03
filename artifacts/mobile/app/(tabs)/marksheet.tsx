@@ -849,7 +849,7 @@ function buildCombinedMarksheetHtml(
   @page { size:A4 portrait; margin:0; }
   @media print { html, body { background:#fff; padding:0; margin:0; height:297mm; overflow:hidden; } .page { page-break-after:avoid; break-after:avoid; } }
   /* Keep the combined sheet inside one A4 page in native print as well as web capture. */
-  .page { width:794px; height:1123px; margin:0 auto; background:#fdfefb; border:5px solid #0c1f4a; border-radius:10px; padding:9px; position:relative; box-sizing:border-box; display:flex; flex-direction:column; overflow:hidden; page-break-inside:avoid; break-inside:avoid; }
+  .page { width:794px; height:auto; margin:0 auto; background:#fdfefb; border:5px solid #0c1f4a; border-radius:10px; padding:9px; position:relative; box-sizing:border-box; display:flex; flex-direction:column; page-break-inside:avoid; break-inside:avoid; }
   .corner { position:absolute; width:48px; height:48px; pointer-events:none; z-index:10; }
   .corner.tl { top:5px; left:5px; transform:rotate(0deg); transform-origin:50% 50%; }
   .corner.tr { top:5px; right:5px; transform:rotate(90deg); transform-origin:50% 50%; }
@@ -861,8 +861,8 @@ function buildCombinedMarksheetHtml(
     * signature row from being painted on top of it when native print scales
     * the page.
     */
-   .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px; overflow:hidden; display:flex; flex:1 1 auto; min-height:0; flex-direction:column; position:relative; }
-  .inner-content { display:flex; flex:1 1 auto; min-height:0; overflow:visible; flex-direction:column; ${_innerZoomCss} }
+   .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px 8px 10px; overflow:hidden; display:flex; flex-direction:column; position:relative; }
+  .inner-content { display:flex; overflow:visible; flex-direction:column; ${_innerZoomCss} }
   /* header */
    .hdr { display:table; width:100%; table-layout:fixed; padding-bottom:7px; border-bottom:3px solid #0c1f4a; }
    .hdr > div:first-child { display:table-cell; width:132px; vertical-align:top; }
@@ -961,7 +961,7 @@ function buildCombinedMarksheetHtml(
     .sig-block .role { position:relative; display:block; font-size:11px; font-weight:700; color:#0c1f4a; line-height:1.3; margin-top:2px; letter-spacing:0.3px; white-space:nowrap; }
 
 /* footer — flex-shrink:0 pins it after signatures and at bottom via margin-top:auto */
-   .footer { position:relative; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin-top:auto; min-height:30px; padding:7px 18px; text-align:center; flex-shrink:0; }
+   .footer { position:relative; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 6px 6px; margin-top:6px; min-height:30px; padding:7px 18px; text-align:center; flex-shrink:0; }
    .footer-quote { font-size:10px; line-height:normal; color:#c8a040; letter-spacing:1.2px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; white-space:nowrap; }
 </style>
 </head>

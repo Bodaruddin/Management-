@@ -327,14 +327,15 @@ function applyNativePrintMargins(html: string, marginMm: number): string {
    * non-breaking so native print cannot move signatures and the footer to page 2.
    */
    .page.combined-page {
-     height: ${pageHeight} !important;
+     height: auto !important;
+     max-height: ${pageHeight} !important;
      min-height: 0 !important;
      overflow: hidden !important;
      page-break-inside: avoid !important;
      break-inside: avoid !important;
    }
   .page.combined-page .inner {
-     height: 100% !important;
+     height: auto !important;
      min-height: 0 !important;
      overflow: hidden !important;
    }
