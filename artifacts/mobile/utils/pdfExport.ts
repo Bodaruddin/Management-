@@ -338,7 +338,7 @@ function applyNativePrintMargins(html: string, marginMm: number): string {
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
   }
@@ -349,11 +349,15 @@ function applyNativePrintMargins(html: string, marginMm: number): string {
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     padding-bottom: 0 !important;
   }
   .page.combined-page .footer {
     margin-top: auto !important;
+    flex-shrink: 0 !important;
+  }
+  .page.combined-page .sigs {
+    flex-shrink: 0 !important;
   }
 </style>`;
 

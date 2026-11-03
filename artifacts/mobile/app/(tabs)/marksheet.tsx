@@ -832,9 +832,9 @@ function buildCombinedMarksheetHtml(
   // marksheet scale. Only the dense marks table should need to be compacted.
   // The old hard cap of 0.82 made every part of the combined document visibly
   // smaller, even when there was enough vertical space.
-  const _innerContentH = 780 + subjectRows.length * 26;
-  const _innerZoomVal = Math.min(1.0, 980 / _innerContentH);
-  const _innerZoomCss = _innerZoomVal < 0.999 ? `zoom:${_innerZoomVal.toFixed(3)};` : "";
+  const _innerContentH = 920 + subjectRows.length * 27;
+  const _innerZoomVal = Math.min(0.88, 1000 / _innerContentH);
+  const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -861,7 +861,7 @@ function buildCombinedMarksheetHtml(
     * signature row from being painted on top of it when native print scales
     * the page.
     */
-  .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px 8px 0; overflow:hidden; display:flex; flex:1 1 auto; height:100%; min-height:0; flex-direction:column; position:relative; box-sizing:border-box; ${_innerZoomCss} }
+  .inner { border:1.5px solid #c8a040; border-radius:6px; padding:8px 8px 0; overflow:visible; display:flex; flex:1 1 auto; height:100%; min-height:0; flex-direction:column; position:relative; box-sizing:border-box; ${_innerZoomCss} }
   /* header */
    .hdr { display:table; width:100%; table-layout:fixed; padding-bottom:7px; border-bottom:3px solid #0c1f4a; }
    .hdr > div:first-child { display:table-cell; width:132px; vertical-align:top; }
@@ -960,8 +960,8 @@ function buildCombinedMarksheetHtml(
     .sig-block .role { position:relative; display:block; font-size:11px; font-weight:700; color:#0c1f4a; line-height:1.3; margin-top:2px; letter-spacing:0.3px; white-space:nowrap; }
 
 /* footer — flex-shrink:0 pins it flush against bottom border via margin-top:auto */
-   .footer { position:relative; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 5px 5px; margin-top:auto; min-height:30px; padding:7px 18px; text-align:center; flex-shrink:0; }
-   .footer-quote { font-size:10px; line-height:normal; color:#c8a040; letter-spacing:1.2px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; white-space:nowrap; }
+   .footer { position:relative; z-index:11; display:block; background:#0c1f4a; border-radius:0 0 5px 5px; margin-top:auto; min-height:28px; padding:6px 18px; text-align:center; flex-shrink:0; }
+   .footer-quote { font-size:9.5px; line-height:normal; color:#c8a040; letter-spacing:1.2px; font-weight:700; font-family:'Poppins',Arial,sans-serif; text-transform:uppercase; white-space:nowrap; }
 </style>
 </head>
 <body>
