@@ -832,7 +832,7 @@ function buildCombinedMarksheetHtml(
   // marksheet scale. Only the dense marks table should need to be compacted.
   // The old hard cap of 0.82 made every part of the combined document visibly
   // smaller, even when there was enough vertical space.
-  const _innerContentH = 750 + subjectRows.length * 22;
+  const _innerContentH = 830 + subjectRows.length * 22;
   const _innerZoomVal = Math.min(0.96, Math.max(0.85, 960 / _innerContentH));
   const _innerZoomCss = `zoom:${_innerZoomVal.toFixed(3)};`;
 
@@ -912,19 +912,19 @@ function buildCombinedMarksheetHtml(
   table.mt tr.tr td { background:#0c1f4a; font-weight:800; font-size:13px; border-top:2px solid #0c1f4a; border-bottom:none; }
   table.mt tr.tr td:first-child { font-size:12px; }
   /* summary cards */
-   .summary { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; margin-top:6px; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-   .sc { border:1.5px solid #e2e8f0; border-radius:12px; padding:6px 4px 5px; text-align:center; background:#fff; box-shadow:0 4px 14px rgba(12,31,74,0.08); display:flex; flex-direction:column; align-items:center; justify-content:center; }
-   .sc .si { display:flex; justify-content:center; align-items:center; margin:0 auto 3px; width:34px; height:34px; border-radius:50%; flex-shrink:0; }
-   .sc .si svg { width:22px; height:22px; }
-   .sc .sl { font-size:8px; font-weight:700; color:#0c1f4a; letter-spacing:0.3px; line-height:1.3; text-transform:uppercase; }
-   .sc .sv { font-family:'Archivo Black',sans-serif; font-size:18px; color:#0c1f4a; margin-top:2px; line-height:1.1; }
-   .sc .ss { font-size:7.5px; color:#64748b; margin-top:1px; line-height:1.2; }
-   .sc .result { display:inline-block; margin-top:2px; padding:2px 8px; border-radius:16px; font-size:9px; font-weight:700; }
-   .sc .pass { background:#d4edda; color:#1a7a40; }
-   .sc .fail { background:#f8d7da; color:#b02020; }
-   .gs-mini { width:100%; margin-top:2px; border-collapse:collapse; }
-   .gs-mini td { font-size:7.5px; padding:1px 2px; border-bottom:1px solid #f0f4f8; text-align:left; color:#475569; line-height:1.2; }
-   .gs-mini td:last-child { text-align:right; font-weight:800; color:#0c1f4a; font-size:9px; padding-right:2px; }
+  .summary { display:grid; grid-template-columns:repeat(6,1fr); gap:7px; margin-top:10px; page-break-inside:avoid; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  .sc { border:1.5px solid #e2e8f0; border-radius:14px; padding:10px 6px 8px; text-align:center; background:#fff; box-shadow:0 6px 22px rgba(12,31,74,0.10), 0 1px 5px rgba(12,31,74,0.06); display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .sc .si { display:flex; justify-content:center; align-items:center; margin:0 auto 8px; width:50px; height:50px; border-radius:50%; flex-shrink:0; }
+  .sc .si svg { width:34px; height:34px; }
+  .sc .sl { font-size:8.5px; font-weight:700; color:#0c1f4a; letter-spacing:0.4px; line-height:1.5; text-transform:uppercase; }
+  .sc .sv { font-family:'Archivo Black',sans-serif; font-size:20px; color:#0c1f4a; margin-top:4px; line-height:1.1; }
+  .sc .ss { font-size:8px; color:#64748b; margin-top:2px; line-height:1.4; }
+  .sc .result { display:inline-block; margin-top:3px; padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700; }
+  .sc .pass { background:#d4edda; color:#1a7a40; }
+  .sc .fail { background:#f8d7da; color:#b02020; }
+  .gs-mini { width:100%; margin-top:4px; border-collapse:collapse; }
+  .gs-mini td { font-size:8.5px; padding:2px 3px; border-bottom:1px solid #f0f4f8; text-align:left; color:#475569; }
+  .gs-mini td:last-child { text-align:right; font-weight:800; color:#0c1f4a; font-size:10px; padding-right:4px; }
   @media print { .summary { display:grid !important; grid-template-columns:repeat(6,1fr) !important; } }
   /* remarks */
    .rem { display:table; width:100%; table-layout:fixed; margin-top:4px; border-radius:5px; overflow:hidden; border:1.5px solid #d0d8ea; }
@@ -1075,7 +1075,7 @@ function buildCombinedMarksheetHtml(
       <!-- Card 1: Total Marks -->
       <div class="sc" style="border-color:#bfdbfe;border-top:3px solid #1e40af">
         <div class="si" style="background:#dbeafe">
-           <svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+           <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#1e40af" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <rect x="8" y="2" width="8" height="4" rx="1"/>
             <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
             <path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>
@@ -1088,7 +1088,7 @@ function buildCombinedMarksheetHtml(
       <!-- Card 2: Total Obtained Marks -->
       <div class="sc" style="border-color:#a7f3d0;border-top:3px solid #059669">
         <div class="si" style="background:#dcfce7">
-           <svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+           <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
             <path d="m9 12 2 2 4-4"/>
           </svg>
@@ -1100,33 +1100,33 @@ function buildCombinedMarksheetHtml(
       <!-- Card 3: Percentage -->
       <div class="sc" style="border-color:#bfdbfe;border-top:3px solid #2563eb">
         <div class="si" style="background:#eff6ff">
-           <svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+           <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <line x1="19" y1="5" x2="5" y2="19"/>
             <circle cx="6.5" cy="6.5" r="2.5"/>
             <circle cx="17.5" cy="17.5" r="2.5"/>
           </svg>
         </div>
         <div class="sl">PERCENTAGE</div>
-        <div class="sv" style="color:#2563eb;font-size:15px">${pctFmt}%</div>
+        <div class="sv" style="color:#2563eb;font-size:17px">${pctFmt}%</div>
       </div>
 
       <!-- Card 4: Overall Grade -->
       <div class="sc" style="border-color:#fcd34d;border-top:3px solid #d97706">
         <div class="si" style="background:#fef3c7">
-           <svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+           <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="8" r="6"/>
             <path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/>
           </svg>
         </div>
         <div class="sl">OVERALL GRADE</div>
-        <div class="sv" style="color:#d97706;font-size:20px">${grade}</div>
+        <div class="sv" style="color:#d97706;font-size:26px">${grade}</div>
         <span class="result ${passed?'pass':'fail'}">${passed?'PASS':'FAIL'}</span>
       </div>
 
       <!-- Card 5: Position / Rank -->
       <div class="sc" style="border-color:#fed7aa;border-top:3px solid #ea580c">
         <div class="si" style="background:#ffedd5">
-           <svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+           <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#ea580c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/>
             <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/>
             <path d="M4 22h16"/>
@@ -1136,14 +1136,14 @@ function buildCombinedMarksheetHtml(
           </svg>
         </div>
         <div class="sl">POSITION / RANK</div>
-        <div class="sv" style="color:#ea580c;font-size:18px">${rank}<sup style="font-size:10px">${rankSuffix(rank)}</sup></div>
+        <div class="sv" style="color:#ea580c;font-size:22px">${rank}<sup style="font-size:11px">${rankSuffix(rank)}</sup></div>
         <div class="ss">Out of ${totalStudents} Students</div>
       </div>
 
       <!-- Card 6: Grade Scale -->
       <div class="sc" style="border-color:#ddd6fe;border-top:3px solid #7c3aed">
         <div class="si" style="background:#f3e8ff">
-           <svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+           <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 3v18h18"/>
             <path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>
           </svg>
