@@ -142,10 +142,11 @@ export async function syncTeacherScheduledNotifications(
           data: { screen: "notifications", scheduleId: schedule.id },
         },
         trigger: {
+          type: Notifications.SchedulableTriggerInputTypes?.DAILY ?? ("daily" as any),
           hour,
           minute,
-          repeats: true,
-        },
+          channelId: ANDROID_NOTIFICATION_CHANNEL_ID,
+        } as any,
       });
     }
   } catch (error) {
