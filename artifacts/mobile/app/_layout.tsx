@@ -157,7 +157,7 @@ function RootLayoutNav() {
         const token = await getExpoPushToken();
         if (!mounted || !token) return;
 
-        const registrationKey = ;
+        const registrationKey = `${user.id}:${token}`;
         if (lastRegisteredTokenRef.current === registrationKey) {
           return;
         }
