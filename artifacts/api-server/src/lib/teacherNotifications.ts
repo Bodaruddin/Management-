@@ -353,10 +353,7 @@ export async function saveDailyNotificationSchedule(input: {
   teacherId: string | null;
 }): Promise<DailyNotificationSchedule> {
   return updateState((state) => {
-    let target = input.id ? state.schedules.find((s) => s.id === input.id) : undefined;
-    if (!target && !input.id && state.schedules.length === 1) {
-      target = state.schedules[0];
-    }
+    const target = input.id ? state.schedules.find((s) => s.id === input.id) : undefined;
 
     if (target) {
       const isConfigChanged =
