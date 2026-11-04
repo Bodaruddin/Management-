@@ -135,7 +135,7 @@ function AppHeader({ onAvatarPress, userName }: { onAvatarPress: () => void; use
   });
   const notificationCount = user?.role === 'teacher'
     ? (inboxQuery.data?.notifications?.filter((n) => !n.read).length ?? 0)
-    : (adminNotificationQuery.data?.history?.length ?? 0);
+    : 0;
   return (
     <View style={[ah.wrap, { paddingTop: topPad + 10 }]}>
       <View style={ah.inner}>

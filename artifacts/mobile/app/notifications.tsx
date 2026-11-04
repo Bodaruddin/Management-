@@ -152,7 +152,7 @@ export default function NotificationsScreen() {
   const didHydrateSchedule = useRef(false);
   const unreadInboxCount = inboxQuery.data?.notifications?.filter((item) => !item.read).length ?? 0;
   const adminNotificationCount = adminQuery.data?.history?.length ?? 0;
-  const bellCount = isAdmin ? adminNotificationCount : unreadInboxCount;
+  const bellCount = isAdmin ? 0 : unreadInboxCount;
   const [editingNotification, setEditingNotification] = useState<{ id: string } | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editBody, setEditBody] = useState("");
