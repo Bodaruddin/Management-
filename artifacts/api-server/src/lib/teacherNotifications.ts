@@ -8,6 +8,7 @@ const MAX_HISTORY = 300;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export interface DailyNotificationSchedule {
+  id?: string;
   enabled: boolean;
   title: string;
   body: string;
@@ -15,6 +16,7 @@ export interface DailyNotificationSchedule {
   timeZone: string;
   teacherId: string | null;
   lastSentDate: string | null;
+  createdAt?: string;
 }
 
 interface DeviceRegistration {
@@ -41,6 +43,7 @@ interface NotificationState {
   devices: DeviceRegistration[];
   notifications: StoredNotification[];
   schedule: DailyNotificationSchedule;
+  schedules: DailyNotificationSchedule[];
 }
 
 interface PushResult {
@@ -60,18 +63,22 @@ const defaultTimeZone = (() => {
 })();
 
 function emptyState(): NotificationState {
+  const defaultSchedule: DailyNotificationSchedule = {
+    id: "default-schedule",
+    enabled: false,
+    title: "",
+    body: "",
+    time: "08:00",
+    timeZone: defaultTimeZone,
+    teacherId: null,
+    lastSentDate: null,
+    createdAt: new Date().toISOString(),
+  };
   return {
     devices: [],
     notifications: [],
-    schedule: {
-      enabled: false,
-      title: "",
-      body: "",
-      time: "08:00",
-      timeZone: defaultTimeZone,
-      teacherId: null,
-      lastSentDate: null,
-    },
+    schedule: defaultSchedule,
+    schedules: [],
   };
 }
 
@@ -133,7 +140,39 @@ async function loadState(): Promise<NotificationState> {
     )).slice(0, MAX_HISTORY)
     : [];
 
-  return { devices, notifications, schedule };
+  let schedules: DailyNotificationSchedule[] = [];
+  if (Array.isArray(value.schedules)) {
+    schedules = value.schedules
+      .filter((item: unknown): item is DailyNotificationSchedule => (
+        isRecord(item)
+        && typeof item.title === "string"
+        && typeof item.body === "string"
+        && typeof item.time === "string"
+        && TIME_PATTERN.test(item.time)
+      ))
+      .map((s, idx) => ({
+        id: typeof s.id === "string" && s.id ? s.id : `schedule-${idx + 1}`,
+        enabled: s.enabled === true,
+        title: s.title,
+        body: s.body,
+        time: s.time,
+        timeZone: typeof s.timeZone === "string" ? s.timeZone : defaultTimeZone,
+        teacherId: typeof s.teacherId === "string" ? s.teacherId : null,
+        lastSentDate: typeof s.lastSentDate === "string" ? s.lastSentDate : null,
+        createdAt: typeof s.createdAt === "string" ? s.createdAt : new Date().toISOString(),
+      }));
+  }
+
+  if (schedules.length === 0 && (schedule.title.trim() || schedule.enabled)) {
+    schedules.push({
+      ...schedule,
+      id: schedule.id || "schedule-1",
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  const primarySchedule = schedules[0] ?? schedule;
+  return { devices, notifications, schedule: primarySchedule, schedules };
 }
 
 let stateQueue: Promise<unknown> = Promise.resolve();
@@ -187,6 +226,7 @@ async function sendPushMessages(
           priority: "high",
           channelId: "school_alerts_v2",
           badge: 1,
+          ttl: 86400,
           _displayInForeground: true,
           data: { notificationId: notification.id, screen: "notifications" },
         }))),
@@ -305,6 +345,7 @@ export async function sendTeacherNotification(input: {
 }
 
 export async function saveDailyNotificationSchedule(input: {
+  id?: string;
   enabled: boolean;
   title: string;
   body: string;
@@ -312,23 +353,57 @@ export async function saveDailyNotificationSchedule(input: {
   teacherId: string | null;
 }): Promise<DailyNotificationSchedule> {
   return updateState((state) => {
-    const isConfigChanged =
-      state.schedule.time !== input.time ||
-      state.schedule.title !== input.title ||
-      state.schedule.body !== input.body ||
-      state.schedule.teacherId !== input.teacherId;
+    let target = input.id ? state.schedules.find((s) => s.id === input.id) : undefined;
+    if (!target && !input.id && state.schedules.length === 1) {
+      target = state.schedules[0];
+    }
 
-    state.schedule = {
-      ...state.schedule,
-      enabled: input.enabled,
-      title: input.title,
-      body: input.body,
-      time: input.time,
-      teacherId: input.teacherId,
-      // If the schedule was modified, reset lastSentDate so today's daily alert can deliver on schedule
-      lastSentDate: isConfigChanged ? null : state.schedule.lastSentDate,
-    };
-    return state.schedule;
+    if (target) {
+      const isConfigChanged =
+        target.time !== input.time ||
+        target.title !== input.title ||
+        target.body !== input.body ||
+        target.teacherId !== input.teacherId;
+
+      target.enabled = input.enabled;
+      target.title = input.title;
+      target.body = input.body;
+      target.time = input.time;
+      target.teacherId = input.teacherId;
+      if (isConfigChanged) {
+        target.lastSentDate = null;
+      }
+    } else {
+      target = {
+        id: input.id || randomUUID(),
+        enabled: input.enabled,
+        title: input.title,
+        body: input.body,
+        time: input.time,
+        timeZone: defaultTimeZone,
+        teacherId: input.teacherId,
+        lastSentDate: null,
+        createdAt: new Date().toISOString(),
+      };
+      state.schedules.push(target);
+    }
+
+    state.schedule = state.schedules[0] ?? target;
+    return target;
+  });
+}
+
+export async function deleteDailyNotificationSchedule(id: string): Promise<boolean> {
+  return updateState((state) => {
+    const idx = state.schedules.findIndex((s) => s.id === id);
+    if (idx === -1) return false;
+    state.schedules.splice(idx, 1);
+    if (state.schedules.length > 0) {
+      state.schedule = state.schedules[0];
+    } else {
+      state.schedule = emptyState().schedule;
+    }
+    return true;
   });
 }
 
@@ -404,31 +479,52 @@ export async function runDailyNotificationScheduler(): Promise<void> {
   if (schedulerRunning) return;
   schedulerRunning = true;
   try {
-    const scheduled = await updateState((state) => {
-      const schedule = state.schedule;
-      if (!schedule.enabled || !schedule.title.trim() || !schedule.body.trim()) return null;
-      const local = getSchoolClock(schedule.timeZone);
-      if (local.time < schedule.time || schedule.lastSentDate === local.date) return null;
-      schedule.lastSentDate = local.date;
-      return {
-        title: schedule.title,
-        body: schedule.body,
-        teacherId: schedule.teacherId,
-        date: local.date,
-      };
-    }, (value) => value !== null);
-    if (!scheduled) return;
-    const result = await createAndDeliver({
-      title: scheduled.title,
-      body: scheduled.body,
-      teacherId: scheduled.teacherId,
-      source: "daily",
-      scheduleDate: scheduled.date,
-    });
-    logger.info(
-      { date: scheduled.date, targetCount: result.targetCount, pushAccepted: result.pushAccepted },
-      "Daily teacher notification sent",
-    );
+    const dueItems = await updateState((state) => {
+      const dueList: Array<{
+        scheduleId: string;
+        title: string;
+        body: string;
+        teacherId: string | null;
+        date: string;
+      }> = [];
+
+      for (const schedule of state.schedules) {
+        if (!schedule.enabled || !schedule.title.trim() || !schedule.body.trim()) continue;
+        const local = getSchoolClock(schedule.timeZone || defaultTimeZone);
+        if (local.time < schedule.time || schedule.lastSentDate === local.date) continue;
+        schedule.lastSentDate = local.date;
+        dueList.push({
+          scheduleId: schedule.id || "default",
+          title: schedule.title,
+          body: schedule.body,
+          teacherId: schedule.teacherId,
+          date: local.date,
+        });
+      }
+
+      if (state.schedules[0]) {
+        state.schedule = state.schedules[0];
+      }
+      return dueList;
+    }, (items) => items.length > 0);
+
+    for (const item of dueItems) {
+      try {
+        const result = await createAndDeliver({
+          title: item.title,
+          body: item.body,
+          teacherId: item.teacherId,
+          source: "daily",
+          scheduleDate: item.date,
+        });
+        logger.info(
+          { scheduleId: item.scheduleId, date: item.date, targetCount: result.targetCount, pushAccepted: result.pushAccepted },
+          "Daily scheduled teacher notification sent",
+        );
+      } catch (itemError) {
+        logger.error({ error: itemError, scheduleId: item.scheduleId }, "Failed delivering scheduled notification");
+      }
+    }
   } catch (error) {
     logger.error({ error }, "Daily teacher notification scheduler failed");
   } finally {

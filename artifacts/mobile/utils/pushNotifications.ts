@@ -109,3 +109,46 @@ export async function getExpoPushToken(): Promise<string> {
   const token = await Notifications.getExpoPushTokenAsync({ projectId });
   return token.data;
 }
+
+
+export async function syncTeacherScheduledNotifications(
+  schedules: Array<{ id: string; title: string; body: string; time: string }>,
+): Promise<void> {
+  if (Platform.OS === "web") return;
+  try {
+    await configureAndroidNotificationChannel();
+    const existing = await Notifications.getAllScheduledNotificationsAsync();
+    for (const item of existing) {
+      if (item.identifier && item.identifier.startsWith("daily_schedule_")) {
+        await Notifications.cancelScheduledNotificationAsync(item.identifier);
+      }
+    }
+    for (const schedule of schedules) {
+      const timeParts = schedule.time.split(":");
+      if (timeParts.length !== 2) continue;
+      const hour = parseInt(timeParts[0], 10);
+      const minute = parseInt(timeParts[1], 10);
+      if (isNaN(hour) || isNaN(minute)) continue;
+
+      await Notifications.scheduleNotificationAsync({
+        identifier: `daily_schedule_${schedule.id}`,
+        content: {
+          title: schedule.title,
+          body: schedule.body,
+          sound: "default",
+          vibrate: [0, 250, 250, 250],
+          priority: Notifications.AndroidNotificationPriority.MAX,
+          channelId: ANDROID_NOTIFICATION_CHANNEL_ID,
+          data: { screen: "notifications", scheduleId: schedule.id },
+        },
+        trigger: {
+          hour,
+          minute,
+          repeats: true,
+        },
+      });
+    }
+  } catch (error) {
+    console.warn("[push] Failed to sync local daily schedules:", error);
+  }
+}

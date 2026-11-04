@@ -30,6 +30,7 @@ import {
   isAndroidExpoGo,
   requestPushPermission,
   showLocalPopupNotification,
+  syncTeacherScheduledNotifications,
 } from '@/utils/pushNotifications';
 
 SplashScreen.preventAutoHideAsync();
@@ -92,7 +93,11 @@ function RootLayoutNav() {
 
         const data = await res.json() as {
           notifications?: Array<{ id: string; title: string; body: string; read?: boolean }>;
+          activeSchedules?: Array<{ id: string; title: string; body: string; time: string }>;
         };
+        if (Array.isArray(data.activeSchedules)) {
+          void syncTeacherScheduledNotifications(data.activeSchedules);
+        }
         const items = Array.isArray(data.notifications) ? data.notifications : [];
         const unreadItems = items.filter((n) => !n.read);
 

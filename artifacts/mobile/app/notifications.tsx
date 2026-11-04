@@ -123,7 +123,7 @@ function errorText(error: unknown, fallback: string): string {
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, authenticatedFetch } = useAuth();
   const isAdmin = user?.role === "admin";
   const adminQuery = useGetAdminNotifications({
     query: {
@@ -144,7 +144,9 @@ export default function NotificationsScreen() {
   const [sendTitle, setSendTitle] = useState("");
   const [sendBody, setSendBody] = useState("");
   const [sendTeacherId, setSendTeacherId] = useState<string | null>(null);
-  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
+  const [showScheduleForm, setShowScheduleForm] = useState(false);
+  const [scheduleEnabled, setScheduleEnabled] = useState(true);
   const [scheduleTitle, setScheduleTitle] = useState("");
   const [scheduleBody, setScheduleBody] = useState("");
   const [scheduleTime, setScheduleTime] = useState("08:00");
@@ -215,6 +217,7 @@ export default function NotificationsScreen() {
   });
 
   const teachers = adminQuery.data?.teachers ?? [];
+  const schedulesList = adminQuery.data?.schedules ?? (adminQuery.data?.schedule && (adminQuery.data.schedule.title || adminQuery.data.schedule.enabled) ? [adminQuery.data.schedule] : []);
   const contentTop = (Platform.OS === "web" ? 20 : insets.top) + 14;
   const contentBottom = (Platform.OS === "web" ? 28 : insets.bottom) + 24;
 
@@ -228,6 +231,26 @@ export default function NotificationsScreen() {
     sendMutation.mutate({ data: { title, body, teacherId: sendTeacherId } });
   };
 
+  const openNewScheduleForm = () => {
+    setEditingScheduleId(null);
+    setScheduleEnabled(true);
+    setScheduleTitle("");
+    setScheduleBody("");
+    setScheduleTime("08:30");
+    setScheduleTeacherId(null);
+    setShowScheduleForm(true);
+  };
+
+  const openEditSchedule = (item: any) => {
+    setEditingScheduleId(item.id ?? null);
+    setScheduleEnabled(item.enabled);
+    setScheduleTitle(item.title);
+    setScheduleBody(item.body);
+    setScheduleTime(item.time);
+    setScheduleTeacherId(item.teacherId ?? null);
+    setShowScheduleForm(true);
+  };
+
   const saveSchedule = () => {
     if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(scheduleTime)) {
       setFeedback("Enter a valid time in 24-hour format, such as 08:30.");
@@ -239,30 +262,42 @@ export default function NotificationsScreen() {
       setFeedback("Add a title and message for the daily notification.");
       return;
     }
-    setScheduleEnabled(true);
     scheduleMutation.mutate({
       data: {
-        enabled: true,
+        id: editingScheduleId ?? undefined,
+        enabled: scheduleEnabled,
         title: cleanTitle,
         body: cleanBody,
         time: scheduleTime,
         teacherId: scheduleTeacherId,
       },
     });
+    setShowScheduleForm(false);
+    setEditingScheduleId(null);
   };
 
-  const onToggleSchedule = (enabled: boolean) => {
-    setScheduleEnabled(enabled);
-    if (!enabled && adminQuery.data?.schedule?.enabled) {
-      scheduleMutation.mutate({
-        data: {
-          enabled: false,
-          title: scheduleTitle.trim() || adminQuery.data.schedule.title,
-          body: scheduleBody.trim() || adminQuery.data.schedule.body,
-          time: scheduleTime,
-          teacherId: scheduleTeacherId,
-        },
+  const toggleSchedule = (item: any) => {
+    scheduleMutation.mutate({
+      data: {
+        id: item.id,
+        enabled: !item.enabled,
+        title: item.title,
+        body: item.body,
+        time: item.time,
+        teacherId: item.teacherId,
+      },
+    });
+  };
+
+  const deleteSchedule = async (id: string) => {
+    try {
+      await authenticatedFetch(`/api/notifications/schedule/${encodeURIComponent(id)}`, {
+        method: "DELETE",
       });
+      setFeedback("Scheduled notification removed.");
+      void adminQuery.refetch();
+    } catch (err) {
+      setFeedback(errorText(err, "Could not delete schedule."));
     }
   };
 
@@ -511,126 +546,257 @@ export default function NotificationsScreen() {
                   <Feather name="clock" size={17} color="#A16207" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={s.cardTitle}>Daily notification</Text>
-                  <Text style={s.cardSubtitle}>Automatically send the saved message once each day.</Text>
-                </View>
-              </View>
-              <View style={s.switchRow}>
-                <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <Text style={s.fieldLabelNoMargin}>Daily schedule</Text>
-                    <View style={{
-                      paddingHorizontal: 7,
-                      paddingVertical: 2,
-                      borderRadius: 6,
-                      backgroundColor: scheduleEnabled ? C.paleGreen : "#F1F5F9",
-                    }}>
-                      <Text style={{
-                        fontSize: 10,
-                        fontWeight: "800",
-                        color: scheduleEnabled ? C.green : C.muted,
+                    <Text style={s.cardTitle}>Daily schedules</Text>
+                    {schedulesList.filter((s: any) => s.enabled).length > 0 && (
+                      <View style={{
+                        paddingHorizontal: 7,
+                        paddingVertical: 2,
+                        borderRadius: 6,
+                        backgroundColor: C.paleGreen,
                       }}>
-                        {scheduleEnabled ? "ACTIVE" : "PAUSED"}
-                      </Text>
-                    </View>
+                        <Text style={{ fontSize: 10, fontWeight: "800", color: C.green }}>
+                          {schedulesList.filter((s: any) => s.enabled).length} ACTIVE
+                        </Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={s.helperText}>Server time zone: {adminQuery.data?.schedule.timeZone ?? "Asia/Kolkata"}</Text>
+                  <Text style={s.cardSubtitle}>Automatically send alerts to teachers at scheduled times every day.</Text>
                 </View>
-                <Switch
-                  value={scheduleEnabled}
-                  onValueChange={onToggleSchedule}
-                  trackColor={{ false: "#CBD5E1", true: C.blue }}
-                  thumbColor={C.white}
-                  accessibilityLabel="Enable daily notification"
-                />
+                {!showScheduleForm && (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={openNewScheduleForm}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 4,
+                      backgroundColor: C.blue,
+                      paddingHorizontal: 11,
+                      paddingVertical: 7,
+                      borderRadius: 9,
+                    }}
+                  >
+                    <Feather name="plus" size={14} color="#fff" />
+                    <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>Add schedule</Text>
+                  </Pressable>
+                )}
               </View>
-              <Text style={s.fieldLabel}>Recipient</Text>
-              {teachers.length > 0 ? (
-                <RecipientChooser
-                  teachers={teachers}
-                  selected={scheduleTeacherId}
-                  onSelect={setScheduleTeacherId}
-                />
+
+              {/* List of scheduled notifications */}
+              {schedulesList.length === 0 && !showScheduleForm ? (
+                <View style={{ paddingVertical: 18, alignItems: "center" }}>
+                  <Text style={s.mutedText}>No daily notifications scheduled yet.</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={openNewScheduleForm}
+                    style={[s.secondaryButton, { marginTop: 10 }]}
+                  >
+                    <Feather name="plus" size={15} color={C.navy} />
+                    <Text style={s.secondaryButtonText}>Create first schedule</Text>
+                  </Pressable>
+                </View>
               ) : (
-                <Text style={s.mutedText}>No teacher accounts are available yet.</Text>
+                <View style={{ gap: 10, marginBottom: showScheduleForm ? 14 : 0 }}>
+                  {schedulesList.map((item: any, idx: number) => {
+                    const recipientName = item.teacherId
+                      ? teachers.find((t) => t.id === item.teacherId)?.name ?? "1 teacher"
+                      : "All teachers";
+                    return (
+                      <View
+                        key={item.id || `schedule-${idx}`}
+                        style={{
+                          backgroundColor: "#F8FAFC",
+                          borderRadius: 12,
+                          padding: 12,
+                          borderWidth: 1.5,
+                          borderColor: item.enabled ? "#BFDBFE" : "#E2E8F0",
+                        }}
+                      >
+                        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                            <View style={{
+                              backgroundColor: item.enabled ? C.blue : "#94A3B8",
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 6,
+                            }}>
+                              <Text style={{ color: "#fff", fontSize: 12, fontWeight: "800" }}>{item.time}</Text>
+                            </View>
+                            <View style={{
+                              backgroundColor: item.enabled ? C.paleGreen : "#F1F5F9",
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              borderRadius: 4,
+                            }}>
+                              <Text style={{
+                                color: item.enabled ? C.green : C.muted,
+                                fontSize: 10,
+                                fontWeight: "800",
+                              }}>
+                                {item.enabled ? "ACTIVE" : "PAUSED"}
+                              </Text>
+                            </View>
+                          </View>
+                          <Switch
+                            value={item.enabled}
+                            onValueChange={() => toggleSchedule(item)}
+                            trackColor={{ false: "#CBD5E1", true: C.blue }}
+                            thumbColor={C.white}
+                            accessibilityLabel={`Toggle schedule ${item.title}`}
+                          />
+                        </View>
+
+                        <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B", marginBottom: 2 }}>
+                          {item.title}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: "#64748B", marginBottom: 8 }} numberOfLines={2}>
+                          {item.body}
+                        </Text>
+
+                        <View style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          borderTopWidth: 1,
+                          borderTopColor: "#E2E8F0",
+                          paddingTop: 8,
+                        }}>
+                          <Text style={{ fontSize: 11, color: "#475569", fontWeight: "600" }}>
+                            To: {recipientName}
+                          </Text>
+                          <View style={{ flexDirection: "row", gap: 12 }}>
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel="Test popup"
+                              onPress={() => {
+                                sendMutation.mutate({
+                                  data: {
+                                    title: `[Alert] ${item.title}`,
+                                    body: item.body,
+                                    teacherId: item.teacherId,
+                                  },
+                                });
+                              }}
+                              style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
+                            >
+                              <Feather name="bell" size={12} color={C.blue} />
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: C.blue }}>Test</Text>
+                            </Pressable>
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel="Edit schedule"
+                              onPress={() => openEditSchedule(item)}
+                              style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
+                            >
+                              <Feather name="edit-2" size={12} color={C.blue} />
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: C.blue }}>Edit</Text>
+                            </Pressable>
+                            <Pressable
+                              accessibilityRole="button"
+                              accessibilityLabel="Delete schedule"
+                              onPress={() => item.id && deleteSchedule(item.id)}
+                              style={{ flexDirection: "row", alignItems: "center", gap: 3 }}
+                            >
+                              <Feather name="trash-2" size={12} color={C.red} />
+                              <Text style={{ fontSize: 11, fontWeight: "700", color: C.red }}>Delete</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
               )}
-              <Text style={s.fieldLabel}>Send time (24-hour)</Text>
-              <TextInput
-                value={scheduleTime}
-                onChangeText={setScheduleTime}
-                placeholder="08:30"
-                placeholderTextColor="#94A3B8"
-                keyboardType="numbers-and-punctuation"
-                maxLength={5}
-                style={inputStyle}
-              />
-              <Text style={s.fieldLabel}>Title</Text>
-              <TextInput
-                value={scheduleTitle}
-                onChangeText={setScheduleTitle}
-                placeholder="Daily staff reminder"
-                placeholderTextColor="#94A3B8"
-                maxLength={100}
-                style={inputStyle}
-              />
-              <Text style={s.fieldLabel}>Message</Text>
-              <TextInput
-                value={scheduleBody}
-                onChangeText={setScheduleBody}
-                placeholder="Write the message that should go out each day…"
-                placeholderTextColor="#94A3B8"
-                maxLength={500}
-                multiline
-                textAlignVertical="top"
-                style={[inputStyle, { minHeight: 104 }]}
-              />
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={scheduleMutation.isPending}
-                  onPress={saveSchedule}
-                  style={[s.secondaryButton, { flex: 1 }, scheduleMutation.isPending && s.disabledSecondaryButton]}
-                >
-                  {scheduleMutation.isPending
-                    ? <ActivityIndicator color={C.navy} />
-                    : <Feather name="save" size={16} color={C.navy} />}
-                  <Text style={s.secondaryButtonText}>
-                    {scheduleMutation.isPending ? "Saving…" : "Save daily schedule"}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={sendMutation.isPending || !scheduleTitle.trim() || !scheduleBody.trim()}
-                  onPress={() => {
-                    const title = scheduleTitle.trim();
-                    const body = scheduleBody.trim();
-                    if (!title || !body) {
-                      setFeedback("Add a title and message first to test the alert.");
-                      return;
-                    }
-                    sendMutation.mutate({
-                      data: {
-                        title: `[Daily Alert] ${title}`,
-                        body,
-                        teacherId: scheduleTeacherId,
-                      },
-                    });
-                  }}
-                  style={[s.testAlertButton, (sendMutation.isPending || !scheduleTitle.trim() || !scheduleBody.trim()) && s.disabledSecondaryButton]}
-                >
-                  <Feather name="bell" size={15} color={C.blue} />
-                  <Text style={s.testAlertButtonText}>Test popup</Text>
-                </Pressable>
-              </View>
-              {adminQuery.data?.schedule.enabled && (
-                <View style={s.scheduleStatus}>
-                  <Feather name="check-circle" size={15} color={C.green} />
-                  <Text style={s.scheduleStatusText}>
-                    Active at {adminQuery.data.schedule.time} ·{" "}
-                    {adminQuery.data.schedule.teacherId
-                      ? teachers.find((teacher) => teacher.id === adminQuery.data?.schedule.teacherId)?.name ?? "one teacher"
-                      : "all teachers"}
-                  </Text>
+
+              {/* Add / Edit schedule form */}
+              {showScheduleForm && (
+                <View style={{
+                  backgroundColor: "#F8FAFC",
+                  borderRadius: 12,
+                  padding: 14,
+                  marginTop: 10,
+                  borderWidth: 1.5,
+                  borderColor: C.blue,
+                }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#0F172A" }}>
+                      {editingScheduleId ? "Edit scheduled notification" : "Schedule new daily notification"}
+                    </Text>
+                    <Pressable
+                      accessibilityLabel="Close schedule form"
+                      onPress={() => { setShowScheduleForm(false); setEditingScheduleId(null); }}
+                    >
+                      <Feather name="x" size={18} color="#64748B" />
+                    </Pressable>
+                  </View>
+
+                  <Text style={s.fieldLabel}>Recipient</Text>
+                  {teachers.length > 0 ? (
+                    <RecipientChooser
+                      teachers={teachers}
+                      selected={scheduleTeacherId}
+                      onSelect={setScheduleTeacherId}
+                    />
+                  ) : (
+                    <Text style={s.mutedText}>No teacher accounts are available yet.</Text>
+                  )}
+
+                  <Text style={s.fieldLabel}>Send time (24-hour, e.g. 08:30 or 14:00)</Text>
+                  <TextInput
+                    value={scheduleTime}
+                    onChangeText={setScheduleTime}
+                    placeholder="08:30"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="numbers-and-punctuation"
+                    maxLength={5}
+                    style={inputStyle}
+                  />
+
+                  <Text style={s.fieldLabel}>Title</Text>
+                  <TextInput
+                    value={scheduleTitle}
+                    onChangeText={setScheduleTitle}
+                    placeholder="e.g. Morning Staff Reminder"
+                    placeholderTextColor="#94A3B8"
+                    maxLength={100}
+                    style={inputStyle}
+                  />
+
+                  <Text style={s.fieldLabel}>Message</Text>
+                  <TextInput
+                    value={scheduleBody}
+                    onChangeText={setScheduleBody}
+                    placeholder="Write the message that should go out at this time…"
+                    placeholderTextColor="#94A3B8"
+                    maxLength={500}
+                    multiline
+                    textAlignVertical="top"
+                    style={[inputStyle, { minHeight: 88 }]}
+                  />
+
+                  <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={scheduleMutation.isPending}
+                      onPress={saveSchedule}
+                      style={[s.primaryButton, { flex: 1 }, scheduleMutation.isPending && s.disabledPrimaryButton]}
+                    >
+                      {scheduleMutation.isPending
+                        ? <ActivityIndicator color="#fff" />
+                        : <Feather name="check" size={16} color="#fff" />}
+                      <Text style={s.primaryButtonText}>
+                        {scheduleMutation.isPending ? "Saving…" : (editingScheduleId ? "Update schedule" : "Save schedule")}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => { setShowScheduleForm(false); setEditingScheduleId(null); }}
+                      style={[s.secondaryButton, { flex: 0.6 }]}
+                    >
+                      <Text style={s.secondaryButtonText}>Cancel</Text>
+                    </Pressable>
+                  </View>
                 </View>
               )}
             </View>

@@ -10,6 +10,7 @@ import {
   markNotificationRead,
   registerNotificationDevice,
   saveDailyNotificationSchedule,
+  deleteDailyNotificationSchedule,
   sendTeacherNotification,
   TIME_PATTERN,
 } from "../lib/teacherNotifications.js";
@@ -55,6 +56,7 @@ router.get("/notifications/admin", async (req, res) => {
       }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     schedule: state.schedule,
+    schedules: state.schedules,
     history: state.notifications.slice(0, 30).map((notification) => ({
       id: notification.id,
       title: notification.title,
@@ -133,7 +135,7 @@ router.delete("/notifications/admin/:id", async (req, res) => {
 
 router.put("/notifications/schedule", async (req, res) => {
   if (!await requireRole(req.get("authorization"), "admin", res)) return;
-  const { enabled, title, body, time } = req.body ?? {};
+  const { id, enabled, title, body, time } = req.body ?? {};
   const teacherId = parseTarget(req.body?.teacherId);
   if (typeof enabled !== "boolean"
     || typeof title !== "string"
@@ -161,6 +163,7 @@ router.put("/notifications/schedule", async (req, res) => {
     }
   }
   const schedule = await saveDailyNotificationSchedule({
+    id: typeof id === "string" && id ? id : undefined,
     enabled,
     title: cleanTitle,
     body: cleanBody,
@@ -168,6 +171,17 @@ router.put("/notifications/schedule", async (req, res) => {
     teacherId,
   });
   res.json(schedule);
+});
+
+
+router.delete("/notifications/schedule/:id", async (req, res) => {
+  if (!await requireRole(req.get("authorization"), "admin", res)) return;
+  const deleted = await deleteDailyNotificationSchedule(req.params.id);
+  if (!deleted) {
+    res.status(404).json({ error: "Schedule not found" });
+    return;
+  }
+  res.json({ success: true });
 });
 
 router.get("/notifications/inbox", async (req, res) => {
@@ -190,6 +204,14 @@ router.get("/notifications/inbox", async (req, res) => {
         source: notification.source,
       })),
     pushEnabled: state.devices.some((device) => device.teacherId === session.userId),
+    activeSchedules: state.schedules
+      .filter((s) => s.enabled && (!s.teacherId || s.teacherId === session.userId))
+      .map((s) => ({
+        id: s.id ?? "",
+        title: s.title,
+        body: s.body,
+        time: s.time,
+      })),
   });
 });
 

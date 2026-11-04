@@ -84,6 +84,7 @@ export interface AdminUserUpdate {
 }
 
 export interface DailyNotificationSchedule {
+  id?: string;
   enabled: boolean;
   title: string;
   body: string;
@@ -100,6 +101,7 @@ export interface DailyNotificationSchedule {
 }
 
 export interface DailyNotificationScheduleUpdate {
+  id?: string;
   enabled: boolean;
   /** @maxLength 100 */
   title: string;
@@ -198,12 +200,14 @@ export interface NotificationHistoryItem {
 export interface AdminNotificationsDashboard {
   teachers: NotificationTeacher[];
   schedule: DailyNotificationSchedule;
+  schedules?: DailyNotificationSchedule[];
   history: NotificationHistoryItem[];
 }
 
 export interface TeacherNotificationInbox {
   notifications: TeacherNotification[];
   pushEnabled: boolean;
+  activeSchedules?: Array<{ id: string; title: string; body: string; time: string }>;
 }
 
 export type TeacherProfilePermissions = { [key: string]: unknown };
