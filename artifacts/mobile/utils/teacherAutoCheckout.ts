@@ -148,7 +148,7 @@ async function startTracking(
   try {
     if (!(await Location.hasStartedLocationUpdatesAsync(LOCATION_TASK))) {
       await Location.startLocationUpdatesAsync(LOCATION_TASK, {
-        accuracy: Location.Accuracy.Balanced,
+        accuracy: Location.Accuracy.High,
         distanceInterval: 40,
         timeInterval: 5 * 60 * 1000,
         deferredUpdatesInterval: 5 * 60 * 1000,
@@ -227,7 +227,7 @@ export async function syncTeacherAutoCheckoutLocation(
     const foreground = await Location.getForegroundPermissionsAsync();
     if (!foreground.granted) return null;
     const location = await Location.getCurrentPositionAsync({
-      accuracy: Location.Accuracy.Balanced,
+      accuracy: Location.Accuracy.High,
     });
     const { latitude, longitude, accuracy } = location.coords;
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
