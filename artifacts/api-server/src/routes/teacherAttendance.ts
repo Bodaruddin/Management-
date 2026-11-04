@@ -955,8 +955,14 @@ router.post("/teacher-attendance/:id/location-samples", async (req, res) => {
       sample.latitude,
       sample.longitude,
     );
-    const schoolRadius = Math.max(settings.radiusMeters || 100, 100);
-    if (distance <= schoolRadius) {
+    // Determine whether sample is inside school boundary.
+    // Check both configured radius + tolerance AND verified check-in distance
+    // so teachers verified on campus (e.g. at 160m) are never falsely marked as departed.
+    const checkInDistance = Number(record.distanceFromSchool) || 0;
+    const isInside = isWithinSchoolBoundary(distance, settings.radiusMeters, sample.accuracy)
+      || (checkInDistance > 0 && distance <= checkInDistance + 40);
+
+    if (isInside) {
       const updated = await adapter.teacherAttendance.updateLastSchoolLocation(
         String(record.id),
         session.userId,
@@ -966,10 +972,24 @@ router.post("/teacher-attendance/:id/location-samples", async (req, res) => {
       continue;
     }
 
-    // Require the location to be clearly outside the boundary so GPS jitter at
-    // the edge does not close attendance prematurely.
-    const exitMargin = Math.max(30, Math.min(sample.accuracy ?? 30, 100));
-    if (distance <= schoolRadius + exitMargin) continue;
+    // Reject inaccurate GPS samples (accuracy > 100m) to prevent accidental checkout from signal jumps
+    if (sample.accuracy && sample.accuracy > 100) {
+      continue;
+    }
+
+    // Require the location to be clearly outside the school boundary, beyond the check-in
+    // distance and exit margin, before concluding the teacher has left.
+    const effectiveRadius = Math.max(settings.radiusMeters || 100, checkInDistance);
+    const exitMargin = Math.max(60, Math.min(sample.accuracy ?? 60, 150));
+    if (distance <= effectiveRadius + exitMargin) continue;
+
+    // Prevent immediate false checkout: require at least 15 minutes after check-in
+    const checkInIsoTime = toIsoTimestamp(record.checkInAt);
+    const checkInTimeMs = checkInIsoTime ? Date.parse(checkInIsoTime) : 0;
+    if (sample.at.getTime() < checkInTimeMs + 15 * 60 * 1000) {
+      continue;
+    }
+
     // Teacher has exited the school location geofence!
     const lastSchoolIso = toIsoTimestamp(record.lastSchoolAt);
     const checkInIso = toIsoTimestamp(record.checkInAt);
